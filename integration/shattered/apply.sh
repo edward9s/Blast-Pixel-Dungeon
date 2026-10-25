@@ -15,7 +15,7 @@ python "$patches/patch_android_manifest.py" "$upstream/android/src/main/AndroidM
 python "$patches/patch_tag_keybindings.py" "$root/SPDAction.java" "$root/windows/WndKeyBindings.java"
 python "$patches/patch_wndsettings.py" "$root/windows/WndSettings.java"
 python "$patches/patch_title_scene.py" "$root/scenes/TitleScene.java"
-python "$patches/patch_shattered_support.py" "$root/scenes/TitleScene.java" "$root/items/keys/WornKey.java"
+python "$patches/patch_shattered_support.py" "$root/scenes/TitleScene.java" "$root/items/keys/WornKey.java" "$root/windows/WndVictoryCongrats.java"
 python "$patches/patch_about_scene.py" "$root/scenes/AboutScene.java"
 python "$patches/patch_assets.py" "$root/Assets.java" "$upstream/core/src/main/assets" "$blast/core/src/main/assets"
 python "$patches/patch_icons.py" "$upstream" "$blast/assets/app-icons"

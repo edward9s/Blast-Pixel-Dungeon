@@ -7,7 +7,7 @@ public final class BlastSettings {
     /** Controls the Blast tab in both the title-screen and in-game settings. */
     public static final boolean SHOW_BLAST_TAB = true;
 
-    /** Show the original Shattered supporter button and first Worn Key prompt. */
+    /** Show the original Shattered title/victory support buttons and first Worn Key prompt. */
     public static final boolean SHOW_SHATTERED_SUPPORT = false;
 
     public static final int MIN_SPAWN_MULTIPLIER = 1;
