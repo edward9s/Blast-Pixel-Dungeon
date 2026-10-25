@@ -56,13 +56,13 @@ filters bomb-attributed damage in `Hero.damage`; Free Movement extends Hero's
 walking/pathfinding for walls, locked doors, and fixed obstacles (barricades,
 bookshelves, statues, region/custom decorations, mine obstacles, and alchemy
 fixtures), without mutating `Level.passable` or allowing out-of-map movement.
-In the blacksmith's MiningLevel, ordinary WALL tiles remain phaseable while
-Free Movement is enabled, even with a Pickaxe in inventory. A carried Pickaxe
-takes priority on WALL_DECO (dark gold), MINE_CRYSTAL, and MINE_BOULDER:
-tapping a deposit mines it normally, and movement/pathfinding will not phase
-through it. Without a Pickaxe these deposits remain phaseable. When Free
-Movement is off, normal Pickaxe mining applies to all four terrain types.
-Both the test setting and temporary Free Movement buff use these same rules.
+In the blacksmith's MiningLevel, Free Movement phases through ordinary
+WALL, MINE_CRYSTAL, and MINE_BOULDER terrain even when carrying a Pickaxe.
+Only WALL_DECO (dark gold) keeps the native Pickaxe mining action and blocks
+phasing when the Pickaxe is carried. Without a Pickaxe, dark-gold terrain
+is phaseable too. When Free Movement is off, normal Pickaxe mining applies
+to all four terrain types. Both the test setting and the temporary Free
+Movement buff use these same rules.
 Other levels retain normal phasing.
 Locked exits remain blocked, and chasms retain their normal movement rules. A matching iron/crystal key
 triggers SPD's original unlock animation, key consumption, and time cost
