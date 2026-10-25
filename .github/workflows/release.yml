@@ -2,6 +2,8 @@ name: Release Blast
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '0 5 * * *' # Every day at 13:00 in Taiwan (UTC 05:00), one hour after SMM
 
 permissions:
   contents: write
