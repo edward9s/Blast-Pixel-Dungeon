@@ -31,12 +31,11 @@ public final class BlastMovement {
         if (!level.insideMap(cell)) {
             return false;
         }
-        // Mining deposits use the native Pickaxe action when carried, but
-        // ordinary mine walls remain phaseable while Free Movement is active.
+        // A carried Pickaxe prioritizes mining dark gold only. Ordinary
+        // walls, mining crystals and boulders remain phaseable.
         int terrain = level.map[cell];
         if (level instanceof MiningLevel
-                && (terrain == Terrain.WALL_DECO
-                    || terrain == Terrain.MINE_CRYSTAL || terrain == Terrain.MINE_BOULDER)
+                && terrain == Terrain.WALL_DECO
                 && Dungeon.hero != null
                 && Dungeon.hero.belongings.getItem(Pickaxe.class) != null) {
             return false;
