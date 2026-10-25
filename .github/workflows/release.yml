@@ -1,0 +1,322 @@
+name: Release Blast
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      spd_tag: ${{ steps.versions.outputs.spd_tag }}
+      blast_version: ${{ steps.versions.outputs.blast_version }}
+      smm_tag: ${{ steps.versions.outputs.smm_tag }}
+      smm_version: ${{ steps.versions.outputs.smm_version }}
+      release_tag: ${{ steps.versions.outputs.release_tag }}
+    steps:
+      - name: Verify signing configuration
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for key in KEYSTORE_BASE64 KEY_ALIAS STORE_PASSWORD KEY_PASSWORD; do
+            if [ -z "${!key}" ]; then
+              echo "::error::Missing required signing secret: $key"
+              exit 1
+            fi
+          done
+
+      - name: Checkout Blast
+        uses: actions/checkout@v4
+        with:
+          path: blast
+
+      - name: Resolve versions
+        id: versions
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          spd_tag=$(gh api repos/00-Evan/shattered-pixel-dungeon/releases/latest --jq '.tag_name // empty')
+          smm_tag=$(gh api repos/edward9s/Shattered-Master-Mode/releases/latest --jq '.tag_name // empty')
+          if [[ -z "$spd_tag" || ! "$smm_tag" =~ -m([0-9]+(\.[0-9]+)*)$ ]]; then
+            echo "::error::Could not resolve SPD and SMM releases"
+            exit 1
+          fi
+          smm_version="${BASH_REMATCH[1]}"
+          version=$(python blast/scripts/extract_version.py blast/core/src/main/java/com/spd/blast/BlastVersion.java)
+          release_tag="Blast-v$version-SPD-$spd_tag"
+          echo "spd_tag=$spd_tag" >> "$GITHUB_OUTPUT"
+          echo "smm_tag=$smm_tag" >> "$GITHUB_OUTPUT"
+          echo "smm_version=$smm_version" >> "$GITHUB_OUTPUT"
+          echo "blast_version=$version" >> "$GITHUB_OUTPUT"
+          echo "release_tag=$release_tag" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: prepare
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Blast
+        uses: actions/checkout@v4
+        with:
+          path: blast
+          fetch-depth: 0
+
+      - name: Checkout SPD for Blast
+        uses: actions/checkout@v4
+        with:
+          repository: 00-Evan/shattered-pixel-dungeon
+          ref: ${{ needs.prepare.outputs.spd_tag }}
+          path: spd-blast
+
+      - name: Checkout SPD for SMM
+        uses: actions/checkout@v4
+        with:
+          repository: 00-Evan/shattered-pixel-dungeon
+          ref: ${{ needs.prepare.outputs.spd_tag }}
+          path: spd-smm
+
+      - name: Checkout SMM
+        uses: actions/checkout@v4
+        with:
+          repository: edward9s/Shattered-Master-Mode
+          ref: ${{ needs.prepare.outputs.smm_tag }}
+          path: mod
+
+      - name: Install icon generation dependency
+        run: python -m pip install Pillow==11.3.0
+
+      - name: Apply Blast and optional SMM
+        shell: bash
+        run: |
+          set -euo pipefail
+          for target in spd-blast spd-smm; do
+            cp -a blast/core/. "$target/core/"
+            bash blast/integration/shattered/apply.sh "$target" blast
+          done
+          python mod/scripts/rebase_source.py spd-smm mod
+          python mod/scripts/patch_android.py spd-smm
+          python mod/scripts/inject_mod.py spd-smm
+          cp -a mod/core/. spd-smm/core/
+          if [[ -d mod/android ]]; then cp -a mod/android/. spd-smm/android/; fi
+          if [[ -d mod/desktop ]]; then cp -a mod/desktop/. spd-smm/desktop/; fi
+          if [[ -d mod/assets ]]; then cp -a mod/assets/. spd-smm/assets/; fi
+          python mod/scripts/patch_depth.py 26 spd-smm
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build Blast release APK and JAR
+        working-directory: spd-blast
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x ./gradlew
+          ./gradlew :android:assembleRelease :desktop:release
+
+      - name: Install Android signer tools
+        shell: bash
+        run: $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "build-tools;29.0.3"
+
+      - name: Sign Blast Android APK
+        uses: r0adkll/sign-android-release@v1
+        id: sign_blast
+        with:
+          releaseDirectory: spd-blast/android/build/outputs/apk/release
+          signingKeyBase64: ${{ secrets.KEYSTORE_BASE64 }}
+          alias: ${{ secrets.KEY_ALIAS }}
+          keyStorePassword: ${{ secrets.STORE_PASSWORD }}
+          keyPassword: ${{ secrets.KEY_PASSWORD }}
+
+      - name: Stage Blast release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          jar=$(find spd-blast/desktop/build/libs -maxdepth 1 -name '*.jar' -type f -print -quit)
+          test -f "$jar"
+          test -f "${{ steps.sign_blast.outputs.signedReleaseFile }}"
+          base="${{ needs.prepare.outputs.release_tag }}"
+          cp "${{ steps.sign_blast.outputs.signedReleaseFile }}" "out/$base.apk"
+          cp "$jar" "out/$base.jar"
+
+      - name: Build SMM release APK and JAR
+        working-directory: spd-smm
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x ./gradlew
+          ./gradlew :android:assembleRelease :desktop:release
+
+      - name: Sign SMM Android APK
+        uses: r0adkll/sign-android-release@v1
+        id: sign_smm
+        with:
+          releaseDirectory: spd-smm/android/build/outputs/apk/release
+          signingKeyBase64: ${{ secrets.KEYSTORE_BASE64 }}
+          alias: ${{ secrets.KEY_ALIAS }}
+          keyStorePassword: ${{ secrets.STORE_PASSWORD }}
+          keyPassword: ${{ secrets.KEY_PASSWORD }}
+
+      - name: Stage SMM release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          jar=$(find spd-smm/desktop/build/libs -maxdepth 1 -name '*.jar' -type f -print -quit)
+          test -f "$jar"
+          test -f "${{ steps.sign_smm.outputs.signedReleaseFile }}"
+          base="${{ needs.prepare.outputs.release_tag }}-SMM-m${{ needs.prepare.outputs.smm_version }}"
+          cp "${{ steps.sign_smm.outputs.signedReleaseFile }}" "out/$base.apk"
+          cp "$jar" "out/$base.jar"
+
+      - name: Find previous Blast release
+        id: previous
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.release_tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          previous=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 100 --json tagName --jq '.[].tagName' \
+            | grep '^Blast-v' | grep -vxF "$RELEASE_TAG" | head -1 || true)
+          echo "tag=$previous" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Node.js for Copilot
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install Copilot CLI
+        run: npm install -g @github/copilot
+
+      - name: Generate Blast changelog with Copilot
+        working-directory: blast
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PREV_TAG: ${{ steps.previous.outputs.tag }}
+        run: |
+          set -euo pipefail
+          rm -f release-notes-ai.md
+          if [[ -n "$PREV_TAG" ]] && git rev-parse --verify "$PREV_TAG^{commit}" >/dev/null 2>&1; then
+            SCOPE="Compare git tag $PREV_TAG to HEAD using git log and git diff. Describe only the final player-visible changes since that release."
+          else
+            SCOPE="This is the first Blast release or its previous tag is unavailable. Inspect the current Blast code and git history, and summarize the main player-visible Blast gameplay features."
+          fi
+
+          copilot -p "Generate concise player-facing changelog notes for Blast Pixel Dungeon.
+
+          $SCOPE
+
+          Rules:
+          - Inspect source changes and actual final behavior, including integration patches. Do not rely on commit messages alone.
+          - Describe meaningful Blast gameplay, bombs, terrain destruction, controls, UI, compatibility and balance changes.
+          - Combine related changes into a single bullet that describes the final behavior.
+          - Ignore version bumps, CI/build/release workflow changes, docs-only changes, refactors, tests, and reverted changes unless they affect gameplay.
+          - Ignore Shattered Pixel Dungeon upstream changes and Shattered Master Mode changes; their versions are listed separately.
+          - Do not invent features or behavior.
+          - Use concise English with at most 8 Markdown bullet points. No heading, preamble, links or commentary.
+          - If there are no player-visible changes, write exactly: NO_USER_FACING_CHANGES
+          - Write only the final result to release-notes-ai.md in the current directory." \
+            --allow-tool='shell(git:*)' \
+            --allow-tool=write \
+            --no-ask-user
+          test -s release-notes-ai.md
+
+      - name: Compose release notes
+        working-directory: blast
+        shell: bash
+        env:
+          PREV_TAG: ${{ steps.previous.outputs.tag }}
+          SPD_TAG: ${{ needs.prepare.outputs.spd_tag }}
+          SMM_VER: ${{ needs.prepare.outputs.smm_version }}
+        run: |
+          set -euo pipefail
+          changes="../release-notes-changes.md"
+          notes="../release-notes.md"
+          : > "$changes"
+          if [[ -z "$PREV_TAG" ]]; then
+            echo "- Initial release built against Shattered Pixel Dungeon $SPD_TAG." >> "$changes"
+          else
+            previous_spd="${PREV_TAG##*-SPD-}"
+            if [[ "$previous_spd" != "$SPD_TAG" ]]; then
+              echo "- Updated base game from Shattered Pixel Dungeon $previous_spd to $SPD_TAG." >> "$changes"
+            fi
+          fi
+          ai_notes=$(cat release-notes-ai.md)
+          if [[ "$ai_notes" != "NO_USER_FACING_CHANGES" ]]; then
+            cat release-notes-ai.md >> "$changes"
+            echo >> "$changes"
+          fi
+          if [[ ! -s "$changes" ]]; then
+            echo "- Maintenance release with no player-visible gameplay changes." >> "$changes"
+          fi
+          {
+            echo "## Changes"
+            echo
+            cat "$changes"
+            echo
+            echo "> Blast Pixel Dungeon based on SPD $SPD_TAG. Downloads include standalone and SMM m$SMM_VER APK/JAR variants."
+          } > "$notes"
+          cat "$notes"
+
+      - name: Verify release files
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(find out -maxdepth 1 -type f \( -name '*.jar' -o -name '*.apk' \) | wc -l)" -eq 4
+
+      - name: Publish four-file release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.release_tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" out/* --repo "$GITHUB_REPOSITORY" --clobber
+            gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+              --title "$RELEASE_TAG" --notes-file release-notes.md
+          else
+            gh release create "$RELEASE_TAG" out/* \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "$RELEASE_TAG" \
+              --notes-file release-notes.md
+          fi
+
+          # Remove outdated APK/JAR filenames when rebuilding an existing release.
+          while IFS='|' read -r asset_id asset_name; do
+            case "$asset_name" in
+              *.apk|*.jar)
+                if [[ ! -f "out/$asset_name" ]]; then
+                  gh api --method DELETE \
+                    "repos/$GITHUB_REPOSITORY/releases/assets/$asset_id"
+                fi
+                ;;
+            esac
+          done < <(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" \
+            --jq '.assets[] | "\\(.id)|\\(.name)"')
+
+          # Overwritten releases must also point their tag to the new build.
+          tag_sha=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" --jq '.object.sha')
+          if [[ "$tag_sha" != "$GITHUB_SHA" ]]; then
+            gh api --method PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/$RELEASE_TAG" \
+              -f sha="$GITHUB_SHA" -F force=true >/dev/null
+          fi
+          actual_sha=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" --jq '.object.sha')
+          test "$actual_sha" = "$GITHUB_SHA"

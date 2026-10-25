@@ -1,0 +1,224 @@
+name: Build Blast
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# Only one manual build may replace the shared test release at a time.
+concurrency:
+  group: blast-test-release
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Blast
+        uses: actions/checkout@v4
+        with:
+          path: blast
+
+      - name: Checkout SMM main
+        uses: actions/checkout@v4
+        with:
+          repository: edward9s/Shattered-Master-Mode
+          ref: main
+          path: mod
+
+      - name: Resolve versions
+        id: versions
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag=$(gh api repos/00-Evan/shattered-pixel-dungeon/releases/latest --jq '.tag_name // empty')
+          test -n "$tag"
+          version=$(python blast/scripts/extract_version.py blast/core/src/main/java/com/spd/blast/BlastVersion.java)
+          smm_version=$(python mod/scripts/extract_version.py mod/core/src/main/java/com/spd/mod/ModGame.java)
+          test -n "$smm_version"
+          echo "spd_tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "blast_version=$version" >> "$GITHUB_OUTPUT"
+          echo "smm_version=$smm_version" >> "$GITHUB_OUTPUT"
+          echo "Building SMM main commit $(git -C mod rev-parse HEAD) (m$smm_version)"
+
+      - name: Checkout upstream SPD for Blast
+        uses: actions/checkout@v4
+        with:
+          repository: 00-Evan/shattered-pixel-dungeon
+          ref: ${{ steps.versions.outputs.spd_tag }}
+          path: spd-blast
+
+      - name: Checkout upstream SPD for SMM
+        uses: actions/checkout@v4
+        with:
+          repository: 00-Evan/shattered-pixel-dungeon
+          ref: ${{ steps.versions.outputs.spd_tag }}
+          path: spd-smm
+
+      - name: Install icon generation dependency
+        run: python -m pip install Pillow==11.3.0
+
+      - name: Apply Blast to both variants
+        shell: bash
+        run: |
+          set -euo pipefail
+          for variant in blast smm; do
+            target="spd-$variant"
+            cp -a blast/core/. "$target/core/"
+            bash blast/integration/shattered/apply.sh "$target" blast
+          done
+
+      - name: Integrate SMM
+        shell: bash
+        run: |
+          set -euo pipefail
+          python mod/scripts/rebase_source.py spd-smm mod
+          python mod/scripts/patch_android.py spd-smm
+          python mod/scripts/inject_mod.py spd-smm
+          cp -a mod/core/. spd-smm/core/
+          if [[ -d mod/android ]]; then cp -a mod/android/. spd-smm/android/; fi
+          if [[ -d mod/desktop ]]; then cp -a mod/desktop/. spd-smm/desktop/; fi
+          if [[ -d mod/assets ]]; then cp -a mod/assets/. spd-smm/assets/; fi
+          python mod/scripts/patch_depth.py 26 spd-smm
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Verify signing secrets
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for key in KEYSTORE_BASE64 KEY_ALIAS STORE_PASSWORD KEY_PASSWORD; do
+            if [[ -z "${!key}" ]]; then
+              echo "::error::Missing required signing secret: $key"
+              exit 1
+            fi
+          done
+
+      - name: Install Android signing build tools
+        shell: bash
+        run: $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "build-tools;29.0.3"
+
+      - name: Compile Blast APK and Desktop JAR
+        working-directory: spd-blast
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x ./gradlew
+          ./gradlew :android:assembleRelease :desktop:release
+
+      - name: Sign Blast APK
+        uses: r0adkll/sign-android-release@v1
+        id: sign_blast
+        with:
+          releaseDirectory: spd-blast/android/build/outputs/apk/release
+          signingKeyBase64: ${{ secrets.KEYSTORE_BASE64 }}
+          alias: ${{ secrets.KEY_ALIAS }}
+          keyStorePassword: ${{ secrets.STORE_PASSWORD }}
+          keyPassword: ${{ secrets.KEY_PASSWORD }}
+
+      - name: Stage Blast APK and JAR
+        shell: bash
+        env:
+          SIGNED_APK: ${{ steps.sign_blast.outputs.signedReleaseFile }}
+          BLAST_VERSION: ${{ steps.versions.outputs.blast_version }}
+          SPD_TAG: ${{ steps.versions.outputs.spd_tag }}
+        run: |
+          set -euo pipefail
+          jar=$(find spd-blast/desktop/build/libs -maxdepth 1 -name '*.jar' -type f -print -quit)
+          test -f "$SIGNED_APK"
+          test -f "$jar"
+          "$ANDROID_HOME/build-tools/29.0.3/apksigner" verify --verbose "$SIGNED_APK"
+          mkdir -p out
+          base="Blast-v$BLAST_VERSION-SPD-$SPD_TAG"
+          cp "$SIGNED_APK" "out/$base.apk"
+          cp "$jar" "out/$base.jar"
+
+      - name: Compile SMM APK and Desktop JAR
+        working-directory: spd-smm
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x ./gradlew
+          ./gradlew :android:assembleRelease :desktop:release
+
+      - name: Sign SMM APK
+        uses: r0adkll/sign-android-release@v1
+        id: sign_smm
+        with:
+          releaseDirectory: spd-smm/android/build/outputs/apk/release
+          signingKeyBase64: ${{ secrets.KEYSTORE_BASE64 }}
+          alias: ${{ secrets.KEY_ALIAS }}
+          keyStorePassword: ${{ secrets.STORE_PASSWORD }}
+          keyPassword: ${{ secrets.KEY_PASSWORD }}
+
+      - name: Stage SMM APK and JAR
+        shell: bash
+        env:
+          SIGNED_APK: ${{ steps.sign_smm.outputs.signedReleaseFile }}
+          BLAST_VERSION: ${{ steps.versions.outputs.blast_version }}
+          SPD_TAG: ${{ steps.versions.outputs.spd_tag }}
+          SMM_VERSION: ${{ steps.versions.outputs.smm_version }}
+        run: |
+          set -euo pipefail
+          jar=$(find spd-smm/desktop/build/libs -maxdepth 1 -name '*.jar' -type f -print -quit)
+          test -f "$SIGNED_APK"
+          test -f "$jar"
+          "$ANDROID_HOME/build-tools/29.0.3/apksigner" verify --verbose "$SIGNED_APK"
+          mkdir -p out
+          base="Blast-v$BLAST_VERSION-SPD-$SPD_TAG-SMM-m$SMM_VERSION"
+          cp "$SIGNED_APK" "out/$base.apk"
+          cp "$jar" "out/$base.jar"
+
+      - name: Publish rolling test release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SPD_TAG: ${{ steps.versions.outputs.spd_tag }}
+          TEST_TAG: build-test
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          files=(out/*.apk out/*.jar)
+          if [[ ${#files[@]} -ne 4 ]]; then
+            echo "::error::Expected exactly four APK/JAR files"
+            exit 1
+          fi
+          notes=$(printf 'Latest successful manual test build.\n\nBlast commit: %s\nSPD: %s\nSMM main commit: %s\n' \
+            "$GITHUB_SHA" "$SPD_TAG" "$(git -C mod rev-parse HEAD)")
+          if gh release view "$TEST_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TEST_TAG" "${files[@]}" --repo "$GITHUB_REPOSITORY" --clobber
+            gh release edit "$TEST_TAG" --repo "$GITHUB_REPOSITORY" --title "Blast test build" --notes "$notes" --prerelease
+          else
+            gh release create "$TEST_TAG" "${files[@]}" \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "Blast test build" \
+              --notes "$notes" \
+              --prerelease \
+              --latest=false
+          fi
+          # Remove stale version-named files after uploading the new set.
+          assets=$(gh release view "$TEST_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')
+          while IFS= read -r asset; do
+            if [[ -n "$asset" && ! -f "out/$asset" ]]; then
+              gh release delete-asset "$TEST_TAG" "$asset" --repo "$GITHUB_REPOSITORY" --yes
+            fi
+          done <<< "$assets"
+          # The fixed test tag always points to the last successfully published build.
+          gh api --method PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/$TEST_TAG" \
+            -f sha="$GITHUB_SHA" -F force=true >/dev/null
