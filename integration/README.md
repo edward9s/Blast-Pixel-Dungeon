@@ -254,11 +254,14 @@ danger takes priority even when another bomb is kickable. If no safer adjacent
 step exists, the mob runs its normal AI. The bomb remains lit, with its fuse,
 danger warnings, and Bomb Maniac deployment slot unchanged.
 
-Otherwise, rare-mob kicks preserve RemoteFuse identity and detonation order.
-Kicked timed bombs restart with a countdown of `max(2, bomb.blastExplosionRange() + 1)`
-units of game time, using the bomb's effective blast radius including upgrades
-(for example: radius 1 → 2, radius 3 → 4, radius 8 → 9). This applies only
-when kicked: ordinary timed throws still start with SPD's native 2-unit fuse.
+Otherwise, every kicked bomb receives a fresh timed fuse of
+`max(2, bomb.blastExplosionRange() + 1)` game-time units, using its effective
+blast radius including upgrades (for example: radius 1 → 2, radius 3 → 4,
+radius 8 → 9). Kicking a remote-controlled bomb snuffs its RemoteFuse, removing
+it from the manual-detonation sequence; the new timed fuse detonates automatically.
+The bomb keeps its Bomb Maniac charge, so its deployment slot remains occupied
+until explosion or normal recovery. An ordinary timed throw still starts with
+SPD's native 2-unit fuse; kicking it restarts the fuse using the same formula.
 The Tag reflects these changes after the next refresh. Chain explosions can
 trigger earlier than the displayed countdown. Lit bombs remain impassable and cannot be
 picked up or manually disarmed; the native Loot Tag does not offer to pick up a heap topped by an armed bomb or death counterbomb; freeze-extinguished bombs can be recovered.
@@ -316,11 +319,11 @@ They can
 teleport beside a visible lit bomb and kick the same bomb toward the Hero
 when they are within that bomb's explosion footprint and the Hero is
 outside it. This also applies if a rare mob has a `ChampionEnemy` buff.
-Kicks use one monster turn. Kicked remote bombs retain their RemoteFuse,
-including manual detonation and original detonation order; they never acquire
-an automatic countdown from the kick. Kicked timed bombs restart with
-`max(2, bomb.blastExplosionRange() + 1)` game-time units, using their effective
-blast radius including upgrades. After each successful kick, that rare mob cannot
+Kicks use one monster turn. Every kicked bomb becomes a timed bomb,
+including bombs previously controlled by RemoteFuse. Both remote and timed bombs
+restart at `max(2, bomb.blastExplosionRange() + 1)` game-time units; kicked
+remote bombs can no longer be manually detonated. After each successful kick,
+that rare mob cannot
 kick again for its next three AI action turns. During those turns it tries
 to dodge visible bomb danger using the same ordinary one-step walking
 logic as champions. When there is no safer dodge step, its normal AI runs.
