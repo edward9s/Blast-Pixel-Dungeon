@@ -181,7 +181,7 @@ def patch(path: Path) -> None:
 
     source = replace(source,
         "\t@Override\n\tpublic boolean doPickUp(Hero hero, int pos) {",
-        """\t/** Kicked timed bombs restart based on effective blast radius, including upgrades. */
+        """\t/** Every kicked bomb gets a new timed fuse based on its effective blast radius. */
 \tpublic void blastResetFuseAfterKick() {
 \t\tif (fuse == null) throw new IllegalStateException("Cannot reset an unlit bomb");
 \t\tfuse.snuff();

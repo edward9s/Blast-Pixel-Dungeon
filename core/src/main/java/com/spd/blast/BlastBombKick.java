@@ -145,10 +145,8 @@ public final class BlastBombKick {
             return true;
         }
         source.remove(selected);
-        // Preserve remote fuse and detonation order; timed fuses scale with blast radius.
-        if (!(selected.fuse instanceof BlastRemoteBomb.RemoteFuse)) {
-            selected.blastResetFuseAfterKick();
-        }
+        // Every kicked bomb becomes timed, including formerly remote-controlled bombs.
+        selected.blastResetFuseAfterKick();
         level.drop(selected, kickTo).sprite.drop(source.pos);
         Recovery.start(mob);
         return true;
