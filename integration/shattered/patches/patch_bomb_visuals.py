@@ -29,11 +29,13 @@ def patch_bomb(source: str) -> str:
         "base blast smoke and order")
     source = replace(source,
         "\t\t\tif (terrainAffected) {\n\t\t\t\tDungeon.observe();\n"
-        "\t\t\t}\n\t\t}\n\t}\n",
+        "\t\t\t}\n\t\t}\n"
+        "\t\tif (demolition != null) demolition.finish();\n\t}\n",
         "\t\t\tif (terrainAffected) {\n\t\t\t\tDungeon.observe();\n"
         "\t\t\t}\n\t\t} else {\n"
         "\t\t\tcom.spd.blast.BlastBombVisuals.blast(this, cell, null);\n"
-        "\t\t}\n\t}\n", "non-destructive blast sound")
+        "\t\t}\n"
+        "\t\tif (demolition != null) demolition.finish();\n\t}\n", "non-destructive blast sound")
     # A Bomb.explode() call may recursively explode other bombs through Heap.
     # Finish gathering the whole chain before the render thread gets its events.
     signature = "\tpublic void explode(int cell){"

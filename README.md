@@ -25,6 +25,23 @@ On Desktop, **B** activates the upper Bomb Maniac Tag and **V** activates the lo
 
 The hidden **Remote Throwing** test option changes the remote-mode Bomb Maniac Tag from placing a bomb at your feet to aiming and throwing a remotely detonated bomb. **Both remote-mode actions cost zero turns**, and neither permanently reduces maximum capacity. This test option does not make timed throws free.
 
+The hidden **Unstoppable** test option is off by default. While enabled, all bomb
+types kill non-Hero characters in their blast area, including red sentries and
+other invulnerable or evasive characters. Destructive bombs open locked and crystal chests using the
+same rules as ordinary chests. Opening a chest exposes its items; later blasts,
+including linked explosions, affect them normally. Other item destruction and
+protection rules remain unchanged.
+With the test enabled, destructive bombs also destroy keys on the ground or in
+reached containers, except the fifth-floor Worn Key. Effect-only bombs retain
+their native item and terrain behavior. Destructive bombs remove traps immediately
+and can break locked doors and bypass statue durability. These new door/statue
+terrain changes resolve after the full chain.
+Hero damage and wall durability rules remain unchanged.
+
+Cages, barrels, bone piles, and other regional decorations can be destroyed only
+with Unstoppable enabled, by bombs that can normally destroy walls. Effect-only
+bombs cannot destroy them. Their normal gameplay behavior remains unchanged.
+
 Lit bombs normally block movement and cannot be picked up or manually disarmed. Free Movement lets you pass through walls and lit bombs, and lets thrown or kicked bombs fly past obstacles. Locked exits still block passage.
 
 If freezing extinguishes a Bomb Maniac bomb, pick it up and imbue it to recover its occupied deployment slot. Reviving with an unblessed Ankh resets bomb capacity to one and removes the blast-radius upgrade, but keeps unlocked bomb types.
