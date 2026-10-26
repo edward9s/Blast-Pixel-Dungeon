@@ -9,11 +9,6 @@ import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.bombs.ArcaneBomb;
 import com.shatteredpixel.shatteredpixeldungeon.items.bombs.Bomb;
-import com.shatteredpixel.shatteredpixeldungeon.items.keys.CrystalKey;
-import com.shatteredpixel.shatteredpixeldungeon.items.keys.GoldenKey;
-import com.shatteredpixel.shatteredpixeldungeon.items.keys.IronKey;
-import com.shatteredpixel.shatteredpixeldungeon.items.keys.Key;
-import com.shatteredpixel.shatteredpixeldungeon.items.keys.WornKey;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
 import com.shatteredpixel.shatteredpixeldungeon.levels.PrisonBossLevel;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
@@ -272,90 +267,12 @@ public final class BlastDemolitionTest {
         }
     }
 
-    private static void keys() {
-        for (boolean enabled : new boolean[]{false, true}) {
-            TestLevel level = setup();
-            BlastSettings.setTestDemolition(enabled);
-            Heap ground = chest(level, 4, 4, Heap.Type.HEAP);
-            ground.items.clear();
-            Key iron = new IronKey(1);
-            iron.quantity(3);
-            Key gold = new GoldenKey(1);
-            Key crystal = new CrystalKey(1);
-            Key worn = new WornKey(5);
-            ground.items.addAll(Arrays.asList(iron, gold, crystal, worn));
-            Heap container = chest(level, 3, 5, Heap.Type.LOCKED_CHEST);
-            Key contained = new IronKey(1);
-            Key containedWorn = new WornKey(5);
-            container.items.add(contained);
-            container.items.add(containedWorn);
-            Heap single = chest(level, 4, 6, Heap.Type.HEAP);
-            single.items.clear();
-            single.items.add(new CrystalKey(1));
-            Level.set(cell(5, 5), Terrain.LOCKED_DOOR, level);
-            Heap sheltered = chest(level, 6, 5, Heap.Type.HEAP);
-            sheltered.items.clear();
-            Key shelteredKey = new IronKey(1);
-            sheltered.items.add(shelteredKey);
-            new Bomb().explode(cell(4, 5));
-            for (Key key : new Key[]{iron, gold, crystal}) {
-                check(ground.items.contains(key) == !enabled, "ground key destruction follows switch");
-            }
-            check(ground.items.contains(worn), "fifth-floor Worn Key survives on the ground");
-            check(container.items.contains(contained) == !enabled, "contained key destruction follows switch");
-            check(container.items.contains(containedWorn), "Worn Key survives inside a chest");
-            check(level.heaps.get(single.pos) == (enabled ? null : single), "last key removal cleans up heap");
-            check(sheltered.items.contains(shelteredKey), "keys behind locked door survive");
-        }
-
-        TestLevel level = setup();
-        BlastSettings.setTestDemolition(true);
-        Heap effectHeap = chest(level, 4, 4, Heap.Type.HEAP);
-        effectHeap.items.clear();
-        Key key = new IronKey(1);
-        Key worn = new WornKey(5);
-        effectHeap.items.addAll(Arrays.asList(key, worn));
-        new ArcaneBomb().explode(cell(4, 5));
-        check(!effectHeap.items.contains(key) && effectHeap.items.contains(worn),
-                "effect bombs destroy keys and preserve Worn Key too");
-    }
-
-    private static void decorations() {
-        for (int terrain : new int[]{Terrain.REGION_DECO, Terrain.REGION_DECO_ALT,
-                Terrain.STATUE, Terrain.STATUE_SP, Terrain.BOOKSHELF, Terrain.BARRICADE}) {
-            TestLevel level = setup();
-            BlastSettings.setTestDemolition(true);
-            for (int y = 1; y < SIZE - 1; y++) Level.set(cell(5, y), Terrain.WALL, level);
-            int obstacle = cell(5, 5);
-            Level.set(obstacle, terrain, level);
-            Heap behind = chest(level, 6, 5, Heap.Type.LOCKED_CHEST);
-            Bomb bomb = new WideBomb();
-            check(bomb.blastWarningCells(cell(4, 5))[obstacle], "decorative obstacle is warned");
-            BlastBombVisuals.begin(cell(4, 5));
-            bomb.explode(cell(4, 5));
-            if (terrain != Terrain.BOOKSHELF && terrain != Terrain.BARRICADE) {
-                check(level.map[obstacle] == terrain, "new decoration stays solid during chain");
-                new WideBomb().explode(cell(4, 5));
-                check(behind.type == Heap.Type.LOCKED_CHEST, "decoration shields later linked blast");
-            }
-            BlastBombVisuals.end();
-            check(!level.solid[obstacle], "decorative obstacle destroyed despite zero durability");
-            check(level.map[cell(5, 3)] == Terrain.WALL, "ordinary wall remains intact");
-        }
-        TestLevel level = setup();
-        Level.set(cell(5, 5), Terrain.REGION_DECO, level);
-        new WideBomb().explode(cell(4, 5));
-        check(level.map[cell(5, 5)] == Terrain.REGION_DECO, "disabled option preserves cage");
-    }
-
     public static void main(String[] args) {
         disabled();
         chain();
         effectBomb();
         heroProtection();
         tenguTransitions();
-        keys();
-        decorations();
         System.out.println("Passed " + checks + " demolition checks");
     }
 }

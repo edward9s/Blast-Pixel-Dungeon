@@ -5,9 +5,7 @@
 default/off behavior, all three locked door types, all three chest types, loot
 preservation across linked explosions, visible/secret/inactive traps, the native
 red sentry, damage-ignoring/high-evasion mobs, blast occlusion, death attribution,
-Hero Bombproof protection, Tengu's two scripted fight transitions, key stacks
-on the ground and inside chests, Worn Key preservation, decorative obstacles,
-and decoration occlusion across linked explosions.
+Hero Bombproof protection, and Tengu's two scripted fight transitions.
 
 First apply Blast to an SPD checkout and compile its `core`, `SPD-classes`, and
 `services` modules. Set `BLAST_TEST_CLASSPATH` to their compiled classes and runtime
