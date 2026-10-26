@@ -207,6 +207,17 @@ zero turn cost. Its serial-numbered RemoteFuse never counts down. A tap on the
 lower Tag detonates the oldest surviving remote bomb; the original golden
 heart overlay stays visible in this mode.
 
+Remote Noisemakers retain their lure: `RemoteFuse` calls the shared native
+`NoisemakerFuse.blastAlert` after 2 game-time units, then every 6 units. The
+helper contains the original alarm particles, sound, and `Mob.beckon` loop;
+the native timed fuse calls the same helper without changing its behavior.
+The remote alarm countdown is saved with the fuse, alongside its sequence.
+An alarm does not consume the bomb or its deployment slot. Character contact
+does not explode a remote bomb; manual detonation and chain reactions still do.
+Freezing extinguishes the remote fuse. Kicks replace it with the native timed
+Noisemaker fuse, retaining the shared radius-based kick countdown and the
+original alarm/contact behavior.
+
 In timed mode, Bomb Maniac restores the previous auto-target crosshair and
 projectile animation. The player chooses a cell or confirms the nearest
 reachable enemy; the throw spends exactly 1 game turn and normally permanently

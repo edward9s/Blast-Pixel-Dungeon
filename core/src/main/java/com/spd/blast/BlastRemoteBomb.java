@@ -7,6 +7,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Buff;
 import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.bombs.Bomb;
+import com.shatteredpixel.shatteredpixeldungeon.items.bombs.Noisemaker;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
 import com.shatteredpixel.shatteredpixeldungeon.ui.BuffIndicator;
 import com.shatteredpixel.shatteredpixeldungeon.utils.GLog;
@@ -163,7 +164,9 @@ public final class BlastRemoteBomb extends Buff {
     /** A fuse that never counts down, but still obeys vanilla snuff/freeze/explode. */
     public static final class RemoteFuse extends Bomb.Fuse {
         private static final String SEQUENCE = "blast_remote_bomb_sequence";
+        private static final String ALARM_DELAY = "blast_remote_alarm_delay";
         private int sequence;
+        private int alarmDelay = 2;
 
         /** Required for SPD bundle restoration. */
         public RemoteFuse() {}
@@ -202,6 +205,19 @@ public final class BlastRemoteBomb extends Buff {
             if (bomb == null || bomb.fuse != this) {
                 snuff();
             } else {
+                if (bomb instanceof Noisemaker) {
+                    for (Heap heap : Dungeon.level.heaps.valueList()) {
+                        if (!heap.items.contains(bomb)) continue;
+                        // Keep the native two-turn startup and six-turn alarm interval.
+                        // Remote bombs still explode only on detonation or a chain reaction.
+                        if (alarmDelay == 0) {
+                            Noisemaker.NoisemakerFuse.blastAlert(heap.pos);
+                            alarmDelay = 6;
+                        }
+                        alarmDelay--;
+                        break;
+                    }
+                }
                 spend(TICK);
             }
             return true;
@@ -211,12 +227,17 @@ public final class BlastRemoteBomb extends Buff {
         public void storeInBundle(Bundle bundle) {
             super.storeInBundle(bundle);
             bundle.put(SEQUENCE, sequence);
+            bundle.put(ALARM_DELAY, alarmDelay);
         }
 
         @Override
         public void restoreFromBundle(Bundle bundle) {
             super.restoreFromBundle(bundle);
             sequence = bundle.getInt(SEQUENCE);
+            alarmDelay = bundle.getInt(ALARM_DELAY);
+            if (alarmDelay < 0 || alarmDelay > 5) {
+                throw new IllegalStateException("Invalid saved remote alarm delay: " + alarmDelay);
+            }
             if (sequence <= 0) {
                 throw new IllegalStateException("Invalid saved remote bomb sequence: " + sequence);
             }
