@@ -25,6 +25,13 @@ On Desktop, **B** activates the upper Bomb Maniac Tag and **V** activates the lo
 
 The hidden **Remote Throwing** test option changes the remote-mode Bomb Maniac Tag from placing a bomb at your feet to aiming and throwing a remotely detonated bomb. **Both remote-mode actions cost zero turns**, and neither permanently reduces maximum capacity. This test option does not make timed throws free.
 
+Remote **Noisemakers** start their alarm after 2 game-time units and repeat it every
+6 game-time units, attracting monsters to the bomb's location with the native
+alarm sound and particles. They remain remotely armed, even when a character
+stands on them. Remote detonation or another explosion blows them up. Freezing
+still extinguishes their remote fuse; a kicked Noisemaker uses its native timed
+alarm and contact-triggered explosion instead.
+
 The hidden **Unstoppable** test option is off by default. While enabled, all bomb
 types kill non-Hero characters in their blast area, including red sentries and
 other invulnerable or evasive characters. Destructive bombs open locked and crystal chests using the

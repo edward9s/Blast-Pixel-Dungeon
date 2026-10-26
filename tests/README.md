@@ -20,3 +20,16 @@ javac --release 11 -encoding UTF-8 -cp "$BLAST_TEST_CLASSPATH" \
   -d /tmp/blast-tests tests/BlastDemolitionTest.java
 java -cp "/tmp/blast-tests:$BLAST_TEST_CLASSPATH" BlastDemolitionTest
 ```
+
+`BlastNoisemakerTest.java` also runs without a graphics/audio backend. It tests
+real lit throws, the two-unit remote alarm startup and six-unit repeat interval,
+native monster waking/targeting, a bomb under the Hero, saved alarm timing and
+remote ordering, immediate remote detonation, freezing, kicked native fuses,
+and ordinary remote bombs remaining silent. Compile and run it with the same
+classpath:
+
+```sh
+javac --release 11 -encoding UTF-8 -cp "$BLAST_TEST_CLASSPATH" \
+  -d /tmp/blast-tests tests/BlastNoisemakerTest.java
+java -cp "/tmp/blast-tests:$BLAST_TEST_CLASSPATH" BlastNoisemakerTest
+```
