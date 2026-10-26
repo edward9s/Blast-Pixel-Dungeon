@@ -316,9 +316,11 @@ They can
 teleport beside a visible lit bomb and kick the same bomb toward the Hero
 when they are within that bomb's explosion footprint and the Hero is
 outside it. This also applies if a rare mob has a `ChampionEnemy` buff.
-Kicks use one monster turn;
-kicks preserve the fuse of remotely controlled
-bombs. Native timed bombs still have their two-turn fuse restarted. After each successful kick, that rare mob cannot
+Kicks use one monster turn. Kicked remote bombs retain their RemoteFuse,
+including manual detonation and original detonation order; they never acquire
+an automatic countdown from the kick. Kicked timed bombs restart with
+`max(2, bomb.blastExplosionRange() + 1)` game-time units, using their effective
+blast radius including upgrades. After each successful kick, that rare mob cannot
 kick again for its next three AI action turns. During those turns it tries
 to dodge visible bomb danger using the same ordinary one-step walking
 logic as champions. When there is no safer dodge step, its normal AI runs.
