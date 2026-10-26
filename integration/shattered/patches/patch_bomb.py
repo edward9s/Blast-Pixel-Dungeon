@@ -157,7 +157,7 @@ def patch(path: Path) -> None:
 \t\tif (explodesDestructively()) {
 \t\t\tcom.watabou.utils.BArray.or(Dungeon.level.flamable, explodable, explodable);
 \t\t}
-\t\tcom.spd.blast.BlastDemolition.includeDoors(explodable);
+\t\tcom.spd.blast.BlastDemolition.includeObstacles(this, explodable);
 \t\treturn com.spd.blast.BlastBombWarnings.reachable(
 \t\t\t\tDungeon.level, cell, explodable, explosionRange());
 \t}""", "bomb blast warning footprint")
@@ -221,10 +221,9 @@ def patch(path: Path) -> None:
         "\t\tif (explodesDestructively()) {\n\n\t\t\tArrayList<Integer> affectedCells",
         "snapshot demolition before bomb terrain changes")
     source = replace(source,
-        "\t\t\t\tif (heap != null) {\n\t\t\t\t\theap.explode();",
-        "\t\t\t\tif (heap != null && !com.spd.blast.BlastDemolition.protect(heap)) {\n"
         "\t\t\t\t\theap.explode();",
-        "preserve chest contents throughout linked explosions")
+        "\t\t\t\t\tcom.spd.blast.BlastDemolition.explode(heap);",
+        "open locked chests with native heap explosion rules")
     source = replace(source,
         "\t\t\tif (terrainAffected) {\n\t\t\t\tDungeon.observe();\n"
         "\t\t\t}\n\t\t}\n\t}\n",

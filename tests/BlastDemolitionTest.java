@@ -9,12 +9,22 @@ import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.bombs.ArcaneBomb;
 import com.shatteredpixel.shatteredpixeldungeon.items.bombs.Bomb;
+import com.shatteredpixel.shatteredpixeldungeon.items.food.Food;
+import com.shatteredpixel.shatteredpixeldungeon.items.keys.CrystalKey;
+import com.shatteredpixel.shatteredpixeldungeon.items.keys.GoldenKey;
+import com.shatteredpixel.shatteredpixeldungeon.items.keys.IronKey;
+import com.shatteredpixel.shatteredpixeldungeon.items.keys.Key;
+import com.shatteredpixel.shatteredpixeldungeon.items.keys.WornKey;
+import com.shatteredpixel.shatteredpixeldungeon.items.potions.Potion;
+import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.Scroll;
+import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.Dagger;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
 import com.shatteredpixel.shatteredpixeldungeon.levels.PrisonBossLevel;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
 import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.special.SentryRoom;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.Trap;
 import com.shatteredpixel.shatteredpixeldungeon.sprites.CharSprite;
+import com.shatteredpixel.shatteredpixeldungeon.sprites.ItemSprite;
 import com.spd.blast.BlastBombVisuals;
 import com.spd.blast.BlastDemolition;
 import com.spd.blast.BlastSettings;
@@ -44,6 +54,24 @@ public final class BlastDemolitionTest {
 
     private static class SilentSprite extends CharSprite {
         @Override public void die() {}
+    }
+
+    private static class SilentItemSprite extends ItemSprite {
+        @Override public void texture(Object texture) {}
+        @Override public ItemSprite view(int image, Glowing glowing) { return this; }
+        @Override public ItemSprite view(Heap heap) { return this; }
+        @Override public void link() {}
+        @Override public void drop() {}
+        @Override public void place(int cell) {}
+    }
+
+    private static class TestPotion extends Potion {
+        int shatters;
+        @Override public void shatter(int cell) { shatters++; }
+    }
+
+    private static class TestScroll extends Scroll {
+        @Override public void doRead() {}
     }
 
     private static class TestPrisonLevel extends PrisonBossLevel {
@@ -130,8 +158,9 @@ public final class BlastDemolitionTest {
         Heap heap = new Heap();
         heap.pos = cell(x, y);
         heap.type = type;
-        heap.items.add(new Item());
-        heap.items.add(new Item());
+        heap.sprite = new SilentItemSprite();
+        heap.items.add(new Food());
+        heap.items.add(new Food());
         level.heaps.put(heap.pos, heap);
         return heap;
     }
@@ -159,7 +188,6 @@ public final class BlastDemolitionTest {
         Bomb bomb = new Bomb();
         check(BlastDemolition.prepare(bomb, cell(4, 5)) == null, "disabled helper must do nothing");
         check(!bomb.blastWarningCells(cell(4, 5))[cell(5, 5)], "disabled locked door warning");
-        check(!BlastDemolition.protect(heap), "disabled container handling");
         bomb.explode(cell(4, 5));
         check(heap.type == Heap.Type.LOCKED_CHEST && heap.size() == 2, "locked chest survives normally");
         check(level.map[cell(5, 5)] == Terrain.LOCKED_DOOR, "locked door survives normally");
@@ -196,14 +224,15 @@ public final class BlastDemolitionTest {
         check(!warning[behind.pos], "door blocks blast behind it");
         BlastBombVisuals.begin(cell(4, 5));
         first.explode(cell(4, 5));
-        check(locked.type == Heap.Type.LOCKED_CHEST, "chest remains enclosed during chain");
+        check(locked.type == Heap.Type.HEAP && locked.size() == 2,
+                "locked chest opens and preserves contents for first blast");
         check(level.map[cell(5, 5)] == Terrain.LOCKED_DOOR, "door blocks entire chain");
         new WideBomb().explode(cell(4, 5));
-        check(normal.size() == 2 && locked.size() == 2 && crystal.size() == 2,
-                "later linked blast must preserve chest contents");
+        check(normal.isEmpty() && locked.isEmpty() && crystal.isEmpty(),
+                "later linked blast destroys exposed items by native rules");
         BlastBombVisuals.end();
         for (Heap heap : new Heap[]{normal, locked, crystal}) {
-            check(heap.type == Heap.Type.HEAP && heap.size() == 2, "chest contents become collectible");
+            check(level.heaps.get(heap.pos) == null, "empty heap removed after linked blast");
         }
         check(behind.type == Heap.Type.LOCKED_CHEST, "sheltered chest remains locked");
         check(level.map[cell(5, 5)] == Terrain.EMPTY && level.map[cell(5, 6)] == Terrain.EMPTY,
@@ -226,10 +255,14 @@ public final class BlastDemolitionTest {
         TestLevel level = setup();
         BlastSettings.setTestDemolition(true);
         Heap chest = chest(level, 4, 4, Heap.Type.CRYSTAL_CHEST);
+        Level.set(cell(4, 6), Terrain.SECRET_TRAP, level);
         SentryRoom.Sentry sentry = mob(level, new SentryRoom.Sentry(), 3, 5);
         new ArcaneBomb().explode(cell(4, 5));
         check(!level.mobs.contains(sentry), "non-destructive bomb also removes red sentry");
-        check(chest.type == Heap.Type.HEAP && chest.size() == 2, "effect bomb releases chest loot");
+        check(chest.type == Heap.Type.CRYSTAL_CHEST && chest.size() == 2,
+                "effect bomb retains native container behavior");
+        check(level.map[cell(4, 6)] == Terrain.SECRET_TRAP,
+                "effect bomb does not gain terrain/trap destruction");
     }
 
     private static void heroProtection() {
@@ -267,12 +300,111 @@ public final class BlastDemolitionTest {
         }
     }
 
+    private static void keys() {
+        for (boolean enabled : new boolean[]{false, true}) {
+            TestLevel level = setup();
+            BlastSettings.setTestDemolition(enabled);
+            Heap ground = chest(level, 4, 4, Heap.Type.HEAP);
+            ground.items.clear();
+            Key iron = new IronKey(1);
+            iron.quantity(3);
+            Key gold = new GoldenKey(1);
+            Key crystal = new CrystalKey(1);
+            Key worn = new WornKey(5);
+            ground.items.addAll(Arrays.asList(iron, gold, crystal, worn));
+            Heap container = chest(level, 3, 5, Heap.Type.LOCKED_CHEST);
+            Key contained = new IronKey(1);
+            Key containedWorn = new WornKey(5);
+            container.items.add(contained);
+            container.items.add(containedWorn);
+            Heap single = chest(level, 4, 6, Heap.Type.HEAP);
+            single.items.clear();
+            single.items.add(new CrystalKey(1));
+            Level.set(cell(5, 5), Terrain.LOCKED_DOOR, level);
+            Heap sheltered = chest(level, 6, 5, Heap.Type.HEAP);
+            sheltered.items.clear();
+            Key shelteredKey = new IronKey(1);
+            sheltered.items.add(shelteredKey);
+            new Bomb().explode(cell(4, 5));
+            for (Key key : new Key[]{iron, gold, crystal}) {
+                check(ground.items.contains(key) == !enabled, "ground key destruction follows switch");
+            }
+            check(ground.items.contains(worn), "fifth-floor Worn Key survives on the ground");
+            check(container.items.contains(contained) == !enabled, "contained key destruction follows switch");
+            check(container.items.contains(containedWorn), "Worn Key survives inside a chest");
+            check(level.heaps.get(single.pos) == (enabled ? null : single), "last key removal cleans up heap");
+            check(sheltered.items.contains(shelteredKey), "keys behind locked door survive");
+        }
+
+        TestLevel level = setup();
+        BlastSettings.setTestDemolition(true);
+        Heap effectHeap = chest(level, 4, 4, Heap.Type.HEAP);
+        effectHeap.items.clear();
+        Key key = new IronKey(1);
+        Key worn = new WornKey(5);
+        effectHeap.items.addAll(Arrays.asList(key, worn));
+        new ArcaneBomb().explode(cell(4, 5));
+        check(effectHeap.items.contains(key) && effectHeap.items.contains(worn),
+                "effect bombs retain native item protection");
+    }
+
+    private static void decorations() {
+        for (boolean enabled : new boolean[]{false, true}) {
+            for (boolean destructive : new boolean[]{false, true}) {
+                for (int terrain : new int[]{Terrain.REGION_DECO, Terrain.REGION_DECO_ALT,
+                        Terrain.STATUE, Terrain.STATUE_SP, Terrain.BOOKSHELF, Terrain.BARRICADE}) {
+                    TestLevel level = setup();
+                    BlastSettings.setTestDemolition(enabled);
+                    for (int y = 1; y < SIZE - 1; y++) Level.set(cell(5, y), Terrain.WALL, level);
+                    int obstacle = cell(5, 5);
+                    Level.set(obstacle, terrain, level);
+                    Heap behind = chest(level, 6, 5, Heap.Type.CHEST);
+                    Bomb bomb = destructive ? new WideBomb() : new ArcaneBomb();
+                    boolean nativeBreakable = terrain == Terrain.BOOKSHELF || terrain == Terrain.BARRICADE;
+                    boolean destroyed = destructive && (nativeBreakable || enabled);
+                    BlastBombVisuals.begin(cell(4, 5));
+                    bomb.explode(cell(4, 5));
+                    check(behind.type == Heap.Type.CHEST, "solid prop shields first blast");
+                    BlastBombVisuals.end();
+                    check(level.solid[obstacle] == !destroyed,
+                            "decoration follows destructive bomb classification");
+                    check(level.map[cell(5, 3)] == Terrain.WALL, "ordinary wall remains intact");
+                }
+            }
+        }
+    }
+
+    private static void nativeItems() {
+        for (boolean enabled : new boolean[]{false, true}) {
+            TestLevel level = setup();
+            BlastSettings.setTestDemolition(enabled);
+            Heap heap = chest(level, 4, 4, Heap.Type.HEAP);
+            heap.items.clear();
+            Item ordinary = new Food();
+            Item unique = new Food();
+            unique.unique = true;
+            Item equipment = new Dagger();
+            Item scroll = new TestScroll();
+            TestPotion potion = new TestPotion();
+            heap.items.addAll(Arrays.asList(ordinary, unique, equipment, scroll, potion));
+            new Bomb().explode(cell(4, 5));
+            check(!heap.items.contains(ordinary) && !heap.items.contains(scroll),
+                    "native destruction of ordinary items and scrolls");
+            check(!heap.items.contains(potion) && potion.shatters == 1, "native potion shatter");
+            check(heap.items.contains(unique) && heap.items.contains(equipment),
+                    "native protection of unique items and equipment");
+        }
+    }
+
     public static void main(String[] args) {
         disabled();
         chain();
         effectBomb();
         heroProtection();
         tenguTransitions();
+        keys();
+        decorations();
+        nativeItems();
         System.out.println("Passed " + checks + " demolition checks");
     }
 }

@@ -6,7 +6,10 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Tengu;
 import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
+import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.bombs.Bomb;
+import com.shatteredpixel.shatteredpixeldungeon.items.keys.Key;
+import com.shatteredpixel.shatteredpixeldungeon.items.keys.WornKey;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
 import com.shatteredpixel.shatteredpixeldungeon.levels.PrisonBossLevel;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
@@ -19,8 +22,7 @@ public final class BlastDemolition {
     private final Level level;
     private final Bomb bomb;
     private final PrisonBossLevel.State prisonPhase;
-    private final ArrayList<Integer> doors = new ArrayList<>();
-    private final ArrayList<Heap> chests = new ArrayList<>();
+    private final ArrayList<Integer> obstacles = new ArrayList<>();
     private final ArrayList<Mob> mobs = new ArrayList<>();
 
     private BlastDemolition(Level level, Bomb bomb) {
@@ -29,47 +31,63 @@ public final class BlastDemolition {
         prisonPhase = level instanceof PrisonBossLevel ? ((PrisonBossLevel) level).state() : null;
     }
 
-    private static boolean lockedDoor(int terrain) {
-        return terrain == Terrain.LOCKED_DOOR || terrain == Terrain.CRYSTAL_DOOR
-                || terrain == Terrain.HERO_LKD_DR;
-    }
-
-    /** Locked doors can be hit endpoints, while still blocking the ray behind them. */
-    public static void includeDoors(boolean[] explodable) {
-        if (!BlastSettings.testDemolition()) return;
-        Level level = Dungeon.level;
-        for (int cell = 0; cell < explodable.length; cell++) {
-            if (lockedDoor(level.map[cell])) explodable[cell] = true;
+    private static boolean obstacle(int terrain) {
+        switch (terrain) {
+            case Terrain.LOCKED_DOOR:
+            case Terrain.CRYSTAL_DOOR:
+            case Terrain.HERO_LKD_DR:
+            case Terrain.REGION_DECO:
+            case Terrain.REGION_DECO_ALT:
+            case Terrain.STATUE:
+            case Terrain.STATUE_SP:
+                return true;
+            default:
+                return false;
         }
     }
 
-    /** Keep chest contents enclosed until every linked bomb and subtype effect resolves. */
-    public static boolean protect(Heap heap) {
-        return BlastSettings.testDemolition() && chest(heap);
+    /** Solid obstacles can be hit endpoints, while still blocking the ray behind them. */
+    public static void includeObstacles(Bomb bomb, boolean[] explodable) {
+        if (!bomb.explodesDestructively() || !BlastSettings.testDemolition()) return;
+        Level level = Dungeon.level;
+        for (int cell = 0; cell < explodable.length; cell++) {
+            if (obstacle(level.map[cell])) explodable[cell] = true;
+        }
     }
 
-    private static boolean chest(Heap heap) {
-        return heap.type == Heap.Type.CHEST || heap.type == Heap.Type.LOCKED_CHEST
-                || heap.type == Heap.Type.CRYSTAL_CHEST;
+    /** Locked chests use the same opening and subsequent item damage as ordinary chests. */
+    public static void explode(Heap heap) {
+        if (BlastSettings.testDemolition()
+                && (heap.type == Heap.Type.LOCKED_CHEST || heap.type == Heap.Type.CRYSTAL_CHEST)) {
+            heap.type = Heap.Type.CHEST;
+        }
+        heap.explode();
     }
 
     public static BlastDemolition prepare(Bomb bomb, int center) {
         if (!BlastSettings.testDemolition()) return null;
         Level level = Dungeon.level;
         BlastDemolition demolition = new BlastDemolition(level, bomb);
+        boolean destructive = bomb.explodesDestructively();
         boolean[] cells = bomb.blastWarningCells(center);
         for (int cell = 0; cell < cells.length; cell++) {
             if (!cells[cell]) continue;
             int terrain = level.map[cell];
-            if (lockedDoor(terrain)) demolition.doors.add(cell);
+            if (destructive && obstacle(terrain)) demolition.obstacles.add(cell);
             Heap heap = level.heaps.get(cell);
-            if (heap != null && chest(heap)) demolition.chests.add(heap);
+            if (heap != null && destructive) {
+                // Keys are normally unique and explosion-proof. WornKey is the
+                // fifth-floor progression key and must retain that protection.
+                for (Item item : heap.items.toArray(new Item[0])) {
+                    if (item instanceof Key && !(item instanceof WornKey)) heap.remove(item);
+                }
+            }
             Char ch = Actor.findChar(cell);
             if (ch instanceof Mob) demolition.mobs.add((Mob) ch);
 
             // Remove traps before potions, fire, or other bomb effects can trigger them.
-            if (level.traps.get(cell) != null || terrain == Terrain.TRAP
-                    || terrain == Terrain.SECRET_TRAP || terrain == Terrain.INACTIVE_TRAP) {
+            if (destructive && (level.traps.get(cell) != null || terrain == Terrain.TRAP
+                    || terrain == Terrain.SECRET_TRAP || terrain == Terrain.INACTIVE_TRAP)) {
                 Level.set(cell, Terrain.EMPTY, level);
                 GameScene.updateMap(cell);
             }
@@ -104,19 +122,11 @@ public final class BlastDemolition {
             if (level instanceof PrisonBossLevel
                     && ((PrisonBossLevel) level).state() != prisonPhase) return;
             boolean changed = false;
-            for (int cell : doors) {
-                if (!lockedDoor(level.map[cell])) continue;
+            for (int cell : obstacles) {
+                if (!obstacle(level.map[cell])) continue;
                 Level.set(cell, Terrain.EMPTY, level);
                 GameScene.updateMap(cell);
                 changed = true;
-            }
-            for (Heap heap : chests) {
-                if (level.heaps.get(heap.pos) != heap || !chest(heap)) continue;
-                heap.type = Heap.Type.HEAP;
-                if (heap.sprite != null) {
-                    heap.sprite.link();
-                    heap.sprite.drop();
-                }
             }
             if (changed) {
                 level.cleanWalls();
