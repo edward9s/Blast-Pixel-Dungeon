@@ -21,6 +21,7 @@ public final class BlastSettings {
     private static final String INDESTRUCTIBLE = "blast_test_indestructible";
     private static final String FREE_MOVEMENT = "blast_test_free_movement";
     private static final String REMOTE_THROW = "blast_test_remote_throw";
+    private static final String DEMOLITION = "blast_test_demolition";
 
     private BlastSettings() {}
 
@@ -81,6 +82,14 @@ public final class BlastSettings {
 
     public static void setTestRemoteThrow(boolean value) {
         GameSettings.put(REMOTE_THROW, value);
+    }
+
+    public static boolean testDemolition() {
+        return GameSettings.getBoolean(DEMOLITION, false);
+    }
+
+    public static void setTestDemolition(boolean value) {
+        GameSettings.put(DEMOLITION, value);
     }
 
     private static void validateMultiplier(int value) {

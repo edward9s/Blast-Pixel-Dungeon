@@ -157,6 +157,7 @@ def patch(path: Path) -> None:
 \t\tif (explodesDestructively()) {
 \t\t\tcom.watabou.utils.BArray.or(Dungeon.level.flamable, explodable, explodable);
 \t\t}
+\t\tcom.spd.blast.BlastDemolition.includeDoors(explodable);
 \t\treturn com.spd.blast.BlastBombWarnings.reachable(
 \t\t\t\tDungeon.level, cell, explodable, explosionRange());
 \t}""", "bomb blast warning footprint")
@@ -212,6 +213,25 @@ def patch(path: Path) -> None:
         "PathFinder.buildDistanceMap( cell, explodable, blastExplosionRange() );",
         "com.spd.blast.BlastBombWarnings.buildEffectDistanceMap( cell, explodable, blastExplosionRange() );",
         "actual enhanced blast footprint")
+
+    source = replace(source,
+        "\t\tif (explodesDestructively()) {\n\n\t\t\tArrayList<Integer> affectedCells",
+        "\t\tcom.spd.blast.BlastDemolition demolition =\n"
+        "\t\t\t\tcom.spd.blast.BlastDemolition.prepare(this, cell);\n\n"
+        "\t\tif (explodesDestructively()) {\n\n\t\t\tArrayList<Integer> affectedCells",
+        "snapshot demolition before bomb terrain changes")
+    source = replace(source,
+        "\t\t\t\tif (heap != null) {\n\t\t\t\t\theap.explode();",
+        "\t\t\t\tif (heap != null && !com.spd.blast.BlastDemolition.protect(heap)) {\n"
+        "\t\t\t\t\theap.explode();",
+        "preserve chest contents throughout linked explosions")
+    source = replace(source,
+        "\t\t\tif (terrainAffected) {\n\t\t\t\tDungeon.observe();\n"
+        "\t\t\t}\n\t\t}\n\t}\n",
+        "\t\t\tif (terrainAffected) {\n\t\t\t\tDungeon.observe();\n"
+        "\t\t\t}\n\t\t}\n"
+        "\t\tif (demolition != null) demolition.finish();\n\t}\n",
+        "finish demolition for every bomb type")
 
     path.write_text(source, encoding="utf-8")
     print(f"patched {path}: remote fuse, generated bomb throw and identity")

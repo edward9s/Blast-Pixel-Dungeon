@@ -418,6 +418,30 @@ stack count; no maximum-value validation or clamping is performed during save
 restoration. Blast footprints still obey the 20-tile limit.
 No separate persistent testing override is stored.
 
+**Unstoppable** (`BlastSettings.testDemolition()`, default false) is another
+hidden checkbox, stored globally like the other test settings. It applies to
+every `Bomb` subtype, including effect bombs. `BlastDemolition.prepare` snapshots
+the bomb's warning footprint before terrain changes and removes reached traps
+(including secret and inactive traps) without triggering them. After the base
+explosion, `finish` calls the remaining reached mobs' `die(bomb)` hooks directly,
+bypassing armor, evasion, invulnerability, and damage-discarding overrides such
+as the red sentry's. Normal death hooks still handle loot and boss cleanup;
+the Hero continues to use normal bomb damage and Bombproof protection. Tengu
+completes the current fight phase through `PrisonBossLevel.progress()` after the
+chain, preserving the scripted transition and final exit unlock. Neutral
+and allied mobs are also affected. The separate enemy counterbomb is not a
+`Bomb` and keeps its existing rules.
+
+Locked/crystal doors, including doors locked by the Skeleton Key, are included
+as hit endpoints in bomb warnings. They still
+block blast rays behind them and are changed to EMPTY only after the full linked
+explosion, including subtype effects, finishes. Ordinary, locked, and crystal
+chests stay closed throughout that chain and become HEAPs afterwards, preserving
+all contained items without consuming keys. Switching the option off immediately
+restores ordinary explosion behavior and refreshes existing bomb warnings.
+Existing wall/statue durability and locked-exit rules are unchanged. This option
+does not grant a separate buff.
+
 To toggle test visibility, drop both the waterskin and velvet pouch on the
 current floor and clear every equipped weapon, armor, artifact, and ring slot.
 Then click the debug-logging checkbox to turn it **on**. The visibility toggle
