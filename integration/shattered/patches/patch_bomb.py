@@ -157,7 +157,7 @@ def patch(path: Path) -> None:
 \t\tif (explodesDestructively()) {
 \t\t\tcom.watabou.utils.BArray.or(Dungeon.level.flamable, explodable, explodable);
 \t\t}
-\t\tcom.spd.blast.BlastDemolition.includeDoors(explodable);
+\t\tcom.spd.blast.BlastDemolition.includeObstacles(explodable);
 \t\treturn com.spd.blast.BlastBombWarnings.reachable(
 \t\t\t\tDungeon.level, cell, explodable, explosionRange());
 \t}""", "bomb blast warning footprint")

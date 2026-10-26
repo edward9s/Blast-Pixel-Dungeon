@@ -432,14 +432,22 @@ chain, preserving the scripted transition and final exit unlock. Neutral
 and allied mobs are also affected. The separate enemy counterbomb is not a
 `Bomb` and keeps its existing rules.
 
-Locked/crystal doors, including doors locked by the Skeleton Key, are included
-as hit endpoints in bomb warnings. They still
+Locked/crystal doors, including doors locked by the Skeleton Key, and ordinary
+decorative obstacles (`REGION_DECO`, `REGION_DECO_ALT`, `STATUE`, `STATUE_SP`,
+`BOOKSHELF`, `BARRICADE`) are included as hit endpoints in bomb warnings. Cages,
+barrels, bone piles, and other region-specific props use the regional terrain
+types; statues are destroyed regardless of their saved durability. Newly
+supported solid obstacles still
 block blast rays behind them and are changed to EMPTY only after the full linked
 explosion, including subtype effects, finishes. Ordinary, locked, and crystal
 chests stay closed throughout that chain and become HEAPs afterwards, preserving
-all contained items without consuming keys. Switching the option off immediately
+their remaining contents without consuming keys. All reached `Key` items,
+including entire stacks and keys inside containers, are removed before the
+normal explosion. `WornKey` (the fifth-floor progression key) is explicitly
+excluded and retains its normal unique-item protection. Carried/journal keys
+are outside the blast and are unaffected. Switching the option off immediately
 restores ordinary explosion behavior and refreshes existing bomb warnings.
-Existing wall/statue durability and locked-exit rules are unchanged. This option
+Existing wall durability, scripted custom fixtures, and locked-exit rules are unchanged. This option
 does not grant a separate buff.
 
 To toggle test visibility, drop both the waterskin and velvet pouch on the

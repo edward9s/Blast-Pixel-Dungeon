@@ -6,7 +6,10 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Tengu;
 import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
+import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.bombs.Bomb;
+import com.shatteredpixel.shatteredpixeldungeon.items.keys.Key;
+import com.shatteredpixel.shatteredpixeldungeon.items.keys.WornKey;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
 import com.shatteredpixel.shatteredpixeldungeon.levels.PrisonBossLevel;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
@@ -19,7 +22,7 @@ public final class BlastDemolition {
     private final Level level;
     private final Bomb bomb;
     private final PrisonBossLevel.State prisonPhase;
-    private final ArrayList<Integer> doors = new ArrayList<>();
+    private final ArrayList<Integer> obstacles = new ArrayList<>();
     private final ArrayList<Heap> chests = new ArrayList<>();
     private final ArrayList<Mob> mobs = new ArrayList<>();
 
@@ -29,17 +32,29 @@ public final class BlastDemolition {
         prisonPhase = level instanceof PrisonBossLevel ? ((PrisonBossLevel) level).state() : null;
     }
 
-    private static boolean lockedDoor(int terrain) {
-        return terrain == Terrain.LOCKED_DOOR || terrain == Terrain.CRYSTAL_DOOR
-                || terrain == Terrain.HERO_LKD_DR;
+    private static boolean obstacle(int terrain) {
+        switch (terrain) {
+            case Terrain.LOCKED_DOOR:
+            case Terrain.CRYSTAL_DOOR:
+            case Terrain.HERO_LKD_DR:
+            case Terrain.REGION_DECO:
+            case Terrain.REGION_DECO_ALT:
+            case Terrain.STATUE:
+            case Terrain.STATUE_SP:
+            case Terrain.BOOKSHELF:
+            case Terrain.BARRICADE:
+                return true;
+            default:
+                return false;
+        }
     }
 
-    /** Locked doors can be hit endpoints, while still blocking the ray behind them. */
-    public static void includeDoors(boolean[] explodable) {
+    /** Solid obstacles can be hit endpoints, while still blocking the ray behind them. */
+    public static void includeObstacles(boolean[] explodable) {
         if (!BlastSettings.testDemolition()) return;
         Level level = Dungeon.level;
         for (int cell = 0; cell < explodable.length; cell++) {
-            if (lockedDoor(level.map[cell])) explodable[cell] = true;
+            if (obstacle(level.map[cell])) explodable[cell] = true;
         }
     }
 
@@ -61,9 +76,16 @@ public final class BlastDemolition {
         for (int cell = 0; cell < cells.length; cell++) {
             if (!cells[cell]) continue;
             int terrain = level.map[cell];
-            if (lockedDoor(terrain)) demolition.doors.add(cell);
+            if (obstacle(terrain)) demolition.obstacles.add(cell);
             Heap heap = level.heaps.get(cell);
-            if (heap != null && chest(heap)) demolition.chests.add(heap);
+            if (heap != null) {
+                // Keys are normally unique and explosion-proof. WornKey is the
+                // fifth-floor progression key and must retain that protection.
+                for (Item item : heap.items.toArray(new Item[0])) {
+                    if (item instanceof Key && !(item instanceof WornKey)) heap.remove(item);
+                }
+                if (chest(heap)) demolition.chests.add(heap);
+            }
             Char ch = Actor.findChar(cell);
             if (ch instanceof Mob) demolition.mobs.add((Mob) ch);
 
@@ -104,8 +126,8 @@ public final class BlastDemolition {
             if (level instanceof PrisonBossLevel
                     && ((PrisonBossLevel) level).state() != prisonPhase) return;
             boolean changed = false;
-            for (int cell : doors) {
-                if (!lockedDoor(level.map[cell])) continue;
+            for (int cell : obstacles) {
+                if (!obstacle(level.map[cell])) continue;
                 Level.set(cell, Terrain.EMPTY, level);
                 GameScene.updateMap(cell);
                 changed = true;

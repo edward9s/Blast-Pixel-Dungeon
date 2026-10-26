@@ -30,8 +30,11 @@ types destroy traps and kill non-Hero characters in their blast area, including
 red sentries and other invulnerable or evasive characters. Locked and crystal
 doors break, and ordinary, locked, and crystal chests release their contents
 after the complete chain of explosions, preserving the items for pickup.
-Doors still block that chain's blast rays until it finishes. Hero damage and
-the existing wall/statue durability rules remain unchanged.
+Keys on the ground or inside reached containers are destroyed, except the
+fifth-floor Worn Key, which always survives. Cages and other regional decorations,
+statues, bookshelves, and barricades can also be demolished. Newly supported solid
+obstacles block the chain's blast rays until it finishes. Hero damage and wall
+durability rules remain unchanged; the test bypasses statue durability.
 
 Lit bombs normally block movement and cannot be picked up or manually disarmed. Free Movement lets you pass through walls and lit bombs, and lets thrown or kicked bombs fly past obstacles. Locked exits still block passage.
 
