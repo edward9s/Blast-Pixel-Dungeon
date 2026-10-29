@@ -67,10 +67,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          args=()
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            args=(--manual)
+          fi
           mode=$(python blast/scripts/decide_release.py \
-            "$BLAST_VERSION" "$GITHUB_SHA" "$SPD_TAG" "$SMM_MAIN_SHA" "$SMM_TAG")
+            "$BLAST_VERSION" "$GITHUB_SHA" "$SPD_TAG" "$SMM_MAIN_SHA" "$SMM_TAG" "${args[@]}")
           case "$mode" in
-            formal) smm_ref="$SMM_TAG" ;;
+            formal|manual) smm_ref="$SMM_TAG" ;;
             test|skip) smm_ref="$SMM_MAIN_SHA" ;;
             *) echo "::error::Unknown release mode: $mode"; exit 1 ;;
           esac
@@ -223,7 +227,7 @@ jobs:
           cp "$jar" "out/$base.jar"
 
       - name: Find previous Blast release
-        if: needs.prepare.outputs.mode == 'formal'
+        if: needs.prepare.outputs.mode == 'formal' || needs.prepare.outputs.mode == 'manual'
         id: previous
         env:
           GH_TOKEN: ${{ github.token }}
@@ -236,17 +240,17 @@ jobs:
           echo "tag=$previous" >> "$GITHUB_OUTPUT"
 
       - name: Set up Node.js for Copilot
-        if: needs.prepare.outputs.mode == 'formal'
+        if: needs.prepare.outputs.mode == 'formal' || needs.prepare.outputs.mode == 'manual'
         uses: actions/setup-node@v4
         with:
           node-version: '22'
 
       - name: Install Copilot CLI
-        if: needs.prepare.outputs.mode == 'formal'
+        if: needs.prepare.outputs.mode == 'formal' || needs.prepare.outputs.mode == 'manual'
         run: npm install -g @github/copilot
 
       - name: Generate Blast changelog with Copilot
-        if: needs.prepare.outputs.mode == 'formal'
+        if: needs.prepare.outputs.mode == 'formal' || needs.prepare.outputs.mode == 'manual'
         working-directory: blast
         shell: bash
         env:
@@ -281,7 +285,7 @@ jobs:
           test -s release-notes-ai.md
 
       - name: Compose release notes
-        if: needs.prepare.outputs.mode == 'formal'
+        if: needs.prepare.outputs.mode == 'formal' || needs.prepare.outputs.mode == 'manual'
         working-directory: blast
         shell: bash
         env:
