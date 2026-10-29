@@ -6,7 +6,8 @@ import re
 import sys
 from urllib.request import Request, urlopen
 
-OFFICIAL_TAG = re.compile(r"Blast-v(\d+\.\d+\.\d+)-SPD-v\d+(?:\.\d+)+")
+OFFICIAL_TAG = re.compile(r"Blast-v(\d+\.\d+\.\d+)-SPD-(v\d+(?:\.\d+)+)")
+SPD_TAG = re.compile(r"v\d+(?:\.\d+)+")
 VERSION = re.compile(r"\d+\.\d+\.\d+")
 
 
@@ -16,22 +17,25 @@ def version_tuple(version):
     return tuple(map(int, version.split(".")))
 
 
-def decide_mode(version, releases, manual=False):
+def decide_mode(version, spd_tag, releases, manual=False):
     installed = version_tuple(version)
-    published = []
+    if not SPD_TAG.fullmatch(spd_tag):
+        raise ValueError("Invalid SPD release tag: " + spd_tag)
+    published = set()
     for release in releases:
         if release["draft"] or release["prerelease"]:
             continue
         match = OFFICIAL_TAG.fullmatch(release["tag_name"])
         if match:
-            published.append(version_tuple(match.group(1)))
+            published.add((version_tuple(match.group(1)), match.group(2)))
 
-    latest = max(published, default=None)
-    if latest is not None and installed < latest:
+    latest_blast = max((item[0] for item in published), default=None)
+    if latest_blast is not None and installed < latest_blast:
         raise ValueError("Blast version is older than the newest official release")
     if manual:
         return "manual"
-    return "formal" if latest is None or installed > latest else "skip"
+    # New combinations must publish even if only SPD changed.
+    return "skip" if (installed, spd_tag) in published else "formal"
 
 
 def github_json(path):
@@ -47,8 +51,8 @@ def github_json(path):
 
 
 def main():
-    if len(sys.argv) not in (2, 3) or (len(sys.argv) == 3 and sys.argv[2] != "--manual"):
-        raise SystemExit("usage: decide_release.py VERSION [--manual]")
+    if len(sys.argv) not in (3, 4) or (len(sys.argv) == 4 and sys.argv[3] != "--manual"):
+        raise SystemExit("usage: decide_release.py VERSION SPD_TAG [--manual]")
 
     releases = []
     for page in range(1, 101):
@@ -61,7 +65,7 @@ def main():
     else:
         raise ValueError("Too many releases to inspect safely")
 
-    print(decide_mode(sys.argv[1], releases, manual=len(sys.argv) == 3))
+    print(decide_mode(sys.argv[1], sys.argv[2], releases, manual=len(sys.argv) == 4))
 
 
 if __name__ == "__main__":
