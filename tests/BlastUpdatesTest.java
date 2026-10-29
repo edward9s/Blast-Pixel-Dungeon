@@ -11,9 +11,10 @@ public final class BlastUpdatesTest {
     }
 
     public static void main(String[] args) {
-        equals("v" + BlastVersion.VERSION, BlastVersion.display());
-        equals("v0.1.0", BlastVersion.format("0.1.0", null));
-        equals("v0.1.0 | new 0.1.1", BlastVersion.format("0.1.0", "0.1.1"));
+        equals("BPD v" + BlastVersion.VERSION + " | SPD v4.0.2", BlastVersion.display("4.0.2"));
+        equals("BPD v0.1.0 | SPD v4.0.2", BlastVersion.format("4.0.2", "0.1.0", null));
+        equals("BPD v0.1.0 | new 0.1.1 | SPD v4.0.2",
+                BlastVersion.format("4.0.2", "0.1.0", "0.1.1"));
         equals(1, BlastUpdates.compareVersions("0.1.10", "0.1.9"));
         equals(0, BlastUpdates.compareVersions("0.2", "0.2.0"));
         equals(-1, BlastUpdates.compareVersions("0.1.9", "0.1.10"));
