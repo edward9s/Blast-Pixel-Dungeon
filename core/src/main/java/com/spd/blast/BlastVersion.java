@@ -13,7 +13,8 @@ public final class BlastVersion {
 
     // Show Blast first, followed by the upstream SPD version, in both screens.
     static String format(String spdVersion, String installed, String latest) {
-        return "BPD v" + installed + " | SPD v" + spdVersion
-                + (latest == null ? "" : " | new " + latest);
+        return "BPD v" + installed
+                + (latest == null ? "" : " | new " + latest)
+                + " | SPD v" + spdVersion;
     }
 }
