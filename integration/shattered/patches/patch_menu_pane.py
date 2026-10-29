@@ -10,7 +10,7 @@ path = Path(sys.argv[1])
 menu = path.read_text(encoding="utf-8")
 
 old = 'version = new BitmapText( "v" + Game.version , PixelScene.pixelFont);'
-new = 'version = new BitmapText( com.spd.blast.BlastVersion.display(Game.version), PixelScene.pixelFont);'
+new = 'version = new BitmapText( com.spd.blast.BlastVersion.display(), PixelScene.pixelFont);'
 if new in menu:
     raise SystemExit("Blast MenuPane version hook is already present")
 if menu.count(old) != 1:
@@ -27,7 +27,7 @@ update_hook = """
 \t@Override
 \tpublic void update() {
 \t\tsuper.update();
-\t\tString display = com.spd.blast.BlastVersion.display(Game.version);
+\t\tString display = com.spd.blast.BlastVersion.display();
 \t\tif (!display.equals(version.text())) {
 \t\t\tversion.text(display);
 \t\t\tlayout();
