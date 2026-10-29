@@ -65,6 +65,15 @@ Release tags must follow `Blast-v<version>-SPD-v<upstream-version>`. To notify p
 
 The title screen's bottom-right label and the in-game top-right menu pane both use `BlastVersion.display()`. When a newer published version is found, both show `BLAST v<installed-version> (new <version>)`. Checks are non-blocking, occur when either screen opens, are limited to once an hour following success, and are retried on a later opening following failure. Draft releases, prereleases and unrelated tags such as `build-test` are excluded. Standalone and SMM builds display the same Blast update notice.
 
+## Build and release policy
+
+Blast version numbers are set **manually** in `BlastVersion.VERSION`; neither workflow increments them. At 13:00 Taiwan time each day, the scheduled workflow compares the current Blast commit, the latest SPD release, the SMM `main` commit, and the latest SMM release tag against the last successful `build-test` prerelease. When all inputs and its four APK/JAR assets match, the build is skipped and no Release is changed.
+
+When any input changes while the Blast version stays the same, the schedule rebuilds the **`build-test` prerelease** and replaces its four files. Test-asset download counts may reset. The separate manual `Build Blast` workflow still permits an unconditional test build, and both workflows serialize writes to `build-test`.
+
+When you manually increase the Blast version above the newest already published Blast version, the schedule builds and **creates a new official Release once**. It never replaces, deletes, or retags existing official-release assets, so their download counts remain intact. An SPD or SMM update alone does not create another official release under the same Blast version. Setting Blast to an older already-published version causes a clear failure.
+
+Official releases use the latest published SMM tag; test builds use SMM `main`. After an official release, the next scheduled check updates `build-test` only if its recorded inputs or assets differ. Initially, older `build-test` releases without complete input metadata will be rebuilt once.
 ## Download
 
 Get available builds from this repository's [Releases](../../releases):
