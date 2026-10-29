@@ -11,9 +11,9 @@ public final class BlastVersion {
         return format(spdVersion, VERSION, BlastUpdates.latestVersion());
     }
 
-    // Match CoHero's SPD-first version display in both screens.
+    // Show Blast first, followed by the upstream SPD version, in both screens.
     static String format(String spdVersion, String installed, String latest) {
-        return "SPD v" + spdVersion + " | BPD v" + installed
+        return "BPD v" + installed + " | SPD v" + spdVersion
                 + (latest == null ? "" : " | new " + latest);
     }
 }
