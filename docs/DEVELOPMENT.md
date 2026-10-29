@@ -22,3 +22,37 @@ Official Release builds use the latest published SPD and SMM versions. Manual te
 
 Setting Blast to an older version than the latest published official Blast release fails immediately. Rebuilding the same Blast version does not trigger a new in-game version notification.
 
+## Experimental test options
+
+These options are hidden by default and are intended for development and testing. They are not part of normal player-facing instructions.
+
+### Infinite Bombs
+
+The **Infinite Bombs** test option allows entering timed mode even with only one maximum bomb slot. Timed throws still cost one turn but do not permanently reduce maximum capacity.
+
+### Remote Throwing
+
+The hidden **Remote Throwing** test option changes the remote-mode Bomb Maniac Tag from placing a bomb at your feet to aiming and throwing a remotely detonated bomb. **Both remote-mode actions cost zero turns**, and neither permanently reduces maximum capacity. This test option does not make timed throws free.
+
+### Unstoppable
+
+The hidden **Unstoppable** test option is off by default. While enabled, all bomb
+types kill non-Hero characters in their blast area, including red sentries and
+other invulnerable or evasive characters. Destructive bombs open locked and crystal chests using the
+same rules as ordinary chests. Opening a chest exposes its items; later blasts,
+including linked explosions, affect them normally. Other item destruction and
+protection rules remain unchanged.
+With the test enabled, destructive bombs also destroy keys on the ground or in
+reached containers, except the fifth-floor Worn Key. Effect-only bombs retain
+their native item and terrain behavior. Destructive bombs remove traps immediately
+and can break locked doors and bypass statue durability. These new door/statue
+terrain changes resolve after the full chain.
+Hero damage and wall durability rules remain unchanged.
+
+Cages, barrels, bone piles, and other regional decorations can be destroyed only
+with Unstoppable enabled, by bombs that can normally destroy walls. Effect-only
+bombs cannot destroy them. Their normal gameplay behavior remains unchanged.
+
+### Test settings
+
+Experimental switches in the Blast settings tab are hidden unless separately unlocked.
