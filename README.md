@@ -67,15 +67,15 @@ The title screen's bottom-right label and the in-game top-right menu pane both u
 
 ## Build and release policy
 
-Blast version numbers are set **manually** in `BlastVersion.VERSION`; neither workflow increments them. At 13:00 Taiwan time each day, the scheduled workflow compares the current Blast commit, the latest SPD release, the SMM `main` commit, and the latest SMM release tag against the last successful `build-test` prerelease. When all inputs and its four APK/JAR assets match, the build is skipped and no Release is changed.
+Blast versions are set **manually** in `BlastVersion.VERSION`. Neither workflow increments this value.
 
-When any input changes while the Blast version stays the same, the schedule rebuilds the **`build-test` prerelease** and replaces its four files. Test-asset download counts may reset. The separate manual `Build Blast` workflow still permits an unconditional test build, and both workflows serialize writes to `build-test`.
+- **Scheduled Release Blast:** At 13:00 Taiwan time each day, compare the **pair** of manually assigned Blast version and latest published SPD version with the combinations already released. If the exact pair exists, skip compilation and leave Releases unchanged. If either Blast or SPD has a new version and the pair has not been released, compile four standalone/SMM APK/JAR assets and create one official Release. Changes to Blast source or the SMM version alone do **not** trigger scheduled builds. Scheduled runs never overwrite an existing official Release.
+- **Manual Release Blast:** Always compile all four APK/JAR assets, even when every version and source is unchanged. Create a new official Release if its tag does not exist; otherwise overwrite its APK/JAR assets, refresh notes, remove obsolete APK/JAR filenames, and move its tag to the rebuilt commit. Replaced asset download counts reset.
+- **Manual Build Blast:** Always compile all four APK/JAR assets and update the rolling `build-test` prerelease. **There is no scheduled test build.** Replacing test assets may reset their download counts.
 
-When you manually increase the Blast version above the newest already published Blast version, the schedule builds and **creates a new official Release once**. Scheduled runs never overwrite, delete, or retag existing official-release assets, so their download counts remain intact. An SPD or SMM update alone does not create another official release under the same Blast version. Setting Blast to an older already-published version causes a clear failure.
+Official Release builds use the latest published SPD and SMM versions. Manual test builds use the latest published SPD version and SMM `main`. The normal one-hour separation from SMM's scheduled release remains in the official Release Blast schedule.
 
-**Manually running the `Release Blast` workflow** always rebuilds the four APK/JAR files, even when Blast, SPD, and SMM are unchanged. It creates the official Release if the corresponding tag is new; otherwise it **replaces the APK/JAR assets**, refreshes release notes, removes obsolete APK/JAR variants, and moves the existing release tag to the rebuilt commit. Replaced or removed assets lose their prior per-file download counts. Manually rebuilding the same Blast version does not trigger a new in-game version notice.
-
-Official releases use the latest published SMM tag; test builds use SMM `main`. After an official release, the next scheduled check updates `build-test` only if its recorded inputs or assets differ. Initially, older `build-test` releases without complete input metadata will be rebuilt once.
+Setting Blast to an older version than the latest published official Blast release fails immediately. Rebuilding the same Blast version does not trigger a new in-game version notification.
 
 ## Download
 
