@@ -8,7 +8,11 @@ public final class BlastVersion {
     private BlastVersion() {}
 
     public static String display() {
-        String latest = BlastUpdates.latestVersion();
-        return "BLAST v" + VERSION + (latest == null ? "" : " (new " + latest + ")");
+        return format(VERSION, BlastUpdates.latestVersion());
+    }
+
+    // Shared by the title screen and the in-game menu.
+    static String format(String installed, String latest) {
+        return "v" + installed + (latest == null ? "" : " | new " + latest);
     }
 }
