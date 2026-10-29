@@ -7,12 +7,13 @@ public final class BlastVersion {
 
     private BlastVersion() {}
 
-    public static String display() {
-        return format(VERSION, BlastUpdates.latestVersion());
+    public static String display(String spdVersion) {
+        return format(spdVersion, VERSION, BlastUpdates.latestVersion());
     }
 
-    // Shared by the title screen and the in-game menu.
-    static String format(String installed, String latest) {
-        return "v" + installed + (latest == null ? "" : " | new " + latest);
+    // Match CoHero's SPD-first version display in both screens.
+    static String format(String spdVersion, String installed, String latest) {
+        return "SPD v" + spdVersion + " | BPD v" + installed
+                + (latest == null ? "" : " | new " + latest);
     }
 }
