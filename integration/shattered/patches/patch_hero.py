@@ -25,14 +25,15 @@ def patch(path: Path) -> None:
         "Hero.act remote buff maintenance"
     )
 
-    # Unblessed Ankh resets bomb capacity without removing remote control.
+    # Unblessed Ankh removes the blast-radius upgrade but preserves bomb capacity.
     s = replace_once(
         s,
         "\tpublic void resurrect() {\n\t\tHP = HT;",
         "\tpublic void resurrect() {\n"
-        "\t\tcom.spd.blast.BlastBombManiac.onResurrection();\n"
+        "\t\tcom.shatteredpixel.shatteredpixeldungeon.actors.buffs.Buff.detach("
+        "this, com.spd.blast.BlastRadius.class);\n"
         "\t\tHP = HT;",
-        "Hero.resurrect capacity reset"
+        "Hero.resurrect radius reset"
     )
 
     # Source attribution is a Bomb (including its subclasses) only for the actual
@@ -183,14 +184,6 @@ def patch(path: Path) -> None:
         "Hero.handle mining versus phasing"
     )
 
-    s = replace_once(
-        s,
-        "com.spd.blast.BlastBombManiac.onResurrection();\n",
-        "com.spd.blast.BlastBombManiac.onResurrection();\n"
-        "\t\tcom.shatteredpixel.shatteredpixeldungeon.actors.buffs.Buff.detach("
-        "this, com.spd.blast.BlastRadius.class);\n",
-        "remove radius upgrade on unblessed Ankh"
-    )
     s = replace_once(
         s,
         "com.spd.blast.BlastSettings.testIndestructible()\n"

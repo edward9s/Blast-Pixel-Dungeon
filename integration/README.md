@@ -369,8 +369,8 @@ The permanent buff is implemented by `BlastBombManiac` and its
 at capacity 1, and prevents timed throws from reducing maximum capacity.
 Disabling the test reinstates the normal restrictions; if timed mode has only
 1 slot remaining, it reverts to remote mode when no lit bombs remain.
-Unblessed-Ankh resurrection resets Bomb Maniac capacity to one but preserves
-its discovered bomb types; it also removes the BlastRadius upgrade.
+Unblessed-Ankh resurrection preserves Bomb Maniac's maximum capacity and
+discovered bomb types; it still removes the BlastRadius upgrade.
 
 A Bomb Maniac-generated bomb falling into a chasm is consumed immediately:
 its deployment slot is returned, and it does not appear on the next floor.
