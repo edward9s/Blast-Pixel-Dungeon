@@ -11,7 +11,6 @@ title = path.read_text(encoding="utf-8")
 
 old = 'version = new BitmapText( "v" + Game.version, pixelFont);'
 new = 'version = new BitmapText( com.spd.blast.BlastVersion.display(), pixelFont);'
-
 if new in title:
     raise SystemExit("TitleScene Blast version hook is already present")
 if title.count(old) != 1:
@@ -22,6 +21,25 @@ new_icon = "btnAbout.icon(new Image(Assets.Interfaces.BLAST_CREDIT));"
 if title.count(old_icon) != 1:
     raise SystemExit(f"expected exactly one TitleScene about icon anchor, found {title.count(old_icon)}")
 
-title = title.replace(old, new, 1).replace(old_icon, new_icon, 1)
+anchor = "\tprivate float uiAlpha;"
+if title.count(anchor) != 1:
+    raise SystemExit("expected exactly one TitleScene update anchor")
+update_hook = """
+\t@Override
+\tpublic void update() {
+\t\tsuper.update();
+\t\tString display = com.spd.blast.BlastVersion.display();
+\t\tif (!display.equals(version.text())) {
+\t\t\tfloat right = version.x + version.width();
+\t\t\tversion.text(display);
+\t\t\tversion.measure();
+\t\t\tversion.x = right - version.width();
+\t\t}
+\t}
+
+"""
+title = title.replace(old, "com.spd.blast.BlastUpdates.checkForUpdate();\n\t\t" + new, 1)
+title = title.replace(old_icon, new_icon, 1)
+title = title.replace(anchor, update_hook + anchor, 1)
 path.write_text(title, encoding="utf-8")
-print(f"patched {path}: Blast version and About button icon")
+print(f"patched {path}: Blast update check and live version label")

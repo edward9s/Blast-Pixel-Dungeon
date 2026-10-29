@@ -57,6 +57,14 @@ The flame blast-radius and yellow speed-boot pickups activate immediately and co
 
 The **Blast settings tab** is available from both the title-screen settings and the in-game settings by default. Experimental switches inside that tab remain hidden unless separately unlocked.
 
+## Version updates
+
+The Blast version is set **manually** in `core/src/main/java/com/spd/blast/BlastVersion.java` (`BlastVersion.VERSION`). Neither the build nor release workflow increments it automatically.
+
+Release tags must follow `Blast-v<version>-SPD-v<upstream-version>`. To notify players of a new Blast version, manually change `VERSION` and publish a non-draft, non-prerelease GitHub Release with the new version in its tag. Replacing APK assets under an unchanged Blast version does not trigger a notice.
+
+The title screen's bottom-right label and the in-game top-right menu pane both use `BlastVersion.display()`. When a newer published version is found, both show `BLAST v<installed-version> (new <version>)`. Checks are non-blocking, occur when either screen opens, are limited to once an hour following success, and are retried on a later opening following failure. Draft releases, prereleases and unrelated tags such as `build-test` are excluded. Standalone and SMM builds display the same Blast update notice.
+
 ## Download
 
 Get available builds from this repository's [Releases](../../releases):
