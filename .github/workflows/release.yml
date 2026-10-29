@@ -328,22 +328,50 @@ jobs:
           set -euo pipefail
           test "$(find out -maxdepth 1 -type f \( -name '*.jar' -o -name '*.apk' \) | wc -l)" -eq 4
 
-      - name: Publish immutable official release
-        if: needs.prepare.outputs.mode == 'formal'
+      - name: Publish official release
+        if: needs.prepare.outputs.mode == 'formal' || needs.prepare.outputs.mode == 'manual'
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ needs.prepare.outputs.release_tag }}
+          BUILD_MODE: ${{ needs.prepare.outputs.mode }}
         shell: bash
         run: |
           set -euo pipefail
-          # A new manually assigned Blast version creates one official release.
-          # No --clobber, no asset removal, no existing tag rewrite.
-          gh release create "$RELEASE_TAG" out/* \
-            --repo "$GITHUB_REPOSITORY" \
-            --target "$GITHUB_SHA" \
-            --title "$RELEASE_TAG" \
-            --notes-file release-notes.md
+          if [[ "$BUILD_MODE" == "manual" ]] \
+              && gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            # Explicitly requested manual release: replace the APK/JAR files.
+            # Replaced assets start new per-file download counters.
+            gh release upload "$RELEASE_TAG" out/* --repo "$GITHUB_REPOSITORY" --clobber
+            gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+              --title "$RELEASE_TAG" --notes-file release-notes.md
 
+            # Remove version-named assets no longer produced by the build.
+            assets=$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+              --json assets --jq '.assets[].name')
+            while IFS= read -r asset; do
+              case "$asset" in
+                *.apk|*.jar)
+                  if [[ ! -f "out/$asset" ]]; then
+                    gh release delete-asset "$RELEASE_TAG" "$asset" \
+                      --repo "$GITHUB_REPOSITORY" --yes
+                  fi
+                  ;;
+              esac
+            done <<< "$assets"
+
+            # Keep the existing release tag aligned with the rebuilt binaries.
+            gh api --method PATCH \
+              "repos/$GITHUB_REPOSITORY/git/refs/tags/$RELEASE_TAG" \
+              -f sha="$GITHUB_SHA" -F force=true >/dev/null
+          else
+            # Scheduled runs only create new official releases.
+            # No overwrite and no tag rewrite on the scheduled path.
+            gh release create "$RELEASE_TAG" out/* \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "$RELEASE_TAG" \
+              --notes-file release-notes.md
+          fi
       - name: Publish rolling test release
         if: needs.prepare.outputs.mode == 'test'
         env:
