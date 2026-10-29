@@ -8,7 +8,7 @@ The Blast version is set **manually** in `core/src/main/java/com/spd/blast/Blast
 
 Release tags must follow `Blast-v<version>-SPD-v<upstream-version>`. To notify players of a new Blast version, manually change `VERSION` and publish a non-draft, non-prerelease GitHub Release with the new version in its tag. Replacing APK assets under an unchanged Blast version does not trigger a notice.
 
-The title screen's bottom-right label and the in-game top-right menu pane both use `BlastVersion.display(Game.version)` and match CoHero's SPD-first labeling. Without a new Blast release, both show `SPD v<spd-version> | BPD v<blast-version>` (for example, `SPD v4.0.2 | BPD v0.1.1`). When a newer published Blast version is found, the label appends ` | new <version>`. Checks are non-blocking, occur when either screen opens, are limited to once an hour following success, and are retried on a later opening following failure. Draft releases, prereleases and unrelated tags such as `build-test` are excluded. Standalone and SMM builds display the same Blast update notice.
+The title screen's bottom-right label and the in-game top-right menu pane both use `BlastVersion.display(Game.version)` and use BPD-first labeling. Without a new Blast release, both show `BPD v<blast-version> | SPD v<spd-version>` (for example, `BPD v0.1.1 | SPD v4.0.2`). When a newer published Blast version is found, the label appends ` | new <version>`. Checks are non-blocking, occur when either screen opens, are limited to once an hour following success, and are retried on a later opening following failure. Draft releases, prereleases and unrelated tags such as `build-test` are excluded. Standalone and SMM builds display the same Blast update notice.
 
 ## Build and release policy
 
