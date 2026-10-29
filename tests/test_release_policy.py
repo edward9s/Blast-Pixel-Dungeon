@@ -74,5 +74,30 @@ class DecideReleaseTests(unittest.TestCase):
         }]))
 
 
+class WorkflowTriggerTests(unittest.TestCase):
+    def test_scheduled_release_never_writes_build_test(self):
+        root = Path(__file__).resolve().parents[1]
+        release = (root / ".github/workflows/release.yml").read_text(encoding="utf-8")
+        self.assertNotIn("build-test", release)
+        self.assertIn("if: needs.prepare.outputs.mode != 'skip'", release)
+
+    def test_test_build_is_manual_only(self):
+        root = Path(__file__).resolve().parents[1]
+        build = (root / ".github/workflows/build.yml").read_text(encoding="utf-8")
+        triggers = build.split("jobs:", 1)[0]
+        self.assertIn("  workflow_dispatch:", triggers)
+        self.assertNotIn("  schedule:", triggers)
+
+    def test_manual_official_release_can_replace_assets(self):
+        root = Path(__file__).resolve().parents[1]
+        release = (root / ".github/workflows/release.yml").read_text(encoding="utf-8")
+        self.assertIn('args=(--manual)', release)
+        self.assertIn('if [[ "$BUILD_MODE" == "manual" ]]', release)
+        self.assertIn(
+            'gh release upload "$RELEASE_TAG" out/* --repo "$GITHUB_REPOSITORY" --clobber',
+            release,
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
