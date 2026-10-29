@@ -9,6 +9,11 @@ permissions:
   contents: write
   copilot-requests: write
 
+# Serialize scheduled and manual writes to the rolling test release.
+concurrency:
+  group: blast-test-release
+  cancel-in-progress: false
+
 jobs:
   prepare:
     runs-on: ubuntu-latest
@@ -16,25 +21,10 @@ jobs:
       spd_tag: ${{ steps.versions.outputs.spd_tag }}
       blast_version: ${{ steps.versions.outputs.blast_version }}
       smm_tag: ${{ steps.versions.outputs.smm_tag }}
-      smm_version: ${{ steps.versions.outputs.smm_version }}
+      smm_ref: ${{ steps.decision.outputs.smm_ref }}
+      mode: ${{ steps.decision.outputs.mode }}
       release_tag: ${{ steps.versions.outputs.release_tag }}
     steps:
-      - name: Verify signing configuration
-        env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          for key in KEYSTORE_BASE64 KEY_ALIAS STORE_PASSWORD KEY_PASSWORD; do
-            if [ -z "${!key}" ]; then
-              echo "::error::Missing required signing secret: $key"
-              exit 1
-            fi
-          done
-
       - name: Checkout Blast
         uses: actions/checkout@v4
         with:
@@ -49,21 +39,47 @@ jobs:
           set -euo pipefail
           spd_tag=$(gh api repos/00-Evan/shattered-pixel-dungeon/releases/latest --jq '.tag_name // empty')
           smm_tag=$(gh api repos/edward9s/Shattered-Master-Mode/releases/latest --jq '.tag_name // empty')
+          smm_main_sha=$(gh api repos/edward9s/Shattered-Master-Mode/git/ref/heads/main --jq '.object.sha')
           if [[ -z "$spd_tag" || ! "$smm_tag" =~ -m([0-9]+(\.[0-9]+)*)$ ]]; then
             echo "::error::Could not resolve SPD and SMM releases"
             exit 1
           fi
-          smm_version="${BASH_REMATCH[1]}"
           version=$(python blast/scripts/extract_version.py blast/core/src/main/java/com/spd/blast/BlastVersion.java)
           release_tag="Blast-v$version-SPD-$spd_tag"
           echo "spd_tag=$spd_tag" >> "$GITHUB_OUTPUT"
           echo "smm_tag=$smm_tag" >> "$GITHUB_OUTPUT"
-          echo "smm_version=$smm_version" >> "$GITHUB_OUTPUT"
+          echo "smm_main_sha=$smm_main_sha" >> "$GITHUB_OUTPUT"
           echo "blast_version=$version" >> "$GITHUB_OUTPUT"
           echo "release_tag=$release_tag" >> "$GITHUB_OUTPUT"
 
+
+      - name: Test release decision rules
+        run: python -m unittest discover -s blast/tests -p 'test_release_policy.py'
+
+      - name: Decide build mode
+        id: decision
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BLAST_VERSION: ${{ steps.versions.outputs.blast_version }}
+          SPD_TAG: ${{ steps.versions.outputs.spd_tag }}
+          SMM_MAIN_SHA: ${{ steps.versions.outputs.smm_main_sha }}
+          SMM_TAG: ${{ steps.versions.outputs.smm_tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mode=$(python blast/scripts/decide_release.py \
+            "$BLAST_VERSION" "$GITHUB_SHA" "$SPD_TAG" "$SMM_MAIN_SHA" "$SMM_TAG")
+          case "$mode" in
+            formal) smm_ref="$SMM_TAG" ;;
+            test|skip) smm_ref="$SMM_MAIN_SHA" ;;
+            *) echo "::error::Unknown release mode: $mode"; exit 1 ;;
+          esac
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+          echo "smm_ref=$smm_ref" >> "$GITHUB_OUTPUT"
+          echo "Release decision: $mode"
   build:
     needs: prepare
+    if: needs.prepare.outputs.mode != 'skip'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Blast
@@ -90,8 +106,28 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: edward9s/Shattered-Master-Mode
-          ref: ${{ needs.prepare.outputs.smm_tag }}
+          ref: ${{ needs.prepare.outputs.smm_ref }}
           path: mod
+
+      - name: Extract built SMM version
+        id: smm_version
+        run: echo "value=$(python mod/scripts/extract_version.py mod/core/src/main/java/com/spd/mod/ModGame.java)" >> "$GITHUB_OUTPUT"
+
+      - name: Verify signing configuration
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for key in KEYSTORE_BASE64 KEY_ALIAS STORE_PASSWORD KEY_PASSWORD; do
+            if [ -z "${!key}" ]; then
+              echo "::error::Missing required signing secret: $key"
+              exit 1
+            fi
+          done
 
       - name: Install icon generation dependency
         run: python -m pip install Pillow==11.3.0
@@ -182,7 +218,7 @@ jobs:
           jar=$(find spd-smm/desktop/build/libs -maxdepth 1 -name '*.jar' -type f -print -quit)
           test -f "$jar"
           test -f "${{ steps.sign_smm.outputs.signedReleaseFile }}"
-          base="${{ needs.prepare.outputs.release_tag }}-SMM-m${{ needs.prepare.outputs.smm_version }}"
+          base="${{ needs.prepare.outputs.release_tag }}-SMM-m${{ steps.smm_version.outputs.value }}"
           cp "${{ steps.sign_smm.outputs.signedReleaseFile }}" "out/$base.apk"
           cp "$jar" "out/$base.jar"
 
@@ -246,7 +282,7 @@ jobs:
         env:
           PREV_TAG: ${{ steps.previous.outputs.tag }}
           SPD_TAG: ${{ needs.prepare.outputs.spd_tag }}
-          SMM_VER: ${{ needs.prepare.outputs.smm_version }}
+          SMM_VER: ${{ steps.smm_version.outputs.value }}
         run: |
           set -euo pipefail
           changes="../release-notes-changes.md"
