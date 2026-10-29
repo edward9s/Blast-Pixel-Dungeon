@@ -56,14 +56,6 @@ public final class BlastBombManiac extends Buff {
         return Dungeon.hero == null ? null : Dungeon.hero.buff(BlastBombManiac.class);
     }
 
-    /** Unblessed Ankh resets upgrades but retains discovered bomb types. */
-    public static void onResurrection() {
-        BlastBombManiac buff = current();
-        if (buff != null) {
-            buff.capacity = 1;
-        }
-    }
-
     public int capacity() {
         return capacity;
     }
