@@ -41,7 +41,7 @@ def main() -> None:
     menu = patch("patch_menu_pane.py", "MenuPane.java", MENU)
     for source in (title, menu):
         assert "com.spd.blast.BlastUpdates.checkForUpdate();" in source
-        assert "com.spd.blast.BlastVersion.display(Game.version)" in source
+        assert "com.spd.blast.BlastVersion.display()" in source
         assert "public void update()" in source
         assert "version.text(display);" in source
     assert "float right = version.x + version.width();" in title
