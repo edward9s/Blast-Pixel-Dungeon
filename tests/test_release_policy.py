@@ -78,6 +78,13 @@ class DecideReleaseTests(unittest.TestCase):
     def test_manual_release_rebuilds_with_new_version(self):
         self.assertEqual("manual", self.decide(manual=True, version="0.1.1"))
 
+    def test_manual_release_creates_if_no_formal_release_exists(self):
+        self.assertEqual("manual", self.decide(manual=True, releases=[]))
+
+    def test_manual_release_still_rejects_downgrade(self):
+        with self.assertRaisesRegex(ValueError, "older"):
+            self.decide(manual=True, releases=[official("0.1.1")])
+
     def test_manual_release_does_not_require_valid_test_assets(self):
         self.assertEqual("manual", self.decide(manual=True, test={"draft": False,
             "prerelease": True, "body": "", "assets": []}))
