@@ -10,7 +10,7 @@ path = Path(sys.argv[1])
 title = path.read_text(encoding="utf-8")
 
 old = 'version = new BitmapText( "v" + Game.version, pixelFont);'
-new = 'version = new BitmapText( com.spd.blast.BlastVersion.display(Game.version), pixelFont);'
+new = 'version = new BitmapText( com.spd.blast.BlastVersion.display(), pixelFont);'
 if new in title:
     raise SystemExit("TitleScene Blast version hook is already present")
 if title.count(old) != 1:
@@ -28,7 +28,7 @@ update_hook = """
 \t@Override
 \tpublic void update() {
 \t\tsuper.update();
-\t\tString display = com.spd.blast.BlastVersion.display(Game.version);
+\t\tString display = com.spd.blast.BlastVersion.display();
 \t\tif (!display.equals(version.text())) {
 \t\t\tfloat right = version.x + version.width();
 \t\t\tversion.text(display);
