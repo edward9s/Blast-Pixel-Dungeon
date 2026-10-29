@@ -17,7 +17,7 @@ def version_tuple(version):
     return tuple(map(int, version.split(".")))
 
 
-def decide_mode(version, blast_sha, spd_tag, smm_sha, smm_tag, releases, test_release):
+def decide_mode(version, blast_sha, spd_tag, smm_sha, smm_tag, releases, test_release, manual=False):
     installed = version_tuple(version)
     published = []
     for release in releases:
@@ -30,6 +30,8 @@ def decide_mode(version, blast_sha, spd_tag, smm_sha, smm_tag, releases, test_re
     latest = max(published, default=None)
     if latest is not None and installed < latest:
         raise ValueError("Blast version is older than the newest official release")
+    if manual:
+        return "manual"
     if latest is None or installed > latest:
         return "formal"
 
@@ -79,9 +81,10 @@ def github_json(path, allow_missing=False):
 
 
 def main():
-    if len(sys.argv) != 6:
+    if len(sys.argv) not in (6, 7) or (len(sys.argv) == 7 and sys.argv[6] != "--manual"):
         raise SystemExit(
-            "usage: decide_release.py VERSION BLAST_SHA SPD_TAG SMM_MAIN_SHA SMM_RELEASE_TAG"
+            "usage: decide_release.py VERSION BLAST_SHA SPD_TAG SMM_MAIN_SHA "
+            "SMM_RELEASE_TAG [--manual]"
         )
     releases = []
     for page in range(1, 101):
@@ -94,7 +97,7 @@ def main():
     else:
         raise ValueError("Too many releases to inspect safely")
     test_release = github_json("releases/tags/build-test", allow_missing=True)
-    print(decide_mode(*sys.argv[1:], releases, test_release))
+    print(decide_mode(*sys.argv[1:6], releases, test_release, manual=len(sys.argv) == 7))
 
 
 if __name__ == "__main__":
