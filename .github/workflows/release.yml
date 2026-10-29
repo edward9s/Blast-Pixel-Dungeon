@@ -20,7 +20,7 @@ jobs:
     outputs:
       mode: ${{ steps.decision.outputs.mode }}
       blast_version: ${{ steps.version.outputs.blast_version }}
-      spd_tag: ${{ steps.upstream.outputs.spd_tag }}
+      spd_tag: ${{ steps.spd.outputs.spd_tag }}
       smm_tag: ${{ steps.upstream.outputs.smm_tag }}
       release_tag: ${{ steps.upstream.outputs.release_tag }}
     steps:
@@ -37,6 +37,17 @@ jobs:
           version=$(python blast/scripts/extract_version.py blast/core/src/main/java/com/spd/blast/BlastVersion.java)
           echo "blast_version=$version" >> "$GITHUB_OUTPUT"
 
+      - name: Resolve latest SPD release
+        id: spd
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag=$(gh api repos/00-Evan/shattered-pixel-dungeon/releases/latest --jq '.tag_name // empty')
+          [[ "$tag" =~ ^v[0-9]+(\.[0-9]+)+$ ]] || { echo "::error::Invalid SPD release tag: $tag"; exit 1; }
+          echo "spd_tag=$tag" >> "$GITHUB_OUTPUT"
+
       - name: Test release decision rules
         run: python -m unittest discover -s blast/tests -p 'test_release_policy.py'
 
@@ -45,6 +56,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           BLAST_VERSION: ${{ steps.version.outputs.blast_version }}
+          SPD_TAG: ${{ steps.spd.outputs.spd_tag }}
         shell: bash
         run: |
           set -euo pipefail
@@ -52,7 +64,7 @@ jobs:
           if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
             args=(--manual)
           fi
-          mode=$(python blast/scripts/decide_release.py "$BLAST_VERSION" "${args[@]}")
+          mode=$(python blast/scripts/decide_release.py "$BLAST_VERSION" "$SPD_TAG" "${args[@]}")
           case "$mode" in
             formal|manual|skip) ;;
             *) echo "::error::Unknown release mode: $mode"; exit 1 ;;
@@ -60,24 +72,23 @@ jobs:
           echo "mode=$mode" >> "$GITHUB_OUTPUT"
           echo "Official release decision: $mode"
 
-      - name: Resolve upstream releases for a requested build
+      - name: Resolve SMM release for a requested build
         id: upstream
         if: steps.decision.outputs.mode != 'skip'
         env:
           GH_TOKEN: ${{ github.token }}
           BLAST_VERSION: ${{ steps.version.outputs.blast_version }}
+          SPD_TAG: ${{ steps.spd.outputs.spd_tag }}
         shell: bash
         run: |
           set -euo pipefail
-          spd_tag=$(gh api repos/00-Evan/shattered-pixel-dungeon/releases/latest --jq '.tag_name // empty')
           smm_tag=$(gh api repos/edward9s/Shattered-Master-Mode/releases/latest --jq '.tag_name // empty')
-          if [[ -z "$spd_tag" || ! "$smm_tag" =~ -m([0-9]+(\.[0-9]+)*)$ ]]; then
-            echo "::error::Could not resolve SPD and SMM releases"
+          if [[ ! "$smm_tag" =~ -m([0-9]+(\.[0-9]+)*)$ ]]; then
+            echo "::error::Could not resolve SMM release"
             exit 1
           fi
-          echo "spd_tag=$spd_tag" >> "$GITHUB_OUTPUT"
           echo "smm_tag=$smm_tag" >> "$GITHUB_OUTPUT"
-          echo "release_tag=Blast-v$BLAST_VERSION-SPD-$spd_tag" >> "$GITHUB_OUTPUT"
+          echo "release_tag=Blast-v$BLAST_VERSION-SPD-$SPD_TAG" >> "$GITHUB_OUTPUT"
   build:
     needs: prepare
     if: needs.prepare.outputs.mode != 'skip'
