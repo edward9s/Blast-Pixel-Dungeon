@@ -44,11 +44,11 @@ def test_release():
 
 class DecideReleaseTests(unittest.TestCase):
     def decide(self, version=VERSION, sha=SHA, spd=SPD, smm=SMM,
-               smm_tag=SMM_TAG, releases=None, test=None):
+               smm_tag=SMM_TAG, releases=None, test=None, manual=False):
         return decide_mode(
             version, sha, spd, smm, smm_tag,
             [official(VERSION)] if releases is None else releases,
-            test_release() if test is None else test,
+            test_release() if test is None else test, manual=manual,
         )
 
     def test_unchanged_skips(self):
@@ -66,8 +66,21 @@ class DecideReleaseTests(unittest.TestCase):
     def test_smm_release_change_builds_test(self):
         self.assertEqual("test", self.decide(smm_tag="SPD-v4.0.2-m0.3.11"))
 
-    def test_manual_version_increase_creates_official(self):
+    def test_version_increase_on_schedule_creates_official(self):
         self.assertEqual("formal", self.decide(version="0.1.1"))
+
+    def test_manual_release_rebuilds_with_unchanged_inputs(self):
+        self.assertEqual("manual", self.decide(manual=True))
+
+    def test_manual_release_rebuilds_with_changed_source(self):
+        self.assertEqual("manual", self.decide(manual=True, sha="c" * 40))
+
+    def test_manual_release_rebuilds_with_new_version(self):
+        self.assertEqual("manual", self.decide(manual=True, version="0.1.1"))
+
+    def test_manual_release_does_not_require_valid_test_assets(self):
+        self.assertEqual("manual", self.decide(manual=True, test={"draft": False,
+            "prerelease": True, "body": "", "assets": []}))
 
     def test_initial_official_release(self):
         self.assertEqual("formal", self.decide(releases=[]))
