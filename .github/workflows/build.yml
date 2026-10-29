@@ -39,6 +39,9 @@ jobs:
           version=$(python blast/scripts/extract_version.py blast/core/src/main/java/com/spd/blast/BlastVersion.java)
           smm_version=$(python mod/scripts/extract_version.py mod/core/src/main/java/com/spd/mod/ModGame.java)
           test -n "$smm_version"
+          smm_tag=$(gh api repos/edward9s/Shattered-Master-Mode/releases/latest --jq '.tag_name // empty')
+          test -n "$smm_tag"
+          echo "smm_tag=$smm_tag" >> "$GITHUB_OUTPUT"
           echo "spd_tag=$tag" >> "$GITHUB_OUTPUT"
           echo "blast_version=$version" >> "$GITHUB_OUTPUT"
           echo "smm_version=$smm_version" >> "$GITHUB_OUTPUT"
@@ -190,6 +193,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           SPD_TAG: ${{ steps.versions.outputs.spd_tag }}
           TEST_TAG: build-test
+          SMM_TAG: ${{ steps.versions.outputs.smm_tag }}
         run: |
           set -euo pipefail
           shopt -s nullglob
@@ -198,8 +202,8 @@ jobs:
             echo "::error::Expected exactly four APK/JAR files"
             exit 1
           fi
-          notes=$(printf 'Latest successful manual test build.\n\nBlast commit: %s\nSPD: %s\nSMM main commit: %s\n' \
-            "$GITHUB_SHA" "$SPD_TAG" "$(git -C mod rev-parse HEAD)")
+          notes=$(printf 'Latest successful manual test build.\n\nBlast commit: %s\nSPD: %s\nSMM main commit: %s\nSMM release: %s\n' \
+            "$GITHUB_SHA" "$SPD_TAG" "$(git -C mod rev-parse HEAD)" "$SMM_TAG")
           if gh release view "$TEST_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release upload "$TEST_TAG" "${files[@]}" --repo "$GITHUB_REPOSITORY" --clobber
             gh release edit "$TEST_TAG" --repo "$GITHUB_REPOSITORY" --title "Blast test build" --notes "$notes" --prerelease
