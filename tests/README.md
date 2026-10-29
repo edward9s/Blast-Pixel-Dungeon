@@ -33,3 +33,18 @@ javac --release 11 -encoding UTF-8 -cp "$BLAST_TEST_CLASSPATH" \
   -d /tmp/blast-tests tests/BlastNoisemakerTest.java
 java -cp "/tmp/blast-tests:$BLAST_TEST_CLASSPATH" BlastNoisemakerTest
 ```
+
+`BlastUpdatesTest.java` verifies version ordering, draft/prerelease filtering, 
+and unchanged Blast versions across SPD releases. Compile with the same classpath:
+
+```sh
+javac --release 11 -encoding UTF-8 -cp "$BLAST_TEST_CLASSPATH" \
+  -d /tmp/blast-tests tests/BlastUpdatesTest.java
+java -cp "/tmp/blast-tests:$BLAST_TEST_CLASSPATH" com.spd.blast.BlastUpdatesTest
+```
+
+Smoke-test both UI patch anchors:
+
+```sh
+python scripts/test_update_patches.py
+```
