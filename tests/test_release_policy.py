@@ -19,16 +19,32 @@ def official(version, draft=False, prerelease=False, spd="v4.0.2"):
 
 
 class DecideReleaseTests(unittest.TestCase):
-    def decide(self, version=VERSION, releases=None, manual=False):
+    def decide(self, version=VERSION, spd="v4.0.2", releases=None, manual=False):
         return decide_mode(
-            version, [official(VERSION)] if releases is None else releases, manual=manual
+            version, spd,
+            [official(VERSION)] if releases is None else releases, manual=manual,
         )
 
     def test_unchanged_daily_version_skips(self):
         self.assertEqual("skip", self.decide())
 
-    def test_same_blast_version_with_new_spd_release_skips(self):
-        self.assertEqual("skip", self.decide(releases=[official(VERSION, spd="v4.0.1")]))
+    def test_same_blast_version_with_new_spd_release_builds_official(self):
+        self.assertEqual("formal", self.decide(releases=[official(VERSION, spd="v4.0.1")]))
+
+    def test_spd_newer_than_published_pair_triggers_build(self):
+        self.assertEqual("formal", self.decide(spd="v4.0.3"))
+
+    def test_existing_pair_skips_even_if_other_pairs_are_published(self):
+        self.assertEqual("skip", self.decide(releases=[
+            official(VERSION, spd="v4.0.1"), official(VERSION, spd="v4.0.2"),
+        ]))
+
+    def test_smm_version_is_not_a_build_trigger(self):
+        self.assertEqual("skip", self.decide())
+
+    def test_invalid_spd_tag_rejected(self):
+        with self.assertRaisesRegex(ValueError, "Invalid SPD"):
+            self.decide(spd="not-a-tag")
 
     def test_new_blast_version_scheduled_official_build(self):
         self.assertEqual("formal", self.decide(version="0.1.1"))
@@ -80,6 +96,7 @@ class WorkflowTriggerTests(unittest.TestCase):
         release = (root / ".github/workflows/release.yml").read_text(encoding="utf-8")
         self.assertNotIn("build-test", release)
         self.assertIn("if: needs.prepare.outputs.mode != 'skip'", release)
+        self.assertIn('"$BLAST_VERSION" "$SPD_TAG" "${args[@]}"', release)
 
     def test_test_build_is_manual_only(self):
         root = Path(__file__).resolve().parents[1]
