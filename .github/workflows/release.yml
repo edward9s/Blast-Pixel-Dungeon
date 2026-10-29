@@ -223,6 +223,7 @@ jobs:
           cp "$jar" "out/$base.jar"
 
       - name: Find previous Blast release
+        if: needs.prepare.outputs.mode == 'formal'
         id: previous
         env:
           GH_TOKEN: ${{ github.token }}
@@ -235,14 +236,17 @@ jobs:
           echo "tag=$previous" >> "$GITHUB_OUTPUT"
 
       - name: Set up Node.js for Copilot
+        if: needs.prepare.outputs.mode == 'formal'
         uses: actions/setup-node@v4
         with:
           node-version: '22'
 
       - name: Install Copilot CLI
+        if: needs.prepare.outputs.mode == 'formal'
         run: npm install -g @github/copilot
 
       - name: Generate Blast changelog with Copilot
+        if: needs.prepare.outputs.mode == 'formal'
         working-directory: blast
         shell: bash
         env:
@@ -277,6 +281,7 @@ jobs:
           test -s release-notes-ai.md
 
       - name: Compose release notes
+        if: needs.prepare.outputs.mode == 'formal'
         working-directory: blast
         shell: bash
         env:
@@ -319,43 +324,59 @@ jobs:
           set -euo pipefail
           test "$(find out -maxdepth 1 -type f \( -name '*.jar' -o -name '*.apk' \) | wc -l)" -eq 4
 
-      - name: Publish four-file release
+      - name: Publish immutable official release
+        if: needs.prepare.outputs.mode == 'formal'
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ needs.prepare.outputs.release_tag }}
         shell: bash
         run: |
           set -euo pipefail
-          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload "$RELEASE_TAG" out/* --repo "$GITHUB_REPOSITORY" --clobber
-            gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
-              --title "$RELEASE_TAG" --notes-file release-notes.md
+          # A new manually assigned Blast version creates one official release.
+          # No --clobber, no asset removal, no existing tag rewrite.
+          gh release create "$RELEASE_TAG" out/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "$RELEASE_TAG" \
+            --notes-file release-notes.md
+
+      - name: Publish rolling test release
+        if: needs.prepare.outputs.mode == 'test'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SPD_TAG: ${{ needs.prepare.outputs.spd_tag }}
+          SMM_TAG: ${{ needs.prepare.outputs.smm_tag }}
+          TEST_TAG: build-test
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          files=(out/*.apk out/*.jar)
+          if [[ ${#files[@]} -ne 4 ]]; then
+            echo "::error::Expected exactly four APK/JAR files"
+            exit 1
+          fi
+          notes=$(printf 'Latest successful test build.\n\nBlast commit: %s\nSPD: %s\nSMM main commit: %s\nSMM release: %s\n' \
+            "$GITHUB_SHA" "$SPD_TAG" "$(git -C mod rev-parse HEAD)" "$SMM_TAG")
+          if gh release view "$TEST_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            # Only the rolling test assets may be overwritten.
+            gh release upload "$TEST_TAG" "${files[@]}" --repo "$GITHUB_REPOSITORY" --clobber
+            gh release edit "$TEST_TAG" --repo "$GITHUB_REPOSITORY" \
+              --title "Blast test build" --notes "$notes" --prerelease
           else
-            gh release create "$RELEASE_TAG" out/* \
+            gh release create "$TEST_TAG" "${files[@]}" \
               --repo "$GITHUB_REPOSITORY" \
               --target "$GITHUB_SHA" \
-              --title "$RELEASE_TAG" \
-              --notes-file release-notes.md
+              --title "Blast test build" \
+              --notes "$notes" \
+              --prerelease \
+              --latest=false
           fi
-
-          # Remove outdated APK/JAR filenames when rebuilding an existing release.
-          while IFS='|' read -r asset_id asset_name; do
-            case "$asset_name" in
-              *.apk|*.jar)
-                if [[ ! -f "out/$asset_name" ]]; then
-                  gh api --method DELETE \
-                    "repos/$GITHUB_REPOSITORY/releases/assets/$asset_id"
-                fi
-                ;;
-            esac
-          done < <(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" \
-            --jq '.assets[] | "\\(.id)|\\(.name)"')
-
-          # Overwritten releases must also point their tag to the new build.
-          tag_sha=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" --jq '.object.sha')
-          if [[ "$tag_sha" != "$GITHUB_SHA" ]]; then
-            gh api --method PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/$RELEASE_TAG" \
-              -f sha="$GITHUB_SHA" -F force=true >/dev/null
-          fi
-          actual_sha=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" --jq '.object.sha')
-          test "$actual_sha" = "$GITHUB_SHA"
+          assets=$(gh release view "$TEST_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')
+          while IFS= read -r asset; do
+            if [[ -n "$asset" && ! -f "out/$asset" ]]; then
+              gh release delete-asset "$TEST_TAG" "$asset" --repo "$GITHUB_REPOSITORY" --yes
+            fi
+          done <<< "$assets"
+          gh api --method PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/$TEST_TAG" \
+            -f sha="$GITHUB_SHA" -F force=true >/dev/null
