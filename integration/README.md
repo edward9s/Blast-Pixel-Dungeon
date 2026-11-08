@@ -19,10 +19,10 @@ energy cost, reversing SPD's existing scroll-to-two-stones recipes. The recipe
 uses SPD's original mapping directly, so no second conversion table is kept.
 The output scroll is identified when brewed.
 
-`BlastSettings.DISABLE_ENCHANTMENT_STONE_REVERSE_ALCHEMY` is a compile-time
-boolean (default `true`). With `true`, two Stones of Enchantment cannot be
+`BlastSettings.ENABLE_ENCHANTMENT_STONE_REVERSE_ALCHEMY` is a compile-time
+boolean (default `false`). With `false`, two Stones of Enchantment cannot be
 converted into a Scroll of Upgrade; every other mapped runestone remains
-reversible. With `false`, enchantment stones are reversible too. Changing this
+reversible. With `true`, enchantment stones are reversible too. Changing this
 flag requires rebuilding; it does not add an in-game settings control.
 
 ### Blast settings tab visibility
