@@ -66,7 +66,10 @@ class ReverseAlchemyGuideTests(unittest.TestCase):
         self.assertIn("ENABLE_ENCHANTMENT_STONE_REVERSE_ALCHEMY", journal)
         self.assertIn("case 9:", recipe)
         self.assertIn("new Scroll.StoneToScroll()", recipe)
-        self.assertIn("r.testIngredients(in)", recipe)
+        self.assertIn("r.testIngredients(recipeInputs)", recipe)
+        self.assertIn("Item output = r.sampleOutput(recipeInputs);", recipe)
+        self.assertIn("new ArrayList<>(Arrays.asList(stone.quantity(2)))", recipe)
+        self.assertNotIn("new QuickRecipe(r, in, r.sampleOutput(in))", recipe)
         self.assertIn("originalIndex + 1 : originalIndex", page)
 
     def test_patch_fails_on_missing_or_changed_upstream(self):
