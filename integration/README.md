@@ -30,8 +30,15 @@ flag requires rebuilding; it does not add an in-game settings control.
 Thrown weapons with a known curse status can be melted into liquid metal,
 including cursed ones. The alchemy item selector and the liquid-metal recipe
 use the same eligibility rule; unidentified curse status is still rejected.
-Ordinary weapons, wands, and other cursed items retain their original alchemy
+Ordinary weapons and other cursed items retain their original alchemy
 restrictions.
+
+### Cursed wands and arcane resin
+
+Wands with a known curse status, including cursed ones, can be converted to
+arcane resin. Both the ingredient selector and the resin recipe allow these
+wands. Wands whose curse status is unknown remain ineligible; resin energy
+cost (5) and quantity calculation are unchanged.
 
 ### Reverse runestone alchemy guide
 
