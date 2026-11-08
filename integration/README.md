@@ -25,6 +25,14 @@ converted into a Scroll of Upgrade; every other mapped runestone remains
 reversible. With `true`, enchantment stones are reversible too. Changing this
 flag requires rebuilding; it does not add an in-game settings control.
 
+### Cursed thrown weapons and liquid metal
+
+Thrown weapons with a known curse status can be melted into liquid metal,
+including cursed ones. The alchemy item selector and the liquid-metal recipe
+use the same eligibility rule; unidentified curse status is still rejected.
+Ordinary weapons, wands, and other cursed items retain their original alchemy
+restrictions.
+
 ### Reverse runestone alchemy guide
 
 The existing alchemy guide now shows a **Runestones to Scrolls** page immediately
