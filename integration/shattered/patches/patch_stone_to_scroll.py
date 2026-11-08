@@ -27,7 +27,7 @@ STONE_TO_SCROLL = """
 \t\t\t\t\t&& first.getClass() == second.getClass()
 \t\t\t\t\t&& first.quantity() > 0 && second.quantity() > 0
 \t\t\t\t\t&& scrolls.containsKey(first.getClass())
-\t\t\t\t\t&& (!com.spd.blast.BlastSettings.DISABLE_ENCHANTMENT_STONE_REVERSE_ALCHEMY
+\t\t\t\t\t&& (com.spd.blast.BlastSettings.ENABLE_ENCHANTMENT_STONE_REVERSE_ALCHEMY
 \t\t\t\t\t\t\t|| !(first instanceof StoneOfEnchantment));
 \t\t}
 
