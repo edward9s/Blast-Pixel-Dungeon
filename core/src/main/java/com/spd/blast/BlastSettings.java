@@ -10,8 +10,8 @@ public final class BlastSettings {
     /** Show the original Shattered title/victory support buttons and first Worn Key prompt. */
     public static final boolean SHOW_SHATTERED_SUPPORT = false;
 
-    /** If true, enchantment stones cannot be brewed back into upgrade scrolls. */
-    public static final boolean DISABLE_ENCHANTMENT_STONE_REVERSE_ALCHEMY = true;
+    /** Enables brewing two enchantment stones into a scroll of upgrade. */
+    public static final boolean ENABLE_ENCHANTMENT_STONE_REVERSE_ALCHEMY = false;
 
     public static final int MIN_SPAWN_MULTIPLIER = 1;
     public static final int MAX_SPAWN_MULTIPLIER = 10;
