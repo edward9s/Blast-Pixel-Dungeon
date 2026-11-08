@@ -25,6 +25,19 @@ converted into a Scroll of Upgrade; every other mapped runestone remains
 reversible. With `true`, enchantment stones are reversible too. Changing this
 flag requires rebuilding; it does not add an in-game settings control.
 
+### Reverse runestone alchemy guide
+
+The existing alchemy guide now shows a **Runestones to Scrolls** page immediately
+after the original scroll-to-runestone page. It uses native recipe rows with
+click-to-populate behavior; a recipe appears only when its runestones are
+actually brewable. The enchantment-stone recipe and its explanatory text obey
+`BlastSettings.ENABLE_ENCHANTMENT_STONE_REVERSE_ALCHEMY`.
+
+This page reuses the original Runestones discovery state. The guide's stored
+page names and indices are unchanged; display indices are translated when
+opening an original alchemy page from a document pickup. The original nine
+pages keep their existing unlock states and descriptions.
+
 ### Blast settings tab visibility
 
 `BlastSettings.SHOW_BLAST_TAB` is a compile-time boolean (default `true`).
