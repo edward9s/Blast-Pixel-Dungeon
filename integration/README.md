@@ -12,6 +12,19 @@ bash integration/shattered/apply.sh /path/to/shattered-pixel-dungeon .
 All patches fail when their expected upstream seam changes. The workflow builds
 against the latest published upstream release and does not silently skip patches.
 
+### Reverse runestone alchemy
+
+Two identical runestones can be brewed into their corresponding scroll with no
+energy cost, reversing SPD's existing scroll-to-two-stones recipes. The recipe
+uses SPD's original mapping directly, so no second conversion table is kept.
+The output scroll is identified when brewed.
+
+`BlastSettings.ENABLE_ENCHANTMENT_STONE_REVERSE_ALCHEMY` is a compile-time
+boolean (default `false`). With `false`, two Stones of Enchantment cannot be
+converted into a Scroll of Upgrade; every other mapped runestone remains
+reversible. With `true`, enchantment stones are reversible too. Changing this
+flag requires rebuilding; it does not add an in-game settings control.
+
 ### Blast settings tab visibility
 
 `BlastSettings.SHOW_BLAST_TAB` is a compile-time boolean (default `true`).
