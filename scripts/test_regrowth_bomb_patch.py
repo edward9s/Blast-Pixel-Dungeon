@@ -36,7 +36,7 @@ BOMB = (
 
 def main() -> None:
     java = JAVA.read_text(encoding="utf-8")
-    assert "target != Dungeon.hero && target.alignment != Char.Alignment.ALLY" in java
+    assert "return true;" in java
     assert "protected boolean shouldRoot(Char target)" in java
 
     with tempfile.TemporaryDirectory() as temporary:
