@@ -18,8 +18,8 @@ Regrowth bombs cure the Hero and allies and grant stationary Sungrass herbal
 healing instead of potion-style healing. Moving ends the herbal healing effect;
 the healing budget remains `(int) (0.8f * HT + 14)`, matching the original
 potion amount. Under the Pharmacophobia challenge, the Hero retains the native
-healing-potion penalty. The Hero and allies are not rooted; enemies and neutral
-characters remain subject to rooting. A dedicated `BombRegrowth` blob changes
+healing-potion penalty. Grounded characters, including the Hero, allies, enemies, and neutral
+characters, are all subject to rooting. A dedicated `BombRegrowth` blob changes
 the rooting target rule only for these bombs. Regrowth effects from other
 sources, including cursed wands, are unchanged. Existing blob immunities,
 plant growth, and blast-radius upgrades remain in effect. The Wand of Regrowth
