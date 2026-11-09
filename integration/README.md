@@ -12,6 +12,15 @@ bash integration/shattered/apply.sh /path/to/shattered-pixel-dungeon .
 All patches fail when their expected upstream seam changes. The workflow builds
 against the latest published upstream release and does not silently skip patches.
 
+### Regrowth bomb rooting
+
+Regrowth bombs heal the Hero and allies without rooting them. Enemy and
+neutral characters remain subject to rooting. A dedicated `BombRegrowth`
+blob changes the rooting target rule only for these bombs. Regrowth effects
+from other sources, including cursed wands, are unchanged. Existing blob
+immunities, plant growth, healing, and blast-radius upgrades remain in effect.
+The Wand of Regrowth is not modified.
+
 ### Reverse runestone alchemy
 
 Two identical runestones can be brewed into their corresponding scroll with no

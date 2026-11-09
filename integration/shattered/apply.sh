@@ -36,6 +36,7 @@ python "$patches/patch_ethereal_chains.py" "$root/items/artifacts/EtherealChains
 python "$patches/patch_bomb.py" "$root/items/bombs/Bomb.java"
 python "$patches/patch_noisemaker.py" "$root/items/bombs/Noisemaker.java"
 python "$patches/patch_shrapnel_bomb.py" "$root/items/bombs/ShrapnelBomb.java"
+python "$patches/patch_regrowth_bomb.py" "$root/actors/blobs/Regrowth.java" "$root/items/bombs/RegrowthBomb.java"
 python "$patches/patch_bomb_visuals.py" "$root/items/bombs"
 python "$patches/patch_bomb_walls.py" "$root/items/bombs/Bomb.java"
 python "$patches/patch_wnd_info_cell.py" "$root/windows/WndInfoCell.java"
