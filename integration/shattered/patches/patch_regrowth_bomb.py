@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Give regrowth bombs their own rooting rule while preserving other sources."""
+"""Customize regrowth bomb rooting and healing while preserving other sources."""
 from pathlib import Path
 import sys
 
@@ -47,10 +47,45 @@ def patch(regrowth_path: Path, bomb_path: Path) -> None:
         "regrowth bomb cloud",
     )
 
+    bomb = replace_once(
+        bomb,
+        "import com.shatteredpixel.shatteredpixeldungeon.Dungeon;\n",
+        "import com.shatteredpixel.shatteredpixeldungeon.Challenges;\n"
+        "import com.shatteredpixel.shatteredpixeldungeon.Dungeon;\n",
+        "challenge import",
+    )
+    bomb = replace_once(
+        bomb,
+        "import com.shatteredpixel.shatteredpixeldungeon.actors.Char;\n",
+        "import com.shatteredpixel.shatteredpixeldungeon.actors.Char;\n"
+        "import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Buff;\n",
+        "buff import",
+    )
+    bomb = replace_once(
+        bomb,
+        "import com.shatteredpixel.shatteredpixeldungeon.plants.Plant;\n",
+        "import com.shatteredpixel.shatteredpixeldungeon.plants.Plant;\n"
+        "import com.shatteredpixel.shatteredpixeldungeon.plants.Sungrass;\n",
+        "sungrass import",
+    )
+    bomb = replace_once(
+        bomb,
+        "\t\t\t\t\t\t//same as a healing potion\n"
+        "\t\t\t\t\t\tPotionOfHealing.cure(ch);\n"
+        "\t\t\t\t\t\tPotionOfHealing.heal(ch);",
+        "\t\t\t\t\t\tPotionOfHealing.cure(ch);\n"
+        "\t\t\t\t\t\tif (ch == Dungeon.hero && Dungeon.isChallenged(Challenges.NO_HEALING)) {\n"
+        "\t\t\t\t\t\t\tPotionOfHealing.heal(ch);\n"
+        "\t\t\t\t\t\t} else {\n"
+        "\t\t\t\t\t\t\tBuff.affect(ch, Sungrass.Health.class).boost((int) (0.8f * ch.HT + 14));\n"
+        "\t\t\t\t\t\t}",
+        "regrowth bomb healing",
+    )
+
     # Verify both files before changing either; unexpected upstream changes fail.
     regrowth_path.write_text(regrowth, encoding="utf-8")
     bomb_path.write_text(bomb, encoding="utf-8")
-    print("patched regrowth bomb rooting: allies excluded, enemies and neutrals included")
+    print("patched regrowth bomb: ally-safe rooting and stationary herbal healing")
 
 
 if __name__ == "__main__":

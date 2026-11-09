@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Smoke-test the independent regrowth bomb rule and fail-fast patch anchors."""
+"""Smoke-test regrowth bomb rooting, herbal healing, and fail-fast anchors."""
 from pathlib import Path
 import subprocess
 import sys
@@ -22,7 +22,14 @@ REGROWTH = (
     "}\n"
 )
 BOMB = (
+    "import com.shatteredpixel.shatteredpixeldungeon.Dungeon;\n"
+    "import com.shatteredpixel.shatteredpixeldungeon.actors.Char;\n"
     "import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.Regrowth;\n"
+    "import com.shatteredpixel.shatteredpixeldungeon.items.potions.PotionOfHealing;\n"
+    "import com.shatteredpixel.shatteredpixeldungeon.plants.Plant;\n"
+    "\t\t\t\t\t\t//same as a healing potion\n"
+    "\t\t\t\t\t\tPotionOfHealing.cure(ch);\n"
+    "\t\t\t\t\t\tPotionOfHealing.heal(ch);\n"
     "GameScene.add( Blob.seed( i, 10, Regrowth.class ) );\n"
 )
 
@@ -47,9 +54,21 @@ def main() -> None:
         assert "&& shouldRoot(ch)" in shared
         assert "Blob.seed( i, 10, BombRegrowth.class )" in special
         assert "import com.spd.blast.BombRegrowth;" in special
+        assert "PotionOfHealing.cure(ch);" in special
+        assert "Buff.affect(ch, Sungrass.Health.class).boost((int) (0.8f * ch.HT + 14));" in special
+        assert "if (ch == Dungeon.hero && Dungeon.isChallenged(Challenges.NO_HEALING))" in special
+        assert special.count("PotionOfHealing.heal(ch);") == 1
+        assert "//same as a healing potion" not in special
 
         # Reapplying to patched upstream must fail rather than silently pass.
         assert subprocess.run(command, capture_output=True).returncode != 0
+        # An upstream change must fail without partially patching either file.
+        regrowth.write_text(REGROWTH, encoding="utf-8")
+        changed = BOMB.replace("PotionOfHealing.heal(ch);", "PotionOfHealing.otherHeal(ch);")
+        bomb.write_text(changed, encoding="utf-8")
+        assert subprocess.run(command, capture_output=True).returncode != 0
+        assert regrowth.read_text(encoding="utf-8") == REGROWTH
+        assert bomb.read_text(encoding="utf-8") == changed
     print("Regrowth bomb integration checks passed")
 
 
