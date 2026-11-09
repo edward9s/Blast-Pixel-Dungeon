@@ -229,7 +229,7 @@ public final class WndBlastBombs extends Window {
 
     private void choose(BlastBombManiac buff, int index) {
         buff.select(index);
-        highlight(index);
+        hide();
     }
 
     private void highlight(int index) {
