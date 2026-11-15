@@ -34,6 +34,7 @@ public final class BlastSettingsTab extends Component {
     private CheckBox remoteThrow;
     private CheckBox demolition;
     private CheckBox autoPlay;
+    private CheckBox autoFarming;
     private CheckBox enchantmentReverseAlchemy;
     private CheckBox[] testOptions;
     private Runnable heightChanged;
@@ -160,6 +161,17 @@ public final class BlastSettingsTab extends Component {
         autoPlay.checked(BlastSettings.testAutoPlay());
         add(autoPlay);
 
+        autoFarming = new CheckBox(BlastMessages.get("settings.auto_farming")) {
+            @Override
+            protected void onClick() {
+                super.onClick();
+                BlastSettings.setAutoFarming(checked());
+                BlastAutoPlay.onSettingChanged();
+            }
+        };
+        autoFarming.checked(BlastSettings.autoFarming());
+        add(autoFarming);
+
         enchantmentReverseAlchemy = new CheckBox(BlastMessages.get("settings.enchantment_reverse")) {
             @Override
             protected void onClick() {
@@ -172,7 +184,7 @@ public final class BlastSettingsTab extends Component {
 
         testOptions = new CheckBox[]{
                 testInfiniteBomb, indestructible, freeMovement, remoteThrow,
-                demolition, autoPlay, enchantmentReverseAlchemy
+                demolition, autoPlay, autoFarming, enchantmentReverseAlchemy
         };
         for (CheckBox option : testOptions) {
             option.multiline = true;

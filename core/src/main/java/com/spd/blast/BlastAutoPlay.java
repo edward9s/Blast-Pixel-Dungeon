@@ -65,6 +65,7 @@ public final class BlastAutoPlay {
         waitingForInput = false;
         pendingBombInputs.clear();
         BlastAutoPickup.reset();
+        BlastAutoFarming.reset();
 
         Hero hero = Dungeon.hero;
         if (hero == null || Dungeon.level == null) return;
@@ -358,6 +359,12 @@ public final class BlastAutoPlay {
             }
         }
 
+        // Blast-only idle farming runs after combat and floor-loot collection.
+        BlastAutoFarming.Action farmingAction =
+                BlastAutoFarming.chooseAction(hero, safe, distances);
+        if (farmingAction == BlastAutoFarming.Action.BOMB) return true;
+        if (farmingAction == BlastAutoFarming.Action.MOVE) return false;
+
         int step = roamStep(hero, safe, distances);
         if (step >= 0) hero.curAction = new HeroAction.Move(step);
         return false;
@@ -406,6 +413,7 @@ public final class BlastAutoPlay {
         waitingForInput = false;
         pendingBombInputs.clear();
         BlastAutoPickup.reset();
+        BlastAutoFarming.reset();
     }
 
     private static boolean[] safeCells(Hero hero) {

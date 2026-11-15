@@ -106,3 +106,27 @@ during a refresh.
 ```sh
 python scripts/test_wnd_bag_refresh_patch.py
 ```
+
+
+`BlastAutoFarmingTest.java` checks the isolated idle farming policy:
+the first Regrowth bomb is allowed, further bombs wait until a crop was
+harvested and the last BombRegrowth cloud dissipated, visible high grass
+and harmless plants qualify for harvest, and harmful plants remain
+excluded. Farming requires at least 10 accessible growable tiles inside the
+actual wall-occluded Regrowth blast. Suitable terrain is EMPTY, EMPTY_DECO,
+EMBERS, GRASS, or FURROWED_GRASS; walls, water, exits, traps, chasms and
+existing high grass do not count as new growth. Farming selects a reachable
+location with enough space before detonation, using a fixed 7x7 coarse check
+and at most 8 exact blast checks per site search. Searches are at least 8
+game ticks apart and a selected destination is cached while travelling. The implementation temporarily selects a RegrowthBomb type,
+detonates it, restores the original selected type via `finally`, and
+reuses the standard auto-pickup priority before crop collection.
+Farming runs only when auto-play and the independent farming checkbox
+are both enabled, no enemy is visible, the hero is grounded and
+remote bomb mode is available.
+
+```sh
+javac --release 11 -encoding UTF-8 -cp "$BLAST_TEST_CLASSPATH" \
+  -d /tmp/blast-tests tests/BlastAutoFarmingTest.java
+java -cp "/tmp/blast-tests:$BLAST_TEST_CLASSPATH" com.spd.blast.BlastAutoFarmingTest
+```
