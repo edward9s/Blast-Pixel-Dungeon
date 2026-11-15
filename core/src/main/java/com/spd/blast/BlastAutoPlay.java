@@ -353,7 +353,8 @@ public final class BlastAutoPlay {
         }
 
         if (invulnerable == null && attackerTurns > 0 && lastAttacker != null
-                && lastAttacker.isAlive() && lastAttacker.isInvulnerable(Hero.class)) {
+                && lastAttacker.isAlive() && lastAttacker.isInvulnerable(Hero.class)
+                && (!(lastAttacker instanceof Mob) || isAwake((Mob) lastAttacker))) {
             int step = retreatStep(hero, lastAttacker.pos, safe, distances);
             if (step >= 0) hero.curAction = new HeroAction.Move(step);
             return false;
@@ -413,7 +414,8 @@ public final class BlastAutoPlay {
         if (attackerTurns > 0) {
             attackerTurns--;
             if (lastAttacker != null && lastAttacker.isAlive()
-                    && lastAttacker.alignment != Char.Alignment.ALLY) {
+                    && lastAttacker.alignment != Char.Alignment.ALLY
+                    && (!(lastAttacker instanceof Mob) || isAwake((Mob) lastAttacker))) {
                 int goal = nearCell(hero.pos, attackerCell, safe, distances);
                 if (goal >= 0) {
                     hero.curAction = new HeroAction.Move(firstStep(goal, safe, distances));
