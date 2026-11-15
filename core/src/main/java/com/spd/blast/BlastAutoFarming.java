@@ -68,7 +68,9 @@ public final class BlastAutoFarming {
 
         boolean remoteThrow = BlastSettings.testRemoteThrow();
         int destination = remoteThrow ? throwDestination(hero, safe) : hero.pos;
-        if (destination < 0) return false;
+        if (destination < 0 || (!remoteThrow
+                && (level.pit[hero.pos]
+                    || BlastBombCollision.hasLitBomb(level, hero.pos)))) return false;
 
         int previous = maniac.selectedIndex();
         boolean launched;

@@ -166,7 +166,7 @@ public final class BlastSettingsTab extends Component {
             protected void onClick() {
                 super.onClick();
                 BlastSettings.setAutoFarming(checked());
-                BlastAutoFarming.reset();
+                BlastAutoPlay.onSettingChanged();
             }
         };
         autoFarming.checked(BlastSettings.autoFarming());
