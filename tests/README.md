@@ -49,10 +49,12 @@ Smoke-test both UI patch anchors:
 python scripts/test_update_patches.py
 ```
 
-`BlastAutoBombAITest.java` checks that Regrowth, Arcane and Shrapnel
-bombs share the non-destructive automatic attack path, while a normal bomb does not.
-For remote throws, the real bomb landing position determines whether the blast
-can hit an enemy; a direct hit with the thrown bomb is not required.
+`BlastAutoBombAITest.java` checks local Regrowth targeting and blast
+footprint decisions. With auto-play, bomb immunity and remote mode active, the
+selected bomb is eligible even if its explosion destroys floor items. Existing
+restrictions for available charges, visible awake enemies, and rare-mob
+protection still apply. For remote throws, the real bomb landing position
+determines whether the blast can hit an enemy; a direct hit is not required.
 During auto-play, only the hero is exempt from BombRegrowth rooting; all other
 grounded characters keep the existing effect. Compile and run against patched SPD:
 
@@ -60,6 +62,13 @@ grounded characters keep the existing effect. Compile and run against patched SP
 javac --release 11 -encoding UTF-8 -cp "$BLAST_TEST_CLASSPATH" \
   -d /tmp/blast-tests tests/BlastAutoBombAITest.java
 java -cp "/tmp/blast-tests:$BLAST_TEST_CLASSPATH" com.spd.blast.BlastAutoBombAITest
+```
+
+`test_auto_bomb_destructive.py` checks that auto-play does not reject
+destructive bomb types while retaining the existing auto-combat safeguards.
+
+```sh
+python -m unittest discover -s tests -p test_auto_bomb_destructive.py
 ```
 
 `BlastAutoPickupTest.java` checks automatic pickup selection of all
