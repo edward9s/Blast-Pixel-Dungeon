@@ -198,8 +198,9 @@ def patch(path: Path) -> None:
     s = replace_once(
         s,
         "\t\tboolean actResult;\n\t\tif (curAction == null) {",
-        "\t\tif (com.spd.blast.BlastSettings.testAutoPlay()) {\n"
-        "\t\t\tcom.spd.blast.BlastAutoPlay.chooseAction(this);\n"
+        "\t\tif (com.spd.blast.BlastSettings.testAutoPlay()\n"
+        "\t\t\t\t&& com.spd.blast.BlastAutoPlay.chooseAction(this)) {\n"
+        "\t\t\treturn false;\n"
         "\t\t}\n\n"
         "\t\tboolean actResult;\n\t\tif (curAction == null) {",
         "Hero.act automatic actions"

@@ -6,6 +6,15 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroAction;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Necromancer;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Wraith;
+import com.shatteredpixel.shatteredpixeldungeon.items.Item;
+import com.shatteredpixel.shatteredpixeldungeon.items.wands.Wand;
+import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfDisintegration;
+import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfFrost;
+import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfMagicMissile;
+import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfPrismaticLight;
+import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfTransfusion;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
 import com.watabou.utils.PathFinder;
@@ -53,7 +62,8 @@ public final class BlastAutoPlay {
         attackerTurns = ATTACKER_MEMORY_TURNS;
     }
 
-    public static void chooseAction(Hero hero) {
+    /** Returns true only when a wand cast already started its own asynchronous turn. */
+    public static boolean chooseAction(Hero hero) {
         resetForLevel(hero);
         hero.curAction = null;
         hero.lastAction = null;
@@ -61,6 +71,8 @@ public final class BlastAutoPlay {
 
         boolean[] safe = safeCells(hero);
         Mob invulnerable = null;
+        Mob necromancer = null;
+        int necromancerDistance = Integer.MAX_VALUE;
         Mob attackable = null;
         int attackDistance = Integer.MAX_VALUE;
         int approachStep = -1;
@@ -84,6 +96,11 @@ public final class BlastAutoPlay {
             if (hero.isCharmedBy(mob)) continue;
 
             int distance = Dungeon.level.distance(hero.pos, mob.pos);
+            if (mob instanceof Necromancer && distance < necromancerDistance
+                    && (hero.canAttack(mob) || pathNear(hero, mob.pos, safe) != null)) {
+                necromancer = mob;
+                necromancerDistance = distance;
+            }
             if (hero.canAttack(mob)) {
                 if (attackable == null || distance < attackDistance) {
                     attackable = mob;
@@ -103,23 +120,48 @@ public final class BlastAutoPlay {
                 && lastAttacker.isAlive() && lastAttacker.isInvulnerable(Hero.class)) {
             int step = retreatStep(hero, lastAttacker.pos, safe);
             if (step >= 0) hero.curAction = new HeroAction.Move(step);
-            return;
+            return false;
         }
 
         if (invulnerable != null) {
             int step = retreatStep(hero, invulnerable.pos, safe);
             if (step >= 0) hero.curAction = new HeroAction.Move(step);
-            return;
+            return false;
+        }
+
+        // Killing the summoner also removes their living summoned minions.
+        // SpectralNecromancer is a subclass of Necromancer.
+        if (necromancer != null) {
+            if (useWand(hero, necromancer)) return true;
+            if (hero.canAttack(necromancer)) {
+                hero.curAction = new HeroAction.Attack(necromancer);
+            } else {
+                PathFinder.Path path = pathNear(hero, necromancer.pos, safe);
+                if (path != null && !path.isEmpty()) {
+                    hero.curAction = new HeroAction.Move(path.getFirst());
+                }
+            }
+            return false;
+        }
+
+        // A charged damage wand bypasses the high evasion of wraiths.
+        for (Mob mob : Dungeon.level.mobs) {
+            if (mob.isAlive() && mob.alignment != Char.Alignment.ALLY
+                    && mob.invisible == 0 && hero.fieldOfView[mob.pos]
+                    && !mob.isInvulnerable(Hero.class) && !hero.isCharmedBy(mob)
+                    && useWand(hero, mob)) {
+                return true;
+            }
         }
 
         if (attackable != null) {
             hero.curAction = new HeroAction.Attack(attackable);
-            return;
+            return false;
         }
 
         if (approachStep >= 0) {
             hero.curAction = new HeroAction.Move(approachStep);
-            return;
+            return false;
         }
 
         if (attackerTurns > 0) {
@@ -129,13 +171,38 @@ public final class BlastAutoPlay {
                 PathFinder.Path path = pathNear(hero, attackerCell, safe);
                 if (path != null && !path.isEmpty()) {
                     hero.curAction = new HeroAction.Move(path.getFirst());
-                    return;
+                    return false;
                 }
             }
         }
 
         int step = roamStep(hero, safe);
         if (step >= 0) hero.curAction = new HeroAction.Move(step);
+        return false;
+    }
+
+    private static boolean useWand(Hero hero, Mob target) {
+        // Wraiths have unusually high evasion (5x their attack skill).
+        // Include other enemies whose evasion is at least twice our accuracy.
+        if (!(target instanceof Wraith)
+                && target.defenseSkill(hero) < 2L * hero.attackSkill(target)) {
+            return false;
+        }
+
+        for (Item item : hero.belongings) {
+            // Only direct damage wands with predictable single-target effects.
+            // Transfusion damages undead, but charms living targets instead.
+            if (!(item instanceof WandOfMagicMissile
+                    || item instanceof WandOfFrost
+                    || item instanceof WandOfPrismaticLight
+                    || item instanceof WandOfDisintegration
+                    || (item instanceof WandOfTransfusion
+                        && target.properties().contains(Char.Property.UNDEAD)))) {
+                continue;
+            }
+            if (((Wand) item).blastAutoZap(hero, target.pos)) return true;
+        }
+        return false;
     }
 
     private static void resetForLevel(Hero hero) {
