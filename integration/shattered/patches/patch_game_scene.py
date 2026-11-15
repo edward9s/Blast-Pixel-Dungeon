@@ -14,6 +14,12 @@ def replace(source: str, old: str, new: str, label: str) -> str:
 def patch(path: Path) -> None:
     source = path.read_text(encoding="utf-8")
     source = replace(source,
+        "import com.shatteredpixel.shatteredpixeldungeon.windows.WndBag;\n",
+        "import com.shatteredpixel.shatteredpixeldungeon.windows.WndBag;\n"
+        "import com.shatteredpixel.shatteredpixeldungeon.windows.WndQuickBag;\n",
+        "quick-use bag import")
+
+    source = replace(source,
         "\tprivate ResumeIndicator resume;\n",
         """\tprivate ResumeIndicator resume;
 \tprivate com.spd.blast.BlastRemoteBombTag blastRemote;

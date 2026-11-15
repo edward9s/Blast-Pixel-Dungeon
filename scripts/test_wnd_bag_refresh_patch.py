@@ -100,6 +100,7 @@ def main() -> None:
     apply = APPLY.read_text(encoding="utf-8")
     assert "WndBag.refreshOpen();" in game_scene_patch
     assert "WndQuickBag.refreshOpen();" in game_scene_patch
+    assert "import com.shatteredpixel.shatteredpixeldungeon.windows.WndQuickBag;" in game_scene_patch
     assert 'patch_wnd_bag.py" "$root/windows/WndBag.java"' in apply
     assert 'patch_wnd_quick_bag.py" "$root/windows/WndQuickBag.java"' in apply
     print("Open bag and quick-use bag refresh integration checks passed")
