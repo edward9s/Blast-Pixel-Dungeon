@@ -29,6 +29,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 public final class BlastAutoPlay {
 
     private static final int ATTACKER_MEMORY_TURNS = 8;
+    private static final int LOST_TARGET_TURNS = 8;
 
     private static Hero currentHero;
     private static Level currentLevel;
@@ -36,6 +37,11 @@ public final class BlastAutoPlay {
     private static Char lastAttacker;
     private static int attackerCell = -1;
     private static int attackerTurns;
+    private static Mob combatTarget;
+    private static int combatTargetCell = -1;
+    private static int lostTargetTurns;
+    private static Mob ignoredTarget;
+    private static int ignoredTargetCell = -1;
     private static int lastRetryCell = -1;
     private static volatile boolean manualAction;
     private static volatile boolean waitingForInput;
@@ -62,6 +68,9 @@ public final class BlastAutoPlay {
         lastAttacker = null;
         attackerCell = -1;
         attackerTurns = 0;
+        forgetCombatTarget();
+        ignoredTarget = null;
+        ignoredTargetCell = -1;
         lastRetryCell = -1;
         manualAction = false;
         waitingForInput = false;
@@ -85,6 +94,10 @@ public final class BlastAutoPlay {
         Char attacker = (Char) source;
         if (attacker == hero || attacker.alignment == Char.Alignment.ALLY) return;
         resetForLevel(hero);
+        if (ignoredTarget == attacker) {
+            ignoredTarget = null;
+            ignoredTargetCell = -1;
+        }
         lastAttacker = attacker;
         attackerCell = attacker.pos;
         attackerTurns = ATTACKER_MEMORY_TURNS;
@@ -95,6 +108,7 @@ public final class BlastAutoPlay {
         if (!BlastSettings.testAutoPlay()) return;
         resetForLevel(hero);
         manualAction = true;
+        forgetCombatTarget();
         roamCell = -1;
         lastRetryCell = -1;
     }
@@ -117,6 +131,7 @@ public final class BlastAutoPlay {
         hero.curAction = null;
         hero.lastAction = null;
         hero.resting = false;
+        forgetCombatTarget();
         roamCell = -1;
     }
 
@@ -251,11 +266,12 @@ public final class BlastAutoPlay {
         Mob attackable = null;
         int attackDistance = Integer.MAX_VALUE;
         int approachCell = -1;
+        Mob approachEnemy = null;
         int approachLength = Integer.MAX_VALUE;
 
         for (Mob mob : Dungeon.level.mobs) {
             if (!mob.isAlive() || mob.alignment == Char.Alignment.ALLY
-                    || mob.invisible > 0) {
+                    || mob.invisible > 0 || !isAwake(mob) || ignored(mob)) {
                 continue;
             }
 
@@ -299,6 +315,7 @@ public final class BlastAutoPlay {
             if (cell >= 0 && distances[cell] < approachLength) {
                 approachLength = distances[cell];
                 approachCell = cell;
+                approachEnemy = mob;
             }
         }
 
@@ -306,8 +323,12 @@ public final class BlastAutoPlay {
         // Advance one actual actor turn if no usable attack is available.
         if (hero.rooted) {
             if (necromancer != null && hero.fieldOfView[necromancer.pos]) {
-                if (useWand(hero, necromancer)) return true;
+                if (useWand(hero, necromancer)) {
+                    rememberCombatTarget(necromancer);
+                    return true;
+                }
                 if (hero.canAttack(necromancer)) {
+                    rememberCombatTarget(necromancer);
                     hero.curAction = new HeroAction.Attack(necromancer);
                     return false;
                 }
@@ -315,12 +336,15 @@ public final class BlastAutoPlay {
             for (Mob mob : Dungeon.level.mobs) {
                 if (mob.isAlive() && mob.alignment != Char.Alignment.ALLY
                         && mob.invisible == 0 && hero.fieldOfView[mob.pos]
+                        && isAwake(mob) && !ignored(mob)
                         && !mob.isInvulnerable(Hero.class) && !hero.isCharmedBy(mob)
                         && useWand(hero, mob)) {
+                    rememberCombatTarget(mob);
                     return true;
                 }
             }
             if (attackable != null) {
+                rememberCombatTarget(attackable);
                 hero.curAction = new HeroAction.Attack(attackable);
                 return false;
             }
@@ -345,6 +369,7 @@ public final class BlastAutoPlay {
         // SpectralNecromancer is a subclass of Necromancer.
         if (necromancer != null) {
             boolean visible = hero.fieldOfView[necromancer.pos];
+            if (visible) rememberCombatTarget(necromancer);
             if (visible && useWand(hero, necromancer)) return true;
             if (visible && hero.canAttack(necromancer)) {
                 hero.curAction = new HeroAction.Attack(necromancer);
@@ -358,21 +383,28 @@ public final class BlastAutoPlay {
         for (Mob mob : Dungeon.level.mobs) {
             if (mob.isAlive() && mob.alignment != Char.Alignment.ALLY
                     && mob.invisible == 0 && hero.fieldOfView[mob.pos]
+                    && isAwake(mob) && !ignored(mob)
                     && !mob.isInvulnerable(Hero.class) && !hero.isCharmedBy(mob)
                     && useWand(hero, mob)) {
+                rememberCombatTarget(mob);
                 return true;
             }
         }
 
         if (attackable != null) {
+            rememberCombatTarget(attackable);
             hero.curAction = new HeroAction.Attack(attackable);
             return false;
         }
 
         if (approachCell >= 0) {
+            rememberCombatTarget(approachEnemy);
             hero.curAction = new HeroAction.Move(firstStep(approachCell, safe, distances));
             return false;
         }
+
+        // Keep pursuing the last observed position before switching to floor loot.
+        if (pursueLastSeenTarget(hero, safe, distances)) return false;
 
         // Collect reachable floor loot after visible enemies have been handled.
         if (BlastAutoPickup.chooseAction(hero, safe, distances,
@@ -439,6 +471,9 @@ public final class BlastAutoPlay {
         lastAttacker = null;
         attackerCell = -1;
         attackerTurns = 0;
+        forgetCombatTarget();
+        ignoredTarget = null;
+        ignoredTargetCell = -1;
         lastRetryCell = -1;
         manualAction = false;
         waitingForInput = false;
@@ -446,6 +481,70 @@ public final class BlastAutoPlay {
         BlastAutoPickup.reset();
         BlastAutoFarming.reset();
         BlastAutoSacrifice.reset();
+    }
+
+    /** Sleeping enemies are deliberately left alone by automatic combat. */
+    static boolean isAwake(Mob mob) {
+        return mob.state != mob.SLEEPING;
+    }
+
+    private static boolean ignored(Mob mob) {
+        if (mob != ignoredTarget) return false;
+        if (mob.pos == ignoredTargetCell) return true;
+        ignoredTarget = null;
+        ignoredTargetCell = -1;
+        return false;
+    }
+
+    private static void rememberCombatTarget(Mob mob) {
+        combatTarget = mob;
+        combatTargetCell = mob.pos;
+        lostTargetTurns = 0;
+    }
+
+    private static void forgetCombatTarget() {
+        combatTarget = null;
+        combatTargetCell = -1;
+        lostTargetTurns = 0;
+    }
+
+    private static void abandonCombatTarget() {
+        ignoredTarget = combatTarget;
+        ignoredTargetCell = combatTargetCell;
+        forgetCombatTarget();
+    }
+
+    /** Short, bounded pursuit of the last *visible* position, with no hidden-position lookup. */
+    private static boolean pursueLastSeenTarget(Hero hero, boolean[] safe, int[] distances) {
+        if (combatTarget == null) return false;
+        if (!combatTarget.isAlive() || combatTarget.alignment == Char.Alignment.ALLY
+                || combatTarget.invisible > 0 || !isAwake(combatTarget)
+                || hero.isCharmedBy(combatTarget)
+                || combatTarget.isInvulnerable(Hero.class)) {
+            forgetCombatTarget();
+            return false;
+        }
+        if (hero.fieldOfView[combatTarget.pos]) {
+            // A visible but unapproachable enemy is handled by normal targeting.
+            forgetCombatTarget();
+            return false;
+        }
+
+        int goal = nearCell(hero.pos, combatTargetCell, safe, distances);
+        lostTargetTurns++;
+        if (!canPursue(lostTargetTurns,
+                Dungeon.level.distance(hero.pos, combatTargetCell), goal >= 0)) {
+            // Avoid a repeated enemy/loot oscillation until this enemy moves or hits us.
+            abandonCombatTarget();
+            return false;
+        }
+
+        hero.curAction = new HeroAction.Move(firstStep(goal, safe, distances));
+        return true;
+    }
+
+    static boolean canPursue(int unseenTurns, int distance, boolean reachable) {
+        return reachable && distance > 1 && unseenTurns <= LOST_TARGET_TURNS;
     }
 
     private static boolean[] safeCells(Hero hero, Blob[] hazards) {
