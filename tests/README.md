@@ -148,6 +148,15 @@ javac --release 11 -encoding UTF-8 -cp "$BLAST_TEST_CLASSPATH" \
 java -cp "/tmp/blast-tests:$BLAST_TEST_CLASSPATH" com.spd.blast.BlastAutoFarmingTest
 ```
 
+`test_auto_farming_harvest.py` guards the independent harvest path:
+harvesting safely reachable tall grass and beneficial plants must run before
+any bomb-mode, bomb-inventory, or Regrowth-type checks, while preserving
+grounded-hero and awake-enemy safety gates.
+
+```sh
+python -m unittest discover -s tests -p test_auto_farming_harvest.py
+```
+
 
 `BlastAutoEnvironmentTest.java` verifies Blast-only environmental avoidance:
 active Fire and ToxicGas cells are unsafe, inactive cells remain traversable,
