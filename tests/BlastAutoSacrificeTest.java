@@ -1,5 +1,30 @@
 package com.spd.blast;
 
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.DM100;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.DM200;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.DM201;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.DM300;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Warlock;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Shaman;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Scorpio;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Eye;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.GnollTrickster;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Elemental;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.CrystalWisp;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.FungalSentry;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.GnollGeomancer;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.GnollSapper;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.CrystalSpire;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Necromancer;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Tengu;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.YogFist;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.YogDzewa;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Rat;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Gnoll;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Skeleton;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Ghoul;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.SpectralNecromancer;
+
 /** Regression checks for sacrificial fire lure and marked kill decisions. */
 public final class BlastAutoSacrificeTest {
 
@@ -39,6 +64,39 @@ public final class BlastAutoSacrificeTest {
         check(true, BlastAutoSacrifice.shouldLure(false, true), "enemy already in aura");
         check(false, BlastAutoSacrifice.shouldLure(false, false),
                 "do not lure inactive distant enemy");
+
+        // Ranged threats bypass the sacrifice tactic even if another melee enemy is nearby.
+        // Check subclasses as well as exact types; normal melee mobs still follow the lure.
+        check(true, BlastAutoSacrifice.isRangedEnemy(DM100.class), "DM100");
+        check(true, BlastAutoSacrifice.isRangedEnemy(DM200.class), "DM200");
+        check(true, BlastAutoSacrifice.isRangedEnemy(DM201.class), "DM201 subclass");
+        check(true, BlastAutoSacrifice.isRangedEnemy(DM300.class), "DM300");
+        check(true, BlastAutoSacrifice.isRangedEnemy(Warlock.class), "Warlock");
+        check(true, BlastAutoSacrifice.isRangedEnemy(Shaman.RedShaman.class),
+                "Shaman subclass");
+        check(true, BlastAutoSacrifice.isRangedEnemy(Scorpio.class), "Scorpio");
+        check(true, BlastAutoSacrifice.isRangedEnemy(Eye.class), "Eye");
+        check(true, BlastAutoSacrifice.isRangedEnemy(GnollTrickster.class),
+                "Gnoll Trickster");
+        check(true, BlastAutoSacrifice.isRangedEnemy(Elemental.FireElemental.class),
+                "Elemental subclass");
+        check(true, BlastAutoSacrifice.isRangedEnemy(CrystalWisp.class), "Crystal Wisp");
+        check(true, BlastAutoSacrifice.isRangedEnemy(FungalSentry.class), "Fungal Sentry");
+        check(true, BlastAutoSacrifice.isRangedEnemy(GnollGeomancer.class),
+                "Gnoll Geomancer");
+        check(true, BlastAutoSacrifice.isRangedEnemy(GnollSapper.class), "Gnoll Sapper");
+        check(true, BlastAutoSacrifice.isRangedEnemy(CrystalSpire.class), "Crystal Spire");
+        check(true, BlastAutoSacrifice.isRangedEnemy(Necromancer.class), "Necromancer");
+        check(true, BlastAutoSacrifice.isRangedEnemy(SpectralNecromancer.class),
+                "Spectral Necromancer subclass");
+        check(true, BlastAutoSacrifice.isRangedEnemy(Tengu.class), "Tengu");
+        check(true, BlastAutoSacrifice.isRangedEnemy(YogFist.BurningFist.class),
+                "Yog Fist subclass");
+        check(true, BlastAutoSacrifice.isRangedEnemy(YogDzewa.class), "Yog Dzewa");
+        check(false, BlastAutoSacrifice.isRangedEnemy(Rat.class), "Rat melee");
+        check(false, BlastAutoSacrifice.isRangedEnemy(Gnoll.class), "Gnoll melee");
+        check(false, BlastAutoSacrifice.isRangedEnemy(Skeleton.class), "Skeleton melee");
+        check(false, BlastAutoSacrifice.isRangedEnemy(Ghoul.class), "Ghoul melee");
 
         check(false, BlastAutoSacrifice.shouldAbandon(11f, 2), "short moving pursuit");
         check(true, BlastAutoSacrifice.shouldAbandon(12f, 0), "absolute lure timeout");

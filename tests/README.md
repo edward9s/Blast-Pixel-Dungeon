@@ -161,9 +161,12 @@ aura covers the fire and eight adjacent tiles without wrapping across map
 rows, only a marked enemy still within the aura is attacked, and pursuing
 mobs can be lured into the aura while unrelated distant enemies are ignored.
 The auto-player temporarily occupies a reachable sacrificial flame and waits
-for chasing enemies to step within its marking area. A stationary or ranged
-enemy cannot cause an unlimited wait: three stalled hero turns or twelve game ticks end the
-attempt and suspend new lures for eight game ticks. Safety checks continue
+for chasing enemies to step within its marking area. A visible ranged threat immediately disables the sacrifice-luring tactic, so
+normal combat attacks it directly without diverting to the altar. Ranged types
+include SPD spellcasters, projectile users, and stationary ranged attackers;
+subclasses inherit this behavior. A stationary melee enemy cannot cause an
+unlimited wait: three stalled hero turns or twelve game ticks end the attempt
+and suspend new lures for eight game ticks. Safety checks continue
 to exclude every other active damaging or disruptive blob. The lure uses
 the same safe-cell and shortest-distance maps as regular auto-play and
 only activates for fire no more than six safe steps from the hero.
