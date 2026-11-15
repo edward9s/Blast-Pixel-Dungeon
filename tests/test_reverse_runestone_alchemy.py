@@ -49,8 +49,9 @@ class ReverseRunestoneAlchemyTests(unittest.TestCase):
         self.assertIn("scroll.identify();", scroll)
         self.assertIn("stone.quantity(stone.quantity() - 1);", scroll)
         self.assertIn("return scroll.isKnown() ? scroll : new Scroll.PlaceHolder();", scroll)
-        self.assertIn("ENABLE_ENCHANTMENT_STONE_REVERSE_ALCHEMY", scroll)
-        self.assertIn("ENABLE_ENCHANTMENT_STONE_REVERSE_ALCHEMY = false;", SETTINGS.read_text(encoding="utf-8"))
+        self.assertIn("BlastSettings.enchantmentStoneReverseAlchemy()", scroll)
+        self.assertIn("getBoolean(ENCHANTMENT_STONE_REVERSE_ALCHEMY, false)", SETTINGS.read_text(encoding="utf-8"))
+        self.assertIn("setEnchantmentStoneReverseAlchemy(boolean value)", SETTINGS.read_text(encoding="utf-8"))
 
     def test_rejects_duplicate_application(self):
         scroll, recipe = self.patch()

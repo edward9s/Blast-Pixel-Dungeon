@@ -67,7 +67,7 @@ def patch(journal_path: Path, recipe_path: Path, document_page_path: Path) -> No
         "\t\t\tbody.text(Document.ALCHEMY_GUIDE.pageBody(currentPageIdx));",
         "\t\t\tif (currentPageIdx == REVERSE_STONES_IDX) {\n"
         "\t\t\t\tString description = com.spd.blast.BlastMessages.get(\"alchemy.reverse_stones.body\");\n"
-        "\t\t\t\tif (!com.spd.blast.BlastSettings.ENABLE_ENCHANTMENT_STONE_REVERSE_ALCHEMY) {\n"
+        "\t\t\t\tif (!com.spd.blast.BlastSettings.enchantmentStoneReverseAlchemy()) {\n"
         "\t\t\t\t\tdescription += \"\\n\" + com.spd.blast.BlastMessages.get(\"alchemy.reverse_stones.enchantment_disabled\");\n"
         "\t\t\t\t}\n"
         "\t\t\t\tbody.text(description);\n"

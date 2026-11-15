@@ -2,6 +2,8 @@ package com.spd.blast;
 
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
+import com.shatteredpixel.shatteredpixeldungeon.messages.Languages;
+import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.PixelScene;
 import com.shatteredpixel.shatteredpixeldungeon.ui.CheckBox;
 import com.shatteredpixel.shatteredpixeldungeon.ui.OptionSlider;
@@ -34,6 +36,13 @@ public final class BlastSettingsTab extends Component {
     private CheckBox remoteThrow;
     private CheckBox demolition;
     private CheckBox autoPlay;
+    private CheckBox enchantmentReverseAlchemy;
+    private CheckBox[] testOptions;
+    private Runnable heightChanged;
+
+    public void setHeightChanged(Runnable callback) {
+        heightChanged = callback;
+    }
     private RenderedTextBlock radiusLabel;
     private RenderedTextBlock radiusValue;
     private RedButton radiusDecrease;
@@ -79,6 +88,8 @@ public final class BlastSettingsTab extends Component {
                 if (checked() && BlastSecret.canToggleTests()) {
                     BlastSettings.toggleTests();
                     refreshTestVisibility();
+                    layout();
+                    if (heightChanged != null) heightChanged.run();
                 }
             }
         };
@@ -151,6 +162,21 @@ public final class BlastSettingsTab extends Component {
         autoPlay.checked(BlastSettings.testAutoPlay());
         add(autoPlay);
 
+        enchantmentReverseAlchemy = new CheckBox(BlastMessages.get("settings.enchantment_reverse")) {
+            @Override
+            protected void onClick() {
+                super.onClick();
+                BlastSettings.setEnchantmentStoneReverseAlchemy(checked());
+            }
+        };
+        enchantmentReverseAlchemy.checked(BlastSettings.enchantmentStoneReverseAlchemy());
+        add(enchantmentReverseAlchemy);
+
+        testOptions = new CheckBox[]{
+                testInfiniteBomb, indestructible, freeMovement, remoteThrow,
+                demolition, autoPlay, enchantmentReverseAlchemy
+        };
+
         radiusLabel = PixelScene.renderTextBlock(BlastMessages.get("settings.radius"), 7);
         add(radiusLabel);
         radiusValue = PixelScene.renderTextBlock("", 7);
@@ -201,12 +227,9 @@ public final class BlastSettingsTab extends Component {
 
     private void refreshTestVisibility() {
         boolean show = BlastSettings.showTests();
-        testInfiniteBomb.visible = testInfiniteBomb.active = show;
-        indestructible.visible = indestructible.active = show;
-        freeMovement.visible = freeMovement.active = show;
-        remoteThrow.visible = remoteThrow.active = show;
-        demolition.visible = demolition.active = show;
-        autoPlay.visible = autoPlay.active = show;
+        for (CheckBox option : testOptions) {
+            option.visible = option.active = show;
+        }
         boolean radiusVisible = show && Dungeon.hero != null && Dungeon.hero.isAlive();
         radiusLabel.visible = radiusValue.visible = radiusVisible;
         radiusDecrease.visible = radiusIncrease.visible = radiusVisible;
@@ -253,27 +276,44 @@ public final class BlastSettingsTab extends Component {
                 width, SLIDER_HEIGHT);
         debugLog.setRect(0, spawnSlider.bottom() + GAP, width, BUTTON_HEIGHT);
 
-        testInfiniteBomb.setRect(0, debugLog.bottom() + GAP, width, BUTTON_HEIGHT);
-        indestructible.setRect(0, testInfiniteBomb.bottom() + GAP, width, BUTTON_HEIGHT);
-        freeMovement.setRect(0, indestructible.bottom() + GAP, width, BUTTON_HEIGHT);
+        float bottom = debugLog.bottom();
+        if (BlastSettings.showTests()) {
+            boolean twoColumns = width >= 200
+                    || Messages.lang() == Languages.CHI_TRAD
+                    || Messages.lang() == Languages.CHI_SMPL;
+            if (twoColumns) {
+                float columnWidth = (width - GAP) / 2f;
+                for (int i = 0; i < testOptions.length; i++) {
+                    int row = i / 2;
+                    int column = i % 2;
+                    testOptions[i].setRect(column * (columnWidth + GAP),
+                            bottom + GAP + row * (BUTTON_HEIGHT + GAP),
+                            columnWidth, BUTTON_HEIGHT);
+                }
+                bottom += ((testOptions.length + 1) / 2) * (BUTTON_HEIGHT + GAP);
+            } else {
+                for (CheckBox option : testOptions) {
+                    option.setRect(0, bottom + GAP, width, BUTTON_HEIGHT);
+                    bottom = option.bottom();
+                }
+            }
 
-        remoteThrow.setRect(0, freeMovement.bottom() + GAP, width, BUTTON_HEIGHT);
+            if (radiusLabel.visible) {
+                float radiusTop = bottom + GAP;
+                float radiusLeft = Math.max(0, width - 2 * RADIUS_BUTTON_WIDTH
+                        - RADIUS_VALUE_WIDTH - 2 * GAP);
+                radiusLabel.maxWidth(Math.max(1, (int)Math.floor(radiusLeft - GAP)));
+                float rowHeight = Math.max(BUTTON_HEIGHT, radiusLabel.height());
+                radiusLabel.setPos(0, radiusTop + (rowHeight - radiusLabel.height()) / 2f);
+                float buttonTop = radiusTop + (rowHeight - BUTTON_HEIGHT) / 2f;
+                radiusDecrease.setRect(radiusLeft, buttonTop, RADIUS_BUTTON_WIDTH, BUTTON_HEIGHT);
+                radiusIncrease.setRect(width - RADIUS_BUTTON_WIDTH, buttonTop,
+                        RADIUS_BUTTON_WIDTH, BUTTON_HEIGHT);
+                layoutRadiusValue();
+                bottom = radiusTop + rowHeight;
+            }
+        }
 
-        demolition.setRect(0, remoteThrow.bottom() + GAP, width, BUTTON_HEIGHT);
-
-        autoPlay.setRect(0, demolition.bottom() + GAP, width, BUTTON_HEIGHT);
-
-        float radiusTop = autoPlay.bottom() + GAP;
-        float radiusLeft = Math.max(0, width - 2 * RADIUS_BUTTON_WIDTH - RADIUS_VALUE_WIDTH - 2 * GAP);
-        radiusLabel.maxWidth(Math.max(1, (int)Math.floor(radiusLeft - GAP)));
-        float rowHeight = Math.max(BUTTON_HEIGHT, radiusLabel.height());
-        radiusLabel.setPos(0, radiusTop + (rowHeight - radiusLabel.height()) / 2f);
-        float buttonTop = radiusTop + (rowHeight - BUTTON_HEIGHT) / 2f;
-        radiusDecrease.setRect(radiusLeft, buttonTop, RADIUS_BUTTON_WIDTH, BUTTON_HEIGHT);
-        radiusIncrease.setRect(width - RADIUS_BUTTON_WIDTH, buttonTop, RADIUS_BUTTON_WIDTH, BUTTON_HEIGHT);
-        layoutRadiusValue();
-
-        float bottom = radiusTop + rowHeight;
         if (transferLine != null) {
             transferLine.size(width, 1);
             transferLine.y = bottom + GAP;

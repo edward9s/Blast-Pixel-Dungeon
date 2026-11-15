@@ -10,9 +10,6 @@ public final class BlastSettings {
     /** Show the original Shattered title/victory support buttons and first Worn Key prompt. */
     public static final boolean SHOW_SHATTERED_SUPPORT = false;
 
-    /** Enables brewing two enchantment stones into a scroll of upgrade. */
-    public static final boolean ENABLE_ENCHANTMENT_STONE_REVERSE_ALCHEMY = false;
-
     public static final int MIN_SPAWN_MULTIPLIER = 1;
     public static final int MAX_SPAWN_MULTIPLIER = 10;
     public static final int DEFAULT_SPAWN_MULTIPLIER = 1;
@@ -26,6 +23,7 @@ public final class BlastSettings {
     private static final String REMOTE_THROW = "blast_test_remote_throw";
     private static final String DEMOLITION = "blast_test_demolition";
     private static final String AUTO_PLAY = "blast_test_auto_play";
+    private static final String ENCHANTMENT_STONE_REVERSE_ALCHEMY = "blast_test_enchantment_stone_reverse_alchemy";
 
     private BlastSettings() {}
 
@@ -102,6 +100,14 @@ public final class BlastSettings {
 
     public static void setTestAutoPlay(boolean value) {
         GameSettings.put(AUTO_PLAY, value);
+    }
+
+    public static boolean enchantmentStoneReverseAlchemy() {
+        return GameSettings.getBoolean(ENCHANTMENT_STONE_REVERSE_ALCHEMY, false);
+    }
+
+    public static void setEnchantmentStoneReverseAlchemy(boolean value) {
+        GameSettings.put(ENCHANTMENT_STONE_REVERSE_ALCHEMY, value);
     }
 
     private static void validateMultiplier(int value) {
