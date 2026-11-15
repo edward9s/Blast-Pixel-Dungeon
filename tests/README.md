@@ -131,6 +131,15 @@ javac --release 11 -encoding UTF-8 -cp "$BLAST_TEST_CLASSPATH" \
 java -cp "/tmp/blast-tests:$BLAST_TEST_CLASSPATH" com.spd.blast.BlastAutoCombatTest
 ```
 
+`test_auto_play_target_priority.py` verifies that the combat priority
+selection is reached before old-target pursuit or floor pickup, ranged
+opponents require adjacency for ordinary attacks, and bomb selection uses
+the actual landing blast footprint while preserving rare-mob safety checks.
+
+```sh
+python -m unittest discover -s tests -p test_auto_play_target_priority.py
+```
+
 `BlastAutoFarmingTest.java` checks the isolated idle farming policy:
 visible reachable high grass and beneficial plants are deliberately harvested
 whenever auto-play and auto-farming are enabled, even if no Regrowth bomb or
