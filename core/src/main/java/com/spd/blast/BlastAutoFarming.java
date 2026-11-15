@@ -50,28 +50,35 @@ public final class BlastAutoFarming {
             currentLevel = Dungeon.level;
         }
         if (!BlastSettings.testAutoPlay() || !BlastSettings.autoFarming()
-                || BlastRemoteBomb.isTimedMode() || hero.flying
-                || hero.buff(BlastRemoteBomb.class) == null
-                || hasVisibleEnemy(hero)) return Action.NONE;
+                || hero.flying || hasVisibleEnemy(hero)) return Action.NONE;
 
         Level level = Dungeon.level;
         if (safe.length != level.length() || distances.length != level.length()) {
             throw new IllegalArgumentException("Invalid farming distance map");
         }
 
-        if (planted) {
-            int nearest = nearestCrop(hero, safe, distances);
-            if (nearest >= 0) {
-                int next = nearest == hero.pos ? hero.pos
-                        : BlastAutoPlay.firstStep(nearest, safe, distances);
-                hero.curAction = new HeroAction.Move(next);
-                if (harvestable(level.map[next], level.plants.get(next))) harvested = true;
-                return Action.MOVE;
+        // Harvest safe visible grass regardless of whether a Regrowth bomb is available.
+        int nearest = nearestCrop(hero, safe, distances);
+        if (nearest >= 0) {
+            int next = nearest == hero.pos ? hero.pos
+                    : BlastAutoPlay.firstStep(nearest, safe, distances);
+            hero.curAction = new HeroAction.Move(next);
+            if (planted && harvestable(level.map[next], level.plants.get(next))) {
+                harvested = true;
             }
+            return Action.MOVE;
+        }
+
+        if (planted) {
             if (!canPlantAgain(planted, harvested, regrowthActive(level))) return Action.NONE;
             planted = false;
             harvested = false;
             farmingSite = farmingBlastCell = -1;
+        }
+
+        // Bomb-specific checks must not prevent ordinary grass harvesting.
+        if (BlastRemoteBomb.isTimedMode() || hero.buff(BlastRemoteBomb.class) == null) {
+            return Action.NONE;
         }
 
         // An earlier manual Regrowth blast should finish before farming begins.
@@ -153,7 +160,8 @@ public final class BlastAutoFarming {
     private static boolean hasVisibleEnemy(Hero hero) {
         for (Mob mob : Dungeon.level.mobs) {
             if (mob.isAlive() && mob.alignment == Char.Alignment.ENEMY
-                    && mob.invisible <= 0 && hero.fieldOfView[mob.pos]) return true;
+                    && mob.invisible <= 0 && hero.fieldOfView[mob.pos]
+                    && BlastAutoPlay.isAwake(mob)) return true;
         }
         return false;
     }
