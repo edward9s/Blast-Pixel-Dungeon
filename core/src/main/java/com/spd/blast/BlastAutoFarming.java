@@ -103,8 +103,9 @@ public final class BlastAutoFarming {
         if ((!remoteThrow && (level.pit[hero.pos]
                 || BlastBombCollision.hasLitBomb(level, hero.pos)))
                 || (remoteThrow && BlastBombTrajectory.throwPos(hero.pos, destination) != destination)
-                || countGrowable(bomb.blastWarningCells(destination), level, safe, distances,
-                        hero.pos) < MIN_GROWABLE_CELLS) {
+                || !sufficientArea(countGrowable(
+                        bomb.blastWarningCells(destination), level, safe, distances,
+                        hero.pos))) {
             farmingSite = farmingBlastCell = -1;
             return Action.NONE;
         }
@@ -134,6 +135,10 @@ public final class BlastAutoFarming {
     static boolean harvestable(int terrain, Plant plant) {
         return terrain == Terrain.HIGH_GRASS
                 || (plant != null && !AutoPlayPlantSafety.isHarmful(plant));
+    }
+
+    static boolean sufficientArea(int count) {
+        return count >= MIN_GROWABLE_CELLS;
     }
 
     /** Regrowth upgrades ground only on these five terrain types. */
@@ -247,7 +252,7 @@ public final class BlastAutoFarming {
             } else {
                 score = localGrowable(level, site, site, safe, distances);
             }
-            if (score < MIN_GROWABLE_CELLS) continue;
+            if (!sufficientArea(score)) continue;
 
             int insertion = found;
             while (insertion > 0 && (distances[site] < steps[insertion - 1]
@@ -274,8 +279,8 @@ public final class BlastAutoFarming {
                     || (remoteThrow && BlastBombTrajectory.throwPos(site, center) != center)) {
                 continue;
             }
-            if (countGrowable(bomb.blastWarningCells(center), level, safe, distances, site)
-                    < MIN_GROWABLE_CELLS) continue;
+            if (!sufficientArea(countGrowable(
+                    bomb.blastWarningCells(center), level, safe, distances, site))) continue;
             farmingSite = site;
             farmingBlastCell = center;
             return;
