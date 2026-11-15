@@ -1,6 +1,7 @@
 package com.spd.blast;
 
 import com.shatteredpixel.shatteredpixeldungeon.items.Dewdrop;
+import com.shatteredpixel.shatteredpixeldungeon.items.Gold;
 import com.shatteredpixel.shatteredpixeldungeon.items.bombs.Bomb;
 import com.shatteredpixel.shatteredpixeldungeon.items.potions.PotionOfHealing;
 import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfIdentify;
@@ -17,6 +18,7 @@ public final class BlastAutoPickupTest {
 
     public static void main(String[] args) {
         check(true, new Dewdrop());
+        check(true, new Gold());
         check(true, new Sungrass.Seed());
         check(true, new ScrollOfIdentify());
         check(true, new PotionOfHealing());

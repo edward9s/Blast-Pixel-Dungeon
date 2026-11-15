@@ -61,7 +61,8 @@ java -cp "/tmp/blast-tests:$BLAST_TEST_CLASSPATH" com.spd.blast.BlastAutoBombAIT
 ```
 
 `BlastAutoPickupTest.java` checks the automatic floor-pickup allowlist:
-dew, seeds, scrolls, potions, and runestones, excluding bombs.
+dew, seeds, scrolls, potions, runestones, and gold, excluding bombs.
+Gold is collected into the wallet without using backpack capacity.
 
 ```sh
 javac --release 11 -encoding UTF-8 -cp "$BLAST_TEST_CLASSPATH" \

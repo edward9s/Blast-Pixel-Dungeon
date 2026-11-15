@@ -6,6 +6,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroAction;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Talent;
 import com.shatteredpixel.shatteredpixeldungeon.items.Dewdrop;
+import com.shatteredpixel.shatteredpixeldungeon.items.Gold;
 import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.Waterskin;
@@ -83,13 +84,15 @@ public final class BlastAutoPickup {
     }
 
     static boolean isPickupType(Item item) {
-        return item instanceof Dewdrop || item instanceof Plant.Seed
+        return item instanceof Gold || item instanceof Dewdrop || item instanceof Plant.Seed
                 || item instanceof Scroll || item instanceof Potion
                 || item instanceof Runestone;
     }
 
     /** Avoid chasing full-inventory items or unusable dew. */
     private static boolean canCollect(Hero hero, Item item) {
+        // Gold credits the wallet directly; it never occupies backpack space.
+        if (item instanceof Gold) return true;
         if (item instanceof Dewdrop) {
             Waterskin waterskin = hero.belongings.getItem(Waterskin.class);
             if (waterskin != null && !waterskin.isFull()) return true;
