@@ -22,6 +22,8 @@ import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
 import com.watabou.utils.PathFinder;
 import com.watabou.utils.Random;
 
+import java.util.concurrent.ConcurrentLinkedQueue;
+
 /** Autonomous testing, one ordinary HeroAction per actor turn. */
 public final class BlastAutoPlay {
 
@@ -36,6 +38,19 @@ public final class BlastAutoPlay {
     private static int lastRetryCell = -1;
     private static volatile boolean manualAction;
     private static volatile boolean waitingForInput;
+    private static final ConcurrentLinkedQueue<BombInput> pendingBombInputs = new ConcurrentLinkedQueue<>();
+
+    private enum BombAction { PLACE, THROW, DETONATE, TOGGLE }
+
+    private static final class BombInput {
+        final BombAction action;
+        final int destination;
+
+        BombInput(BombAction action, int destination) {
+            this.action = action;
+            this.destination = destination;
+        }
+    }
 
     private BlastAutoPlay() {}
 
@@ -49,6 +64,7 @@ public final class BlastAutoPlay {
         lastRetryCell = -1;
         manualAction = false;
         waitingForInput = false;
+        pendingBombInputs.clear();
 
         Hero hero = Dungeon.hero;
         if (hero == null || Dungeon.level == null) return;
@@ -114,6 +130,63 @@ public final class BlastAutoPlay {
         waitingForInput = false;
         Hero hero = Dungeon.hero;
         if (BlastSettings.testAutoPlay() && hero != null && hero.ready) hero.next();
+    }
+
+    /** Tag commands are applied on the actor thread, never in a render callback. */
+    private static void requestBombInput(BombAction action, int destination) {
+        Hero hero = Dungeon.hero;
+        if (hero == null || !BlastSettings.testAutoPlay()) return;
+        resetForLevel(hero);
+        pendingBombInputs.add(new BombInput(action, destination));
+        if (hero.ready && !GameScene.manualInputPending()) hero.next();
+    }
+
+    public static void requestBombPlacement() {
+        requestBombInput(BombAction.PLACE, -1);
+    }
+
+    public static void requestBombThrow(int destination) {
+        if (Dungeon.level == null || !Dungeon.level.insideMap(destination)) {
+            throw new IllegalArgumentException("Invalid bomb destination: " + destination);
+        }
+        requestBombInput(BombAction.THROW, destination);
+    }
+
+    public static void requestBombDetonation() {
+        requestBombInput(BombAction.DETONATE, -1);
+    }
+
+    public static void requestBombModeToggle() {
+        requestBombInput(BombAction.TOGGLE, -1);
+    }
+
+    /** Returns true only for an asynchronous throw that owns the actor turn. */
+    public static boolean performBombInput(Hero hero) {
+        if (!BlastSettings.testAutoPlay()) return false;
+        resetForLevel(hero);
+        BombInput input = pendingBombInputs.poll();
+        if (input == null) return false;
+        manualAction = false;
+        hero.curAction = null;
+        hero.lastAction = null;
+        hero.resting = false;
+        switch (input.action) {
+            case PLACE:
+                BlastBombManiac maniac = BlastBombManiac.current();
+                if (maniac != null) maniac.place();
+                return false;
+            case THROW:
+                BlastBombManiac thrower = BlastBombManiac.current();
+                return thrower != null && thrower.blastAutoThrow(input.destination);
+            case DETONATE:
+                BlastRemoteBomb.detonateNext();
+                return false;
+            case TOGGLE:
+                BlastRemoteBomb.toggleMode();
+                return false;
+            default:
+                throw new IllegalStateException("Unknown bomb input: " + input.action);
+        }
     }
 
     /** Retry a blocked action once at the same location, then stop idle looping. */
@@ -289,6 +362,7 @@ public final class BlastAutoPlay {
         lastRetryCell = -1;
         manualAction = false;
         waitingForInput = false;
+        pendingBombInputs.clear();
     }
 
     private static boolean[] safeCells(Hero hero) {

@@ -167,7 +167,7 @@ public final class BlastBombManiac extends Buff {
     /** First press chooses a target; second press confirms the aimed throw. */
     public void aim() {
         if (!aimedThrowEnabled() || target != Dungeon.hero
-                || !Dungeon.hero.ready || Dungeon.level == null
+                || (!Dungeon.hero.ready && !BlastSettings.testAutoPlay()) || Dungeon.level == null
                 || GameScene.showingWindow()) return;
         if (BlastRemoteBomb.isTimedMode() && !unlimited() && capacity <= 1) {
             GLog.w(BlastMessages.get("remote_bomb.capacity_required"));
@@ -212,7 +212,8 @@ public final class BlastBombManiac extends Buff {
                 targeting = null;
                 autoTarget = null;
                 if (cell != null && BlastBombManiac.current() == BlastBombManiac.this) {
-                    throwAt(cell);
+                    if (BlastSettings.testAutoPlay()) BlastAutoPlay.requestBombThrow(cell);
+                    else throwAt(cell);
                 }
             }
 
@@ -230,20 +231,28 @@ public final class BlastBombManiac extends Buff {
     }
 
     /** Timed throws cost one turn; test-enabled remote throws are free. */
-    private void throwAt(int destination) {
+    public boolean blastAutoThrow(int destination) {
+        if (!BlastSettings.testAutoPlay()) {
+            throw new IllegalStateException("Automatic bomb throw requires auto-play mode");
+        }
+        return throwAt(destination);
+    }
+
+    private boolean throwAt(int destination) {
         final Hero hero = Dungeon.hero;
         final boolean timed = BlastRemoteBomb.isTimedMode();
-        if (!aimedThrowEnabled() || hero == null || !hero.ready
+        if (!aimedThrowEnabled() || hero == null
+                || (!hero.ready && !BlastSettings.testAutoPlay())
                 || current() != this || remaining() == 0
-                || Dungeon.level == null) return;
+                || Dungeon.level == null) return false;
         if (timed && !unlimited() && capacity <= 1) {
             GLog.w(BlastMessages.get("remote_bomb.capacity_required"));
-            return;
+            return false;
         }
         final Bomb bomb = selectedBomb();
         bomb.blastSetManiacCharge(true);
         final int cell = bomb.throwPos(hero, destination);
-        if (!Dungeon.level.insideMap(cell)) return;
+        if (!Dungeon.level.insideMap(cell)) return false;
 
         hero.sprite.zap(cell);
         hero.busy();
@@ -275,13 +284,15 @@ public final class BlastBombManiac extends Buff {
         } else {
             missile.reset(hero.sprite, cell, bomb, finish);
         }
+        return true;
     }
 
     /** Place a remote-armed bomb on the Hero's cell without spending a turn. */
     public void place() {
         Hero hero = Dungeon.hero;
         if (aimedThrowEnabled() || target != hero || hero == null
-                || !hero.ready || Dungeon.level == null || GameScene.showingWindow()) return;
+                || (!hero.ready && !BlastSettings.testAutoPlay())
+                || Dungeon.level == null || GameScene.showingWindow()) return;
         if (remaining() == 0) {
             GLog.w(BlastMessages.get("bomb_maniac.no_charges"));
             return;

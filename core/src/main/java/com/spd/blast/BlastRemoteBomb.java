@@ -71,7 +71,8 @@ public final class BlastRemoteBomb extends Buff {
 
     /** Enter timed mode only with spare permanent capacity and no lit bombs. */
     public static void toggleMode() {
-        if (Dungeon.hero == null || !Dungeon.hero.ready || Dungeon.level == null) return;
+        if (Dungeon.hero == null || (!Dungeon.hero.ready && !BlastSettings.testAutoPlay())
+                || Dungeon.level == null) return;
         BlastRemoteBomb remote = Dungeon.hero.buff(BlastRemoteBomb.class);
         if (remote == null) return;
         BlastBombManiac maniac = BlastBombManiac.current();

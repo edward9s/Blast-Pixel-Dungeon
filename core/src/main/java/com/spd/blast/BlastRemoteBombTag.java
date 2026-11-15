@@ -82,7 +82,8 @@ public final class BlastRemoteBombTag extends Tag {
         }
         heart.visible = !timed;
         fuseTime.visible = timed;
-        boolean ready = Dungeon.hero != null && Dungeon.hero.ready;
+        boolean ready = Dungeon.hero != null
+                && (Dungeon.hero.ready || BlastSettings.testAutoPlay());
         float alpha = ready ? 1f : 0.4f;
         bombIcon.alpha(alpha);
         heart.alpha(alpha);
@@ -93,17 +94,23 @@ public final class BlastRemoteBombTag extends Tag {
 
     @Override
     protected void onClick() {
-        if (Dungeon.hero == null || !Dungeon.hero.ready
+        if (Dungeon.hero == null
+                || (!Dungeon.hero.ready && !BlastSettings.testAutoPlay())
                 || Dungeon.hero.buff(BlastRemoteBomb.class) == null) return;
         super.onClick();
-        if (!BlastRemoteBomb.isTimedMode()) BlastRemoteBomb.detonateNext();
+        if (!BlastRemoteBomb.isTimedMode()) {
+            if (BlastSettings.testAutoPlay()) BlastAutoPlay.requestBombDetonation();
+            else BlastRemoteBomb.detonateNext();
+        }
     }
 
     @Override
     protected boolean onLongClick() {
-        if (Dungeon.hero == null || !Dungeon.hero.ready
+        if (Dungeon.hero == null
+                || (!Dungeon.hero.ready && !BlastSettings.testAutoPlay())
                 || Dungeon.hero.buff(BlastRemoteBomb.class) == null) return false;
-        BlastRemoteBomb.toggleMode();
+        if (BlastSettings.testAutoPlay()) BlastAutoPlay.requestBombModeToggle();
+        else BlastRemoteBomb.toggleMode();
         return true;
     }
 
