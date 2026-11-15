@@ -169,7 +169,8 @@ def patch(path: Path) -> None:
     source = replace(source,
         "\t\t\tInventoryPane.refresh();",
         "\t\t\tInventoryPane.refresh();\n"
-        "\t\t\tWndBag.refreshOpen();",
+        "\t\t\tWndBag.refreshOpen();\n"
+        "\t\t\tWndQuickBag.refreshOpen();",
         "refresh already-open bag window")
 
     path.write_text(source, encoding="utf-8")

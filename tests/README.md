@@ -94,3 +94,15 @@ javac --release 11 -encoding UTF-8 -cp "$BLAST_TEST_CLASSPATH" \
   -d /tmp/blast-tests tests/AutoPlayPlantSafetyTest.java
 java -cp "/tmp/blast-tests:$BLAST_TEST_CLASSPATH" com.spd.blast.AutoPlayPlantSafetyTest
 ```
+
+
+`scripts/test_wnd_bag_refresh_patch.py` verifies the fail-fast integration
+patches for native `WndBag` and `WndQuickBag`. Both windows are refreshed
+by SPD's existing `GameScene.updateItemDisplays` notification. Open backpack
+tabs remain selected, while the quick-use popup rebuilds its visible item
+buttons as inventory contents change. Neither window is closed or reopened
+during a refresh.
+
+```sh
+python scripts/test_wnd_bag_refresh_patch.py
+```
