@@ -25,6 +25,7 @@ public final class BlastSettings {
     private static final String FREE_MOVEMENT = "blast_test_free_movement";
     private static final String REMOTE_THROW = "blast_test_remote_throw";
     private static final String DEMOLITION = "blast_test_demolition";
+    private static final String AUTO_PLAY = "blast_test_auto_play";
 
     private BlastSettings() {}
 
@@ -93,6 +94,14 @@ public final class BlastSettings {
 
     public static void setTestDemolition(boolean value) {
         GameSettings.put(DEMOLITION, value);
+    }
+
+    public static boolean testAutoPlay() {
+        return GameSettings.getBoolean(AUTO_PLAY, false);
+    }
+
+    public static void setTestAutoPlay(boolean value) {
+        GameSettings.put(AUTO_PLAY, value);
     }
 
     private static void validateMultiplier(int value) {

@@ -193,6 +193,51 @@ def patch(path: Path) -> None:
         "\t\t\t\t&& src",
         "temporary bomb immunity"
     )
+
+    # Use the normal action dispatch for automated turns.
+    s = replace_once(
+        s,
+        "\t\tboolean actResult;\n\t\tif (curAction == null) {",
+        "\t\tif (com.spd.blast.BlastSettings.testAutoPlay()) {\n"
+        "\t\t\tcom.spd.blast.BlastAutoPlay.chooseAction(this);\n"
+        "\t\t}\n\n"
+        "\t\tboolean actResult;\n\t\tif (curAction == null) {",
+        "Hero.act automatic actions"
+    )
+
+    # Resume after a blocked attack/move. Spending a turn avoids zero-time loops.
+    s = replace_once(
+        s,
+        "\t\tGameScene.ready();\n\t\t//check statistics to see if vault warned?",
+        "\t\tGameScene.ready();\n"
+        "\t\tif (com.spd.blast.BlastSettings.testAutoPlay()) {\n"
+        "\t\t\tspendAndNext(TICK);\n"
+        "\t\t}\n"
+        "\t\t//check statistics to see if vault warned?",
+        "Hero.ready automatic continuation"
+    )
+
+    s = replace_once(
+        s,
+        "\tpublic void damage( int dmg, Object src ) {\n",
+        "\tpublic void damage( int dmg, Object src ) {\n"
+        "\t\tcom.spd.blast.BlastAutoPlay.onDamage(this, src);\n",
+        "Hero.damage attack source"
+    )
+
+    # No Ankh, death screen, or save deletion when the test is enabled.
+    s = replace_once(
+        s,
+        "\tpublic void die( Object cause ) {\n\t\t\n\t\tcurAction = null;",
+        "\tpublic void die( Object cause ) {\n"
+        "\t\tif (com.spd.blast.BlastSettings.testAutoPlay()) {\n"
+        "\t\t\tHP = HT;\n"
+        "\t\t\treturn;\n"
+        "\t\t}\n\n"
+        "\t\tcurAction = null;",
+        "Hero.die full heal"
+    )
+
     path.write_text(s, encoding="utf-8")
     print(f"patched {path}: bomb damage immunity and phase movement")
 
