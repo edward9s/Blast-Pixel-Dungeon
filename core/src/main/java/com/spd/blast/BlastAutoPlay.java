@@ -34,8 +34,8 @@ public final class BlastAutoPlay {
     private static int attackerCell = -1;
     private static int attackerTurns;
     private static int lastRetryCell = -1;
-    private static boolean manualAction;
-    private static boolean waitingForInput;
+    private static volatile boolean manualAction;
+    private static volatile boolean waitingForInput;
 
     private BlastAutoPlay() {}
 
