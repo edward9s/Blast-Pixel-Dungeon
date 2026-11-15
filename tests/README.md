@@ -73,3 +73,22 @@ javac --release 11 -encoding UTF-8 -cp "$BLAST_TEST_CLASSPATH" \
   -d /tmp/blast-tests tests/BlastAutoPickupTest.java
 java -cp "/tmp/blast-tests:$BLAST_TEST_CLASSPATH" com.spd.blast.BlastAutoPickupTest
 ```
+
+
+`BlastAutoBombAITest.java` also checks Regrowth's 12-tick minimum reuse interval
+and the refusal to repeat the effect while an existing BombRegrowth cloud is active.
+Regrowth also skips targets already rooted. This applies only to Regrowth bombs;
+other eligible non-destructive bombs are unchanged.
+
+`AutoPlayPlantSafetyTest.java` verifies that automatic movement avoids SPD
+plants with harmful or disruptive effects (Blindweed, Fadeleaf, Firebloom,
+Icecap, Rotberry, Sorrowmoss and Stormvine), while permitting helpful or
+harmless plants (including Sungrass, Starflower and the Regrowth wand's
+Dewcatcher/Seedpod). The same hazard rule applies to normal walking and
+phase movement through sheep.
+
+```sh
+javac --release 11 -encoding UTF-8 -cp "$BLAST_TEST_CLASSPATH" \
+  -d /tmp/blast-tests tests/AutoPlayPlantSafetyTest.java
+java -cp "/tmp/blast-tests:$BLAST_TEST_CLASSPATH" com.spd.blast.AutoPlayPlantSafetyTest
+```

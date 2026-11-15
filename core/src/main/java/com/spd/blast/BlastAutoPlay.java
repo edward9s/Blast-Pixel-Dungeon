@@ -17,7 +17,6 @@ import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfMagicMissile;
 import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfPrismaticLight;
 import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfTransfusion;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
-import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
 import com.watabou.utils.PathFinder;
 import com.watabou.utils.Random;
@@ -421,7 +420,7 @@ public final class BlastAutoPlay {
             safe[cell] = known && level.insideMap(cell) && traversable
                     && !level.pit[cell]
                     && level.traps.get(cell) == null
-                    && (level.plants.get(cell) == null || level.map[cell] == Terrain.HIGH_GRASS);
+                    && !AutoPlayPlantSafety.isHarmful(level.plants.get(cell));
         }
 
         // Inspect occupied cells only; per-cell Actor.findChar() is unnecessary.
@@ -432,7 +431,7 @@ public final class BlastAutoPlay {
                     && level.insideMap(cell)
                     && (level.visited[cell] || level.mapped[cell] || hero.fieldOfView[cell])
                     && !level.pit[cell] && level.traps.get(cell) == null
-                    && (level.plants.get(cell) == null || level.map[cell] == Terrain.HIGH_GRASS)) {
+                    && !AutoPlayPlantSafety.isHarmful(level.plants.get(cell))) {
                 safe[cell] = true;
             } else {
                 safe[cell] = false;
