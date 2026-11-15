@@ -72,7 +72,7 @@ public final class BlastAutoBombAI {
             if (!mob.isAlive() || mob.alignment != Char.Alignment.ENEMY
                     || !hero.fieldOfView[mob.pos] || mob.invisible > 0
                     || hero.isCharmedBy(mob) || mob.isInvulnerable(Hero.class)
-                    || isRare(mob)) continue;
+                    || !BlastAutoPlay.isAwake(mob) || isRare(mob)) continue;
             if (regrowth && !regrowthReady(mob.rooted, regrowthAt(mob.pos))) continue;
 
             if (remoteThrow) {
