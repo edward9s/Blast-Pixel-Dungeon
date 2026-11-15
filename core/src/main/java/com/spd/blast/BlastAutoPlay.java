@@ -20,6 +20,7 @@ import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfMagicMissile;
 import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfPrismaticLight;
 import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfTransfusion;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.Trap;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
 import com.watabou.utils.PathFinder;
 import com.watabou.utils.Random;
@@ -607,6 +608,10 @@ public final class BlastAutoPlay {
         return reachable && distance > 1 && unseenTurns <= LOST_TARGET_TURNS;
     }
 
+    static boolean isTrapSafe(Trap trap) {
+        return trap == null || !trap.active;
+    }
+
     private static boolean[] safeCells(Hero hero, Blob[] hazards) {
         Level level = Dungeon.level;
         boolean[] safe = Dungeon.findPassable(hero, level.passable, hero.fieldOfView, true).clone();
@@ -618,7 +623,7 @@ public final class BlastAutoPlay {
                     || (phaseEnabled && known && BlastMovement.canPhase(cell));
             safe[cell] = known && level.insideMap(cell) && traversable
                     && !level.pit[cell]
-                    && level.traps.get(cell) == null
+                    && isTrapSafe(level.traps.get(cell))
                     && !AutoPlayPlantSafety.isHarmful(level.plants.get(cell))
                     && !BlastAutoEnvironment.hazardousAt(cell, hazards);
         }
@@ -630,7 +635,7 @@ public final class BlastAutoPlay {
             if (phaseEnabled && character instanceof Sheep && level.passable[cell]
                     && level.insideMap(cell)
                     && (level.visited[cell] || level.mapped[cell] || hero.fieldOfView[cell])
-                    && !level.pit[cell] && level.traps.get(cell) == null
+                    && !level.pit[cell] && isTrapSafe(level.traps.get(cell))
                     && !AutoPlayPlantSafety.isHarmful(level.plants.get(cell))
                     && !BlastAutoEnvironment.hazardousAt(cell, hazards)) {
                 safe[cell] = true;
