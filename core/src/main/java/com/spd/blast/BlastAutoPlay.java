@@ -212,6 +212,7 @@ public final class BlastAutoPlay {
         Mob invulnerable = null;
         Mob necromancer = null;
         int necromancerDistance = Integer.MAX_VALUE;
+        int necromancerGoal = -1;
         Mob attackable = null;
         int attackDistance = Integer.MAX_VALUE;
         int approachCell = -1;
@@ -219,14 +220,18 @@ public final class BlastAutoPlay {
 
         for (Mob mob : Dungeon.level.mobs) {
             if (!mob.isAlive() || mob.alignment == Char.Alignment.ALLY
-                    || mob.invisible > 0 || !hero.fieldOfView[mob.pos]) {
+                    || mob.invisible > 0) {
                 continue;
             }
 
+            boolean visible = hero.fieldOfView[mob.pos];
+            // Inspect unseen necromancers, but leave every other enemy sight-limited.
+            if (!visible && !(mob instanceof Necromancer)) continue;
+
             if (mob.isInvulnerable(Hero.class)) {
-                if (invulnerable == null
+                if (visible && (invulnerable == null
                         || Dungeon.level.distance(hero.pos, mob.pos)
-                                < Dungeon.level.distance(hero.pos, invulnerable.pos)) {
+                                < Dungeon.level.distance(hero.pos, invulnerable.pos))) {
                     invulnerable = mob;
                 }
                 continue;
@@ -235,12 +240,18 @@ public final class BlastAutoPlay {
             if (hero.isCharmedBy(mob)) continue;
 
             int distance = Dungeon.level.distance(hero.pos, mob.pos);
-            if (mob instanceof Necromancer && distance < necromancerDistance
-                    && (hero.canAttack(mob)
-                        || nearCell(hero.pos, mob.pos, safe, distances) >= 0)) {
-                necromancer = mob;
-                necromancerDistance = distance;
+            if (mob instanceof Necromancer && distance < necromancerDistance) {
+                // Reuse this turn's distance map; occupied skeletons remain blocked.
+                int goal = nearCell(hero.pos, mob.pos, safe, distances);
+                if (goal >= 0 || (visible && hero.canAttack(mob))) {
+                    necromancer = mob;
+                    necromancerDistance = distance;
+                    necromancerGoal = goal;
+                }
             }
+
+            // Unseen necromancers are navigation targets only, never attack targets.
+            if (!visible) continue;
             if (hero.canAttack(mob)) {
                 if (attackable == null || distance < attackDistance) {
                     attackable = mob;
@@ -272,14 +283,12 @@ public final class BlastAutoPlay {
         // Killing the summoner also removes their living summoned minions.
         // SpectralNecromancer is a subclass of Necromancer.
         if (necromancer != null) {
-            if (useWand(hero, necromancer)) return true;
-            if (hero.canAttack(necromancer)) {
+            boolean visible = hero.fieldOfView[necromancer.pos];
+            if (visible && useWand(hero, necromancer)) return true;
+            if (visible && hero.canAttack(necromancer)) {
                 hero.curAction = new HeroAction.Attack(necromancer);
-            } else {
-                int goal = nearCell(hero.pos, necromancer.pos, safe, distances);
-                if (goal >= 0) {
-                    hero.curAction = new HeroAction.Move(firstStep(goal, safe, distances));
-                }
+            } else if (necromancerGoal >= 0) {
+                hero.curAction = new HeroAction.Move(firstStep(necromancerGoal, safe, distances));
             }
             return false;
         }
