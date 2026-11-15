@@ -36,9 +36,12 @@ def main() -> None:
     tab_anchor = "\t\tadd( langsTab );\n\n\t\tresize(width, (int)Math.ceil(height));\n"
     tab_replacement = """\t\tadd( langsTab );
 
+\t\tfinal float standardHeight = height;
 \t\tif (com.spd.blast.BlastSettings.SHOW_BLAST_TAB) {
 \t\t\tblast = new com.spd.blast.BlastSettingsTab();
 \t\t\tblast.setSize(width, 0);
+\t\t\tblast.setHeightChanged(() -> resize(width,
+\t\t\t\t\t(int)Math.ceil(Math.max(standardHeight, blast.height()))));
 \t\t\theight = Math.max(height, blast.height());
 \t\t\tadd(blast);
 

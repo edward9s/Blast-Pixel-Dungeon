@@ -63,7 +63,7 @@ class ReverseAlchemyGuideTests(unittest.TestCase):
         self.assertIn("i == REVERSE_STONES_IDX ? 1 : originalIndex", journal)
         self.assertIn("currentPageIdx - 1 : currentPageIdx", journal)
         self.assertIn("currentPageIdx == REVERSE_STONES_IDX ? 9 : originalIndex", journal)
-        self.assertIn("ENABLE_ENCHANTMENT_STONE_REVERSE_ALCHEMY", journal)
+        self.assertIn("BlastSettings.enchantmentStoneReverseAlchemy()", journal)
         self.assertIn("case 9:", recipe)
         self.assertIn("new Scroll.StoneToScroll()", recipe)
         self.assertIn("r.testIngredients(recipeInputs)", recipe)
