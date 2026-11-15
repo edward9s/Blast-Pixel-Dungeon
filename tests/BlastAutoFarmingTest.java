@@ -53,6 +53,7 @@ public final class BlastAutoFarmingTest {
             }
         }
 
+        // High grass is an independent harvest target, even without a Regrowth bomb.
         crop(true, Terrain.HIGH_GRASS, null);
         crop(false, Terrain.GRASS, null);
         crop(false, Terrain.EMPTY, null);
