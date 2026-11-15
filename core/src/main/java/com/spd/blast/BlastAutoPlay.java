@@ -139,7 +139,7 @@ public final class BlastAutoPlay {
         roamCell = -1;
     }
 
-    /** Target selection pauses the actor; ordinary windows do not. */
+    /** Target selection and the game/settings menus pause auto-play; informational windows do not. */
     public static boolean pauseForManualInput(Hero hero) {
         if (!GameScene.manualInputPending()) return false;
         waitingForInput = true;
