@@ -13,6 +13,13 @@ def replace(source: str, old: str, new: str, label: str) -> str:
 
 def patch(path: Path) -> None:
     source = path.read_text(encoding="utf-8")
+    for anchor in (
+        "\t\tresize((int)width, (int)height);\n",
+        "\t\toffset(0, (int) (bottom/2 - 30 - height/2));\n",
+    ):
+        if source.count(anchor) != 1:
+            raise SystemExit(f"{path}: quick-use popup layout anchor changed")
+
     source = replace(
         source,
         "\tprivate static Item bag;\n",

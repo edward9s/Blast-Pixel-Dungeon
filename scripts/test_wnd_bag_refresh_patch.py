@@ -29,6 +29,8 @@ QUICK_BAG = (
     "\t\tfloat width = 0, height = 0;\n"
     "\t\t\tadd(slot);\n"
     "\t\tadd( txtTitle );\n"
+    "\t\tresize((int)width, (int)height);\n"
+    "\t\toffset(0, (int) (bottom/2 - 30 - height/2));\n"
 )
 
 
@@ -87,7 +89,8 @@ def main() -> None:
         assert "displaySlots.clear();" in patched
         assert "displayedTitle.destroy();" in patched
         assert "displayedTitle = txtTitle;" in patched
-        assert "resize((int)width, (int)height);" in patched or "float width = 0, height = 0;" in patched
+        assert "resize((int)width, (int)height);" in patched
+        assert "offset(0, (int) (bottom/2 - 30 - height/2));" in patched
         assert run_quick_patch(path).returncode != 0
         assert path.read_text(encoding="utf-8") == patched
 
