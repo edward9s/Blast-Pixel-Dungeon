@@ -48,3 +48,14 @@ Smoke-test both UI patch anchors:
 ```sh
 python scripts/test_update_patches.py
 ```
+
+`BlastAutoBombAITest.java` checks Blast-only Regrowth retreat destinations using
+the already-computed distance map. It covers a reachable exit, a blocked exit,
+unreachable cells, completely enclosed explosions and invalid map dimensions.
+Compile and run it against the patched SPD classpath:
+
+```sh
+javac --release 11 -encoding UTF-8 -cp "$BLAST_TEST_CLASSPATH" \
+  -d /tmp/blast-tests tests/BlastAutoBombAITest.java
+java -cp "/tmp/blast-tests:$BLAST_TEST_CLASSPATH" com.spd.blast.BlastAutoBombAITest
+```

@@ -169,7 +169,7 @@ public final class BlastAutoBombAI {
     }
 
     /** Reuse the existing hero distance map; no extra pathfinding pass. */
-    private static int nearestEscape(boolean[] safe, int[] distances, boolean[] blast) {
+    static int nearestEscape(boolean[] safe, int[] distances, boolean[] blast) {
         if (safe.length != distances.length || safe.length != blast.length) {
             throw new IllegalArgumentException("Mismatched escape-map dimensions");
         }
