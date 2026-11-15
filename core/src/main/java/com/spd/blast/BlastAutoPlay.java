@@ -96,7 +96,8 @@ public final class BlastAutoPlay {
     public static void onDamage(Hero hero, Object source) {
         if (!BlastSettings.testAutoPlay() || !(source instanceof Char)) return;
         Char attacker = (Char) source;
-        if (attacker == hero || attacker.alignment == Char.Alignment.ALLY) return;
+        if (attacker == hero || attacker.alignment == Char.Alignment.ALLY
+                || (attacker instanceof Mob && avoidEvasiveNeutral(hero, (Mob) attacker))) return;
         resetForLevel(hero);
         if (ignoredTarget == attacker) {
             ignoredTarget = null;
@@ -294,6 +295,7 @@ public final class BlastAutoPlay {
                 }
                 continue;
             }
+            if (avoidEvasiveNeutral(hero, mob)) continue;
 
             // Preserve the pre-existing hidden-necromancer fallback without
             // letting an unseen target override any visible threat.
@@ -349,7 +351,7 @@ public final class BlastAutoPlay {
                         && mob.invisible == 0 && hero.fieldOfView[mob.pos]
                         && isAwake(mob) && !ignored(mob)
                         && !mob.isInvulnerable(Hero.class) && !hero.isCharmedBy(mob)
-                        && useWand(hero, mob)) {
+                        && !avoidEvasiveNeutral(hero, mob) && useWand(hero, mob)) {
                     rememberCombatTarget(mob);
                     return true;
                 }
@@ -397,11 +399,16 @@ public final class BlastAutoPlay {
         if (BlastAutoPickup.chooseAction(hero, safe, distances,
                 BlastAutoPickupPolicy::isInstantPickup)) return false;
 
+        // Use native actions to open visible containers and keyed doors.
+        if (BlastAutoInteract.chooseAction(hero, safe, distances)) return false;
+
         if (attackerTurns > 0) {
             attackerTurns--;
             if (lastAttacker != null && lastAttacker.isAlive()
                     && lastAttacker.alignment != Char.Alignment.ALLY
-                    && (!(lastAttacker instanceof Mob) || isAwake((Mob) lastAttacker))) {
+                    && (!(lastAttacker instanceof Mob)
+                        || (isAwake((Mob) lastAttacker)
+                            && !avoidEvasiveNeutral(hero, (Mob) lastAttacker)))) {
                 int goal = nearCell(hero.pos, attackerCell, safe, distances);
                 if (goal >= 0) {
                     hero.curAction = new HeroAction.Move(firstStep(goal, safe, distances));
@@ -421,15 +428,29 @@ public final class BlastAutoPlay {
         return false;
     }
 
+    /** Wraiths and targets with at least twice the hero's accuracy qualify. */
+    static boolean highEvasion(boolean wraith, int defenseSkill, int attackSkill) {
+        return wraith || defenseSkill >= 2L * attackSkill;
+    }
+
+    private static boolean highEvasion(Hero hero, Mob mob) {
+        return highEvasion(mob instanceof Wraith, mob.defenseSkill(hero),
+                hero.attackSkill(mob));
+    }
+
+    static boolean avoidEvasiveNeutral(Char.Alignment alignment, boolean evasive) {
+        return alignment == Char.Alignment.NEUTRAL && evasive;
+    }
+
+    private static boolean avoidEvasiveNeutral(Hero hero, Mob mob) {
+        return avoidEvasiveNeutral(mob.alignment, highEvasion(hero, mob));
+    }
+
     private static boolean useWand(Hero hero, Mob target) {
         // Ranged opponents are always approached for melee, except for bomb attacks.
         if (BlastAutoSacrifice.isRangedEnemy(target.getClass())) return false;
-        // Wraiths have unusually high evasion (5x their attack skill).
-        // Include other enemies whose evasion is at least twice our accuracy.
-        if (!(target instanceof Wraith)
-                && target.defenseSkill(hero) < 2L * hero.attackSkill(target)) {
-            return false;
-        }
+        // High-evasion enemies retain their existing wand fallback.
+        if (!highEvasion(hero, target)) return false;
 
         // The mage's equipped staff can contain a charged wand.
         if (hero.belongings.weapon() instanceof MagesStaff) {
@@ -558,7 +579,8 @@ public final class BlastAutoPlay {
         if (!combatTarget.isAlive() || combatTarget.alignment == Char.Alignment.ALLY
                 || combatTarget.invisible > 0 || !isAwake(combatTarget)
                 || hero.isCharmedBy(combatTarget)
-                || combatTarget.isInvulnerable(Hero.class)) {
+                || combatTarget.isInvulnerable(Hero.class)
+                || avoidEvasiveNeutral(hero, combatTarget)) {
             forgetCombatTarget();
             return false;
         }

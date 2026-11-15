@@ -1,0 +1,130 @@
+package com.spd.blast;
+
+import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
+import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroAction;
+import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
+import com.shatteredpixel.shatteredpixeldungeon.items.keys.CrystalKey;
+import com.shatteredpixel.shatteredpixeldungeon.items.keys.GoldenKey;
+import com.shatteredpixel.shatteredpixeldungeon.items.keys.IronKey;
+import com.shatteredpixel.shatteredpixeldungeon.items.keys.WornKey;
+import com.shatteredpixel.shatteredpixeldungeon.journal.Notes;
+import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
+import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
+import com.watabou.utils.PathFinder;
+
+/** Automated native interactions with discovered containers and keyed doors. */
+public final class BlastAutoInteract {
+    private BlastAutoInteract() {}
+
+    static boolean canOpen(Heap.Type type, int goldenKeys, int crystalKeys) {
+        switch (type) {
+            case CHEST:
+            case SKELETON:
+            case REMAINS:
+                return true;
+            case LOCKED_CHEST:
+                return goldenKeys > 0;
+            case CRYSTAL_CHEST:
+                return crystalKeys > 0;
+            default:
+                return false;
+        }
+    }
+
+    static boolean canUnlock(int terrain, int ironKeys, int crystalKeys, int wornKeys) {
+        switch (terrain) {
+            case Terrain.LOCKED_DOOR:
+                return ironKeys > 0;
+            case Terrain.CRYSTAL_DOOR:
+                return crystalKeys > 0;
+            case Terrain.LOCKED_EXIT:
+                return wornKeys > 0;
+            default:
+                return false;
+        }
+    }
+
+    /** Chooses one safe native action using auto-play's existing distance map. */
+    static boolean chooseAction(Hero hero, boolean[] safe, int[] distances) {
+        Level level = Dungeon.level;
+        if (safe.length != level.length() || distances.length != level.length()) {
+            throw new IllegalArgumentException("Invalid auto-interaction distance map");
+        }
+
+        // Journal keys are valid on the main branch only, like native SPD.
+        int goldenKeys = 0;
+        int crystalKeys = 0;
+        int ironKeys = 0;
+        int wornKeys = 0;
+        if (Dungeon.branch == 0) {
+            goldenKeys = Notes.keyCount(new GoldenKey(Dungeon.depth));
+            crystalKeys = Notes.keyCount(new CrystalKey(Dungeon.depth));
+            ironKeys = Notes.keyCount(new IronKey(Dungeon.depth));
+            wornKeys = Notes.keyCount(new WornKey(Dungeon.depth));
+        }
+
+        int target = -1;
+        int stand = -1;
+        int steps = Integer.MAX_VALUE;
+        boolean chest = false;
+
+        for (Heap heap : level.heaps.valueList()) {
+            if (!heap.seen || !canOpen(heap.type, goldenKeys, crystalKeys)) continue;
+            int candidate = nearestStand(level, heap.pos, true, safe, distances);
+            if (candidate >= 0 && distances[candidate] < steps) {
+                target = heap.pos;
+                stand = candidate;
+                steps = distances[candidate];
+                chest = true;
+            }
+        }
+
+        if (ironKeys > 0 || crystalKeys > 0 || wornKeys > 0) {
+            for (int cell = 0; cell < level.length(); cell++) {
+                if (!(level.visited[cell] || level.mapped[cell] || hero.fieldOfView[cell])
+                        || !canUnlock(level.map[cell], ironKeys, crystalKeys, wornKeys)) {
+                    continue;
+                }
+                int candidate = nearestStand(level, cell, false, safe, distances);
+                if (candidate >= 0 && distances[candidate] < steps) {
+                    target = cell;
+                    stand = candidate;
+                    steps = distances[candidate];
+                    chest = false;
+                }
+            }
+        }
+
+        if (target < 0) return false;
+        if (hero.pos == stand) {
+            hero.curAction = chest ? new HeroAction.OpenChest(target)
+                    : new HeroAction.Unlock(target);
+        } else {
+            hero.curAction = new HeroAction.Move(
+                    BlastAutoPlay.firstStep(stand, safe, distances));
+        }
+        return true;
+    }
+
+    /** Containers allow standing on their cell; doors require an adjacent cell. */
+    private static int nearestStand(Level level, int target, boolean includeTarget,
+                                    boolean[] safe, int[] distances) {
+        int stand = -1;
+        int steps = Integer.MAX_VALUE;
+        if (includeTarget && level.insideMap(target) && safe[target]
+                && distances[target] < steps) {
+            stand = target;
+            steps = distances[target];
+        }
+        for (int offset : PathFinder.NEIGHBOURS8) {
+            int cell = target + offset;
+            if (!level.insideMap(cell) || !safe[cell]) continue;
+            if (distances[cell] < steps) {
+                stand = cell;
+                steps = distances[cell];
+            }
+        }
+        return stand;
+    }
+}
