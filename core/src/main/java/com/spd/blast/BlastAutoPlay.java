@@ -1,0 +1,434 @@
+package com.spd.blast;
+
+import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
+import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
+import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
+import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroAction;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Necromancer;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Wraith;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.Sheep;
+import com.shatteredpixel.shatteredpixeldungeon.items.Item;
+import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.MagesStaff;
+import com.shatteredpixel.shatteredpixeldungeon.items.wands.Wand;
+import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfFrost;
+import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfMagicMissile;
+import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfPrismaticLight;
+import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfTransfusion;
+import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
+import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
+import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
+import com.watabou.utils.PathFinder;
+import com.watabou.utils.Random;
+
+/** Autonomous testing, one ordinary HeroAction per actor turn. */
+public final class BlastAutoPlay {
+
+    private static final int ATTACKER_MEMORY_TURNS = 8;
+
+    private static Hero currentHero;
+    private static Level currentLevel;
+    private static int roamCell = -1;
+    private static Char lastAttacker;
+    private static int attackerCell = -1;
+    private static int attackerTurns;
+    private static int lastRetryCell = -1;
+    private static volatile boolean manualAction;
+    private static volatile boolean waitingForInput;
+
+    private BlastAutoPlay() {}
+
+    public static void onSettingChanged() {
+        currentHero = null;
+        currentLevel = null;
+        roamCell = -1;
+        lastAttacker = null;
+        attackerCell = -1;
+        attackerTurns = 0;
+        lastRetryCell = -1;
+        manualAction = false;
+        waitingForInput = false;
+
+        Hero hero = Dungeon.hero;
+        if (hero == null || Dungeon.level == null) return;
+        if (BlastSettings.testAutoPlay()) {
+            if (hero.ready) hero.next();
+        } else {
+            hero.curAction = null;
+            hero.lastAction = null;
+        }
+    }
+
+    public static void onDamage(Hero hero, Object source) {
+        if (!BlastSettings.testAutoPlay() || !(source instanceof Char)) return;
+        Char attacker = (Char) source;
+        if (attacker == hero || attacker.alignment == Char.Alignment.ALLY) return;
+        resetForLevel(hero);
+        lastAttacker = attacker;
+        attackerCell = attacker.pos;
+        attackerTurns = ATTACKER_MEMORY_TURNS;
+    }
+
+    /** Preserve player control until a complete multi-turn HeroAction finishes. */
+    public static void beginManualAction(Hero hero) {
+        if (!BlastSettings.testAutoPlay()) return;
+        resetForLevel(hero);
+        manualAction = true;
+        roamCell = -1;
+        lastRetryCell = -1;
+    }
+
+    public static boolean manualActionActive(Hero hero) {
+        return currentHero == hero && manualAction;
+    }
+
+    public static boolean finishManualAction(Hero hero) {
+        if (!manualActionActive(hero) || hero.curAction != null) return false;
+        manualAction = false;
+        return true;
+    }
+
+    /** An explicit item action supersedes the last AI movement order. */
+    public static void beginItemAction(Hero hero) {
+        if (!BlastSettings.testAutoPlay()) return;
+        resetForLevel(hero);
+        manualAction = false;
+        hero.curAction = null;
+        hero.lastAction = null;
+        hero.resting = false;
+        roamCell = -1;
+    }
+
+    /** Target selection pauses the actor; ordinary windows do not. */
+    public static boolean pauseForManualInput(Hero hero) {
+        if (!GameScene.manualInputPending()) return false;
+        waitingForInput = true;
+        hero.ready = true;
+        return true;
+    }
+
+    /** The render loop wakes the actor after a selection ends or is cancelled. */
+    public static void resumeIfInputFinished() {
+        if (!waitingForInput || GameScene.manualInputPending()) return;
+        waitingForInput = false;
+        Hero hero = Dungeon.hero;
+        if (BlastSettings.testAutoPlay() && hero != null && hero.ready) hero.next();
+    }
+
+    /** Retry a blocked action once at the same location, then stop idle looping. */
+    public static boolean retryBlockedAction(Hero hero) {
+        if (hero.pos == lastRetryCell) return false;
+        lastRetryCell = hero.pos;
+        return true;
+    }
+
+    /** Returns true only when a wand cast already started its own asynchronous turn. */
+    public static boolean chooseAction(Hero hero) {
+        resetForLevel(hero);
+        hero.curAction = null;
+        hero.lastAction = null;
+        hero.resting = false;
+
+        boolean[] safe = safeCells(hero);
+        // Compute reachability once, rather than doing up to nine searches per mob.
+        PathFinder.buildDistanceMap(hero.pos, safe);
+        int[] distances = PathFinder.distance.clone();
+        if (lastRetryCell != hero.pos) lastRetryCell = -1;
+
+        Mob invulnerable = null;
+        Mob necromancer = null;
+        int necromancerDistance = Integer.MAX_VALUE;
+        Mob attackable = null;
+        int attackDistance = Integer.MAX_VALUE;
+        int approachCell = -1;
+        int approachLength = Integer.MAX_VALUE;
+
+        for (Mob mob : Dungeon.level.mobs) {
+            if (!mob.isAlive() || mob.alignment == Char.Alignment.ALLY
+                    || mob.invisible > 0 || !hero.fieldOfView[mob.pos]) {
+                continue;
+            }
+
+            if (mob.isInvulnerable(Hero.class)) {
+                if (invulnerable == null
+                        || Dungeon.level.distance(hero.pos, mob.pos)
+                                < Dungeon.level.distance(hero.pos, invulnerable.pos)) {
+                    invulnerable = mob;
+                }
+                continue;
+            }
+
+            if (hero.isCharmedBy(mob)) continue;
+
+            int distance = Dungeon.level.distance(hero.pos, mob.pos);
+            if (mob instanceof Necromancer && distance < necromancerDistance
+                    && (hero.canAttack(mob)
+                        || nearCell(hero.pos, mob.pos, safe, distances) >= 0)) {
+                necromancer = mob;
+                necromancerDistance = distance;
+            }
+            if (hero.canAttack(mob)) {
+                if (attackable == null || distance < attackDistance) {
+                    attackable = mob;
+                    attackDistance = distance;
+                }
+                continue;
+            }
+
+            int cell = nearCell(hero.pos, mob.pos, safe, distances);
+            if (cell >= 0 && distances[cell] < approachLength) {
+                approachLength = distances[cell];
+                approachCell = cell;
+            }
+        }
+
+        if (invulnerable == null && attackerTurns > 0 && lastAttacker != null
+                && lastAttacker.isAlive() && lastAttacker.isInvulnerable(Hero.class)) {
+            int step = retreatStep(hero, lastAttacker.pos, safe, distances);
+            if (step >= 0) hero.curAction = new HeroAction.Move(step);
+            return false;
+        }
+
+        if (invulnerable != null) {
+            int step = retreatStep(hero, invulnerable.pos, safe, distances);
+            if (step >= 0) hero.curAction = new HeroAction.Move(step);
+            return false;
+        }
+
+        // Killing the summoner also removes their living summoned minions.
+        // SpectralNecromancer is a subclass of Necromancer.
+        if (necromancer != null) {
+            if (useWand(hero, necromancer)) return true;
+            if (hero.canAttack(necromancer)) {
+                hero.curAction = new HeroAction.Attack(necromancer);
+            } else {
+                int goal = nearCell(hero.pos, necromancer.pos, safe, distances);
+                if (goal >= 0) {
+                    hero.curAction = new HeroAction.Move(firstStep(goal, safe, distances));
+                }
+            }
+            return false;
+        }
+
+        // A charged damage wand bypasses the high evasion of wraiths.
+        for (Mob mob : Dungeon.level.mobs) {
+            if (mob.isAlive() && mob.alignment != Char.Alignment.ALLY
+                    && mob.invisible == 0 && hero.fieldOfView[mob.pos]
+                    && !mob.isInvulnerable(Hero.class) && !hero.isCharmedBy(mob)
+                    && useWand(hero, mob)) {
+                return true;
+            }
+        }
+
+        if (attackable != null) {
+            hero.curAction = new HeroAction.Attack(attackable);
+            return false;
+        }
+
+        if (approachCell >= 0) {
+            hero.curAction = new HeroAction.Move(firstStep(approachCell, safe, distances));
+            return false;
+        }
+
+        if (attackerTurns > 0) {
+            attackerTurns--;
+            if (lastAttacker != null && lastAttacker.isAlive()
+                    && lastAttacker.alignment != Char.Alignment.ALLY) {
+                int goal = nearCell(hero.pos, attackerCell, safe, distances);
+                if (goal >= 0) {
+                    hero.curAction = new HeroAction.Move(firstStep(goal, safe, distances));
+                    return false;
+                }
+            }
+        }
+
+        int step = roamStep(hero, safe, distances);
+        if (step >= 0) hero.curAction = new HeroAction.Move(step);
+        return false;
+    }
+
+    private static boolean useWand(Hero hero, Mob target) {
+        // Wraiths have unusually high evasion (5x their attack skill).
+        // Include other enemies whose evasion is at least twice our accuracy.
+        if (!(target instanceof Wraith)
+                && target.defenseSkill(hero) < 2L * hero.attackSkill(target)) {
+            return false;
+        }
+
+        // The mage's equipped staff can contain a charged wand.
+        if (hero.belongings.weapon() instanceof MagesStaff) {
+            MagesStaff staff = (MagesStaff) hero.belongings.weapon();
+            if (castWand(hero, target, staff.blastAutoPlayWand())) return true;
+        }
+        for (Item item : hero.belongings) {
+            if (item instanceof Wand && castWand(hero, target, (Wand) item)) return true;
+        }
+        return false;
+    }
+
+    private static boolean castWand(Hero hero, Mob target, Wand wand) {
+        if (wand == null || !(wand instanceof WandOfMagicMissile
+                || wand instanceof WandOfFrost
+                || wand instanceof WandOfPrismaticLight
+                || (wand instanceof WandOfTransfusion
+                    && target.properties().contains(Char.Property.UNDEAD)))) {
+            return false;
+        }
+        return wand.blastAutoZap(hero, target.pos);
+    }
+
+    private static void resetForLevel(Hero hero) {
+        if (currentHero == hero && currentLevel == Dungeon.level) return;
+        currentHero = hero;
+        currentLevel = Dungeon.level;
+        roamCell = -1;
+        lastAttacker = null;
+        attackerCell = -1;
+        attackerTurns = 0;
+        lastRetryCell = -1;
+        manualAction = false;
+        waitingForInput = false;
+    }
+
+    private static boolean[] safeCells(Hero hero) {
+        Level level = Dungeon.level;
+        boolean[] safe = Dungeon.findPassable(hero, level.passable, hero.fieldOfView, true).clone();
+        boolean phaseEnabled = BlastMovement.enabled();
+
+        for (int cell = 0; cell < safe.length; cell++) {
+            boolean known = level.visited[cell] || level.mapped[cell] || hero.fieldOfView[cell];
+            boolean traversable = safe[cell]
+                    || (phaseEnabled && known && BlastMovement.canPhase(cell));
+            safe[cell] = known && level.insideMap(cell) && traversable
+                    && !level.pit[cell]
+                    && level.traps.get(cell) == null
+                    && (level.plants.get(cell) == null || level.map[cell] == Terrain.HIGH_GRASS);
+        }
+
+        // Inspect occupied cells only; per-cell Actor.findChar() is unnecessary.
+        for (Char character : Actor.chars()) {
+            if (character == hero) continue;
+            int cell = character.pos;
+            if (phaseEnabled && character instanceof Sheep && level.passable[cell]
+                    && level.insideMap(cell)
+                    && (level.visited[cell] || level.mapped[cell] || hero.fieldOfView[cell])
+                    && !level.pit[cell] && level.traps.get(cell) == null
+                    && (level.plants.get(cell) == null || level.map[cell] == Terrain.HIGH_GRASS)) {
+                safe[cell] = true;
+            } else {
+                safe[cell] = false;
+            }
+        }
+        safe[hero.pos] = true;
+        return safe;
+    }
+
+    /** Find a shortest reachable destination at or beside an occupied target. */
+    private static int nearCell(int origin, int target, boolean[] safe, int[] distances) {
+        int goal = -1;
+        int shortest = Integer.MAX_VALUE;
+        if (target != origin && safe[target] && distances[target] < shortest) {
+            goal = target;
+            shortest = distances[target];
+        }
+        for (int offset : PathFinder.NEIGHBOURS8) {
+            int cell = target + offset;
+            if (!Dungeon.level.insideMap(cell) || cell == origin || !safe[cell]) continue;
+            if (distances[cell] < shortest) {
+                goal = cell;
+                shortest = distances[cell];
+            }
+        }
+        return goal;
+    }
+
+    /** Follow the existing distance map backwards instead of running another search. */
+    private static int firstStep(int goal, boolean[] safe, int[] distances) {
+        int cell = goal;
+        if (distances[cell] == Integer.MAX_VALUE || distances[cell] == 0) {
+            throw new IllegalArgumentException("Unreachable or current auto-play destination: " + goal);
+        }
+        while (distances[cell] > 1) {
+            int previous = -1;
+            for (int offset : PathFinder.NEIGHBOURS8) {
+                int adjacent = cell + offset;
+                if (Dungeon.level.insideMap(adjacent) && safe[adjacent]
+                        && distances[adjacent] == distances[cell] - 1) {
+                    previous = adjacent;
+                    break;
+                }
+            }
+            if (previous < 0) {
+                throw new IllegalStateException("Inconsistent auto-play distance map at " + cell);
+            }
+            cell = previous;
+        }
+        return cell;
+    }
+
+    /** Retreat without entering traps, chasms or non-grass plants. */
+    private static int retreatStep(Hero hero, int threat, boolean[] safe, int[] distances) {
+        int distance = Dungeon.level.distance(hero.pos, threat);
+        int step = -1;
+        for (int offset : PathFinder.NEIGHBOURS8) {
+            int cell = hero.pos + offset;
+            if (!Dungeon.level.insideMap(cell) || !safe[cell]) continue;
+            int nextDistance = Dungeon.level.distance(cell, threat);
+            if (nextDistance > distance) {
+                distance = nextDistance;
+                step = cell;
+            }
+        }
+        if (step >= 0) return step;
+
+        // If the first escape step must be sideways, use the same distance map.
+        int goal = -1;
+        int farthest = Dungeon.level.distance(hero.pos, threat);
+        for (int cell = 0; cell < safe.length; cell++) {
+            if (!safe[cell] || distances[cell] == Integer.MAX_VALUE) continue;
+            int nextDistance = Dungeon.level.distance(cell, threat);
+            if (nextDistance > farthest) {
+                farthest = nextDistance;
+                goal = cell;
+            }
+        }
+        return goal < 0 ? -1 : firstStep(goal, safe, distances);
+    }
+
+    private static int roamStep(Hero hero, boolean[] safe, int[] distances) {
+        if (roamCell >= 0 && roamCell != hero.pos && safe[roamCell]
+                && distances[roamCell] != Integer.MAX_VALUE) {
+            return firstStep(roamCell, safe, distances);
+        }
+
+        // Random reachable destinations, favouring the edge of explored terrain.
+        int frontier = -1;
+        int frontierCount = 0;
+        int distant = -1;
+        int distantCount = 0;
+        int nearby = -1;
+        int nearbyCount = 0;
+        Level level = Dungeon.level;
+        for (int cell = 0; cell < level.length(); cell++) {
+            if (!safe[cell] || cell == hero.pos
+                    || distances[cell] == Integer.MAX_VALUE) continue;
+
+            if (Random.Int(++nearbyCount) == 0) nearby = cell;
+            if (distances[cell] < 3) continue;
+            if (Random.Int(++distantCount) == 0) distant = cell;
+
+            for (int offset : PathFinder.NEIGHBOURS8) {
+                int adjacent = cell + offset;
+                if (level.insideMap(adjacent) && !level.visited[adjacent]
+                        && !level.mapped[adjacent] && !hero.fieldOfView[adjacent]) {
+                    if (Random.Int(++frontierCount) == 0) frontier = cell;
+                    break;
+                }
+            }
+        }
+
+        roamCell = frontier >= 0 ? frontier : distant >= 0 ? distant : nearby;
+        return roamCell < 0 ? -1 : firstStep(roamCell, safe, distances);
+    }
+}

@@ -63,6 +63,7 @@ def patch(path: Path) -> None:
     source = replace(source,
         "\t\tsuper.update();\n\n\t\tif (notifyDelay > 0)",
         """\t\tsuper.update();
+\t\tcom.spd.blast.BlastAutoPlay.resumeIfInputFinished();
 
 \t\tblastRemote.visible = blastRemote.active =
 \t\t\t\tDungeon.hero.buff(com.spd.blast.BlastRemoteBomb.class) != null;
@@ -134,6 +135,36 @@ def patch(path: Path) -> None:
         "\t\tcom.spd.blast.BlastOutOfSightItems.resetSnapshot();\n"
         "\t\tscene = null;\n\t\tBadges.saveGlobal();",
         "warning cleanup on scene close")
+
+    # Opening an informational window does not cancel the auto-play action.
+    source = replace(source,
+        "\t\t\tcancel();\n\n\t\t\t//If a window is already present",
+        "\t\t\tif (!com.spd.blast.BlastSettings.testAutoPlay()) cancel();\n\n"
+        "\t\t\t//If a window is already present",
+        "windows keep auto-play running")
+
+    source = replace(source,
+        "\tpublic static boolean cancel() {\n\t\tcellSelector.resetKeyHold();",
+        "\tpublic static boolean cancel() {\n\t\tcellSelector.resetKeyHold();\n"
+        "\t\tif (com.spd.blast.BlastSettings.testAutoPlay()) return cancelCellSelector();",
+        "autoplay ignores queued move during cancellation")
+
+    source = replace(source,
+        "\tpublic static boolean interfaceBlockingHero(){",
+        "\tpublic static boolean manualInputPending(){\n"
+        "\t\tif (scene == null) return false;\n"
+        "\t\tif (cellSelector.listener != null && cellSelector.listener != defaultCellListener) return true;\n"
+        "\t\tif (scene.inventory != null && scene.inventory.isSelecting()) return true;\n"
+        "\t\treturn WndBag.INSTANCE instanceof WndBag\n"
+        "\t\t\t\t&& ((WndBag) WndBag.INSTANCE).getSelector() != null;\n"
+        "\t}\n\n"
+        "\tpublic static boolean interfaceBlockingHero(){",
+        "manual targeting while auto-play")
+
+    source = replace(source,
+        "\t\tcellSelector.enable(Dungeon.hero.ready);",
+        "\t\tcellSelector.enable(Dungeon.hero.ready || com.spd.blast.BlastSettings.testAutoPlay());",
+        "manual map selection enabled")
 
     path.write_text(source, encoding="utf-8")
     print(f"patched {path}: remote bomb and Bomb Maniac edge tags")

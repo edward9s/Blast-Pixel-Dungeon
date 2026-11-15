@@ -135,6 +135,8 @@ def patch(path: Path) -> None:
     s = replace_once(
         s,
         "\t\treturn actResult;\n\t}",
+        "\t\tif (com.spd.blast.BlastSettings.testAutoPlay()\n"
+        "\t\t\t\t&& com.spd.blast.BlastAutoPlay.finishManualAction(this)) next();\n"
         "\t\treturn actResult && blastActionAfterUnlock == null;\n\t}",
         "Hero.act wait for door unlock animation"
     )
@@ -193,6 +195,77 @@ def patch(path: Path) -> None:
         "\t\t\t\t&& src",
         "temporary bomb immunity"
     )
+
+    # Map taps and directional input retain the native multi-turn HeroAction.
+    s = replace_once(
+        s,
+        "\t\treturn true;\n\t}\n\t\n\tpublic void earnExp( int exp, Class source ) {",
+        "\t\tif (com.spd.blast.BlastSettings.testAutoPlay()) {\n"
+        "\t\t\tcom.spd.blast.BlastAutoPlay.beginManualAction(this);\n"
+        "\t\t}\n"
+        "\t\treturn true;\n\t}\n\t\n\tpublic void earnExp( int exp, Class source ) {",
+        "Hero.handle manual command"
+    )
+
+    # Use the normal action dispatch for automated turns.
+    s = replace_once(
+        s,
+        "\t\tboolean actResult;\n\t\tif (curAction == null) {",
+        "\t\tif (com.spd.blast.BlastSettings.testAutoPlay()\n"
+        "\t\t\t\t&& com.spd.blast.BlastAutoPlay.pauseForManualInput(this)) {\n"
+        "\t\t\treturn false;\n"
+        "\t\t}\n"
+        "\t\tif (com.spd.blast.BlastSettings.testAutoPlay()\n"
+        "\t\t\t\t&& !com.spd.blast.BlastAutoPlay.manualActionActive(this)\n"
+        "\t\t\t\t&& com.spd.blast.BlastAutoPlay.chooseAction(this)) {\n"
+        "\t\t\treturn false;\n"
+        "\t\t}\n\n"
+        "\t\tboolean actResult;\n\t\tif (curAction == null) {",
+        "Hero.act automatic actions"
+    )
+
+    # A single retry can recover from a stale blocked move. If no action was
+    # chosen, leave the hero ready rather than spinning on an idle turn.
+    s = replace_once(
+        s,
+        "\tprivate void ready() {\n",
+        "\tprivate void ready() {\n"
+        "\t\tboolean blastRetry = com.spd.blast.BlastSettings.testAutoPlay()\n"
+        "\t\t\t\t&& !com.spd.blast.BlastAutoPlay.manualActionActive(this)\n"
+        "\t\t\t\t&& curAction != null\n"
+        "\t\t\t\t&& com.spd.blast.BlastAutoPlay.retryBlockedAction(this);\n",
+        "Hero.ready bounded auto retry"
+    )
+    s = replace_once(
+        s,
+        "\t\tGameScene.ready();\n\t\t//check statistics to see if vault warned?",
+        "\t\tGameScene.ready();\n"
+        "\t\tif (blastRetry) spendAndNext(TICK);\n"
+        "\t\t//check statistics to see if vault warned?",
+        "Hero.ready automatic continuation"
+    )
+
+    s = replace_once(
+        s,
+        "\tpublic void damage( int dmg, Object src ) {\n",
+        "\tpublic void damage( int dmg, Object src ) {\n"
+        "\t\tcom.spd.blast.BlastAutoPlay.onDamage(this, src);\n",
+        "Hero.damage attack source"
+    )
+
+    # No Ankh, death screen, or save deletion when the test is enabled.
+    s = replace_once(
+        s,
+        "\tpublic void die( Object cause ) {\n\t\t\n\t\tcurAction = null;",
+        "\tpublic void die( Object cause ) {\n"
+        "\t\tif (com.spd.blast.BlastSettings.testAutoPlay()) {\n"
+        "\t\t\tHP = HT;\n"
+        "\t\t\treturn;\n"
+        "\t\t}\n\n"
+        "\t\tcurAction = null;",
+        "Hero.die full heal"
+    )
+
     path.write_text(s, encoding="utf-8")
     print(f"patched {path}: bomb damage immunity and phase movement")
 

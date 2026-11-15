@@ -33,6 +33,7 @@ public final class BlastSettingsTab extends Component {
     private CheckBox freeMovement;
     private CheckBox remoteThrow;
     private CheckBox demolition;
+    private CheckBox autoPlay;
     private RenderedTextBlock radiusLabel;
     private RenderedTextBlock radiusValue;
     private RedButton radiusDecrease;
@@ -139,6 +140,17 @@ public final class BlastSettingsTab extends Component {
         demolition.checked(BlastSettings.testDemolition());
         add(demolition);
 
+        autoPlay = new CheckBox(BlastMessages.get("settings.auto_play")) {
+            @Override
+            protected void onClick() {
+                super.onClick();
+                BlastSettings.setTestAutoPlay(checked());
+                BlastAutoPlay.onSettingChanged();
+            }
+        };
+        autoPlay.checked(BlastSettings.testAutoPlay());
+        add(autoPlay);
+
         radiusLabel = PixelScene.renderTextBlock(BlastMessages.get("settings.radius"), 7);
         add(radiusLabel);
         radiusValue = PixelScene.renderTextBlock("", 7);
@@ -194,6 +206,7 @@ public final class BlastSettingsTab extends Component {
         freeMovement.visible = freeMovement.active = show;
         remoteThrow.visible = remoteThrow.active = show;
         demolition.visible = demolition.active = show;
+        autoPlay.visible = autoPlay.active = show;
         boolean radiusVisible = show && Dungeon.hero != null && Dungeon.hero.isAlive();
         radiusLabel.visible = radiusValue.visible = radiusVisible;
         radiusDecrease.visible = radiusIncrease.visible = radiusVisible;
@@ -248,7 +261,9 @@ public final class BlastSettingsTab extends Component {
 
         demolition.setRect(0, remoteThrow.bottom() + GAP, width, BUTTON_HEIGHT);
 
-        float radiusTop = demolition.bottom() + GAP;
+        autoPlay.setRect(0, demolition.bottom() + GAP, width, BUTTON_HEIGHT);
+
+        float radiusTop = autoPlay.bottom() + GAP;
         float radiusLeft = Math.max(0, width - 2 * RADIUS_BUTTON_WIDTH - RADIUS_VALUE_WIDTH - 2 * GAP);
         radiusLabel.maxWidth(Math.max(1, (int)Math.floor(radiusLeft - GAP)));
         float rowHeight = Math.max(BUTTON_HEIGHT, radiusLabel.height());
