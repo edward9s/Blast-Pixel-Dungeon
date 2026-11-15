@@ -8,7 +8,6 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroAction;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
-import com.watabou.utils.PathFinder;
 
 /** Lure pursuing enemies into SacrificialFire's marking area before attacking. */
 public final class BlastAutoSacrifice {
@@ -63,8 +62,9 @@ public final class BlastAutoSacrifice {
         Mob attackable = null;
         int attackDistance = Integer.MAX_VALUE;
         for (Mob mob : level.mobs) {
-            if (!eligible(hero, mob) || !nearFlame(level, fire.cur, mob.pos)
-                    || mob.buff(SacrificialFire.Marked.class) == null
+            if (!eligible(hero, mob) || !readyToSacrifice(
+                        nearFlame(fire.cur, level.width(), mob.pos),
+                        mob.buff(SacrificialFire.Marked.class) != null)
                     || !hero.canAttack(mob)) continue;
             int distance = level.distance(hero.pos, mob.pos);
             if (distance < attackDistance) {
@@ -89,7 +89,9 @@ public final class BlastAutoSacrifice {
                     || distances[cell] > MAX_FIRE_ROUTE
                     || !(level.visited[cell] || hero.fieldOfView[cell])) continue;
             for (Mob mob : level.mobs) {
-                if (!eligible(hero, mob) || !canLure(hero, mob, level, fire.cur)) continue;
+                if (!eligible(hero, mob) || !shouldLure(
+                        mob.state == mob.HUNTING && mob.isTargeting(hero),
+                        nearFlame(fire.cur, level.width(), mob.pos))) continue;
                 int enemyDistance = level.distance(cell, mob.pos);
                 if (enemyDistance > MAX_ENEMY_DISTANCE) continue;
                 int score = distances[cell] + enemyDistance;
@@ -135,16 +137,29 @@ public final class BlastAutoSacrifice {
                 && !hero.isCharmedBy(mob) && !mob.isInvulnerable(Hero.class);
     }
 
-    static boolean canLure(Hero hero, Mob mob, Level level, int[] flame) {
-        return (mob.state == mob.HUNTING && mob.isTargeting(hero))
-                || nearFlame(level, flame, mob.pos);
+    static boolean readyToSacrifice(boolean inFireArea, boolean marked) {
+        return inFireArea && marked;
     }
 
-    /** SacrificialFire applies Marked to its own tile and all eight neighbors. */
-    static boolean nearFlame(Level level, int[] flame, int cell) {
-        for (int offset : PathFinder.NEIGHBOURS9) {
-            int adjacent = cell + offset;
-            if (level.insideMap(adjacent) && flame[adjacent] > 0) return true;
+    static boolean shouldLure(boolean huntingHero, boolean inFireArea) {
+        return huntingHero || inFireArea;
+    }
+
+    /** The Marked aura covers the flame and its eight neighbors, without row wrapping. */
+    static boolean nearFlame(int[] flame, int width, int cell) {
+        if (width <= 0 || flame.length % width != 0 || cell < 0 || cell >= flame.length) {
+            throw new IllegalArgumentException("Invalid sacrificial fire grid");
+        }
+        int x = cell % width;
+        int y = cell / width;
+        int height = flame.length / width;
+        for (int dy = -1; dy <= 1; dy++) {
+            int yy = y + dy;
+            if (yy < 0 || yy >= height) continue;
+            for (int dx = -1; dx <= 1; dx++) {
+                int xx = x + dx;
+                if (xx >= 0 && xx < width && flame[yy * width + xx] > 0) return true;
+            }
         }
         return false;
     }
