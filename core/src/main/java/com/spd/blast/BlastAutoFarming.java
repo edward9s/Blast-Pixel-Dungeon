@@ -28,6 +28,7 @@ public final class BlastAutoFarming {
     private static boolean harvested;
     private static int farmingSite = -1;
     private static int farmingBlastCell = -1;
+    private static boolean siteUsesRemoteThrow;
     private static float nextSearchAt = Float.NEGATIVE_INFINITY;
 
     private BlastAutoFarming() {}
@@ -84,7 +85,8 @@ public final class BlastAutoFarming {
         boolean remoteThrow = BlastSettings.testRemoteThrow();
 
         if (farmingSite >= 0
-                && (!safe[farmingSite] || distances[farmingSite] == Integer.MAX_VALUE)) {
+                && (siteUsesRemoteThrow != remoteThrow
+                    || !safe[farmingSite] || distances[farmingSite] == Integer.MAX_VALUE)) {
             farmingSite = farmingBlastCell = -1;
         }
         if (farmingSite < 0) {
@@ -283,6 +285,7 @@ public final class BlastAutoFarming {
                     bomb.blastWarningCells(center), level, safe, distances, site))) continue;
             farmingSite = site;
             farmingBlastCell = center;
+            siteUsesRemoteThrow = remoteThrow;
             return;
         }
     }
