@@ -81,7 +81,9 @@ public final class BlastAutoSacrifice {
         // Never wait for ranged enemies to approach the altar.
         // Let regular combat handle every visible threat until they are defeated.
         for (Mob mob : level.mobs) {
-            if (eligible(hero, mob) && isRangedEnemy(mob.getClass())) {
+            if (mob.isAlive() && mob.alignment == Char.Alignment.ENEMY
+                    && mob.invisible <= 0 && hero.fieldOfView[mob.pos]
+                    && !hero.isCharmedBy(mob) && isRangedEnemy(mob.getClass())) {
                 trackedEnemy = null;
                 waitingSince = Float.NaN;
                 stalledTurns = 0;
