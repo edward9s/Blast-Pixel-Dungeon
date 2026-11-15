@@ -10,6 +10,9 @@ test -f "$upstream/build.gradle"
 test -d "$patches"
 test -d "$root"
 
+# Fail before modifying upstream files if any Python patch has invalid syntax.
+python -m compileall -q "$patches"
+
 python "$patches/patch_app_package.py" "$upstream/build.gradle"
 python "$patches/patch_android_manifest.py" "$upstream/android/src/main/AndroidManifest.xml"
 python "$patches/patch_tag_keybindings.py" "$root/SPDAction.java" "$root/windows/WndKeyBindings.java"

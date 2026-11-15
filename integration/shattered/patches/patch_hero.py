@@ -208,6 +208,7 @@ def patch(path: Path) -> None:
     )
 
     # Use the normal action dispatch for automated turns.
+    # If all safe moves are blocked, advance the game by one regular turn.
     s = replace_once(
         s,
         "\t\tboolean actResult;\n\t\tif (curAction == null) {",
@@ -224,8 +225,6 @@ def patch(path: Path) -> None:
         "\t\t\t\t&& com.spd.blast.BlastAutoPlay.chooseAction(this)) {\n"
         "\t\t\treturn false;\n"
         "\t\t}\n"
-        // The AI may have no legal move while temporary fire or gas blocks every exit.
-        // Spend real game time so environmental blobs and other actors can advance.
         "\t\tif (com.spd.blast.BlastSettings.testAutoPlay()\n"
         "\t\t\t\t&& !com.spd.blast.BlastAutoPlay.manualActionActive(this)\n"
         "\t\t\t\t&& curAction == null) {\n"
