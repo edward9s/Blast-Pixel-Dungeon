@@ -32,11 +32,11 @@ public final class BlastAutoBombAI {
         boolean regrowth = bomb instanceof RegrowthBomb;
         boolean remoteThrow = BlastSettings.testRemoteThrow();
         boolean[] blastAtHero = remoteThrow ? null : bomb.blastWarningCells(hero.pos);
-        Mob target = findTarget(hero, blastAtHero, remoteThrow, regrowth);
+        Mob target = findTarget(hero, bomb, blastAtHero, remoteThrow, regrowth);
         if (target == null) return false;
 
         // Do not affect rare variants, even as collateral or outside hero vision.
-        int center = remoteThrow ? target.pos : hero.pos;
+        int center = remoteThrow ? BlastBombTrajectory.throwPos(hero.pos, target.pos) : hero.pos;
         boolean[] blast = remoteThrow ? bomb.blastWarningCells(center) : blastAtHero;
         if (containsRareMob(blast)) return false;
 
@@ -54,6 +54,13 @@ public final class BlastAutoBombAI {
         return !bomb.explodesDestructively();
     }
 
+    static boolean blastReachesTarget(boolean[] blast, int targetCell) {
+        if (targetCell < 0 || targetCell >= blast.length) {
+            throw new IllegalArgumentException("Invalid bomb target: " + targetCell);
+        }
+        return blast[targetCell];
+    }
+
     /** An existing Regrowth cloud or root already covers the target. */
     static boolean regrowthReady(boolean rooted, boolean regrowthAtTarget) {
         return !rooted && !regrowthAtTarget;
@@ -64,8 +71,8 @@ public final class BlastAutoBombAI {
                 || Blob.volumeAt(cell, Regrowth.class) > 0;
     }
 
-    private static Mob findTarget(Hero hero, boolean[] blastAtHero, boolean remoteThrow,
-                                  boolean regrowth) {
+    private static Mob findTarget(Hero hero, Bomb bomb, boolean[] blastAtHero,
+                                  boolean remoteThrow, boolean regrowth) {
         Mob chosen = null;
         int closest = Integer.MAX_VALUE;
         for (Mob mob : Dungeon.level.mobs) {
@@ -76,8 +83,14 @@ public final class BlastAutoBombAI {
             if (regrowth && !regrowthReady(mob.rooted, regrowthAt(mob.pos))) continue;
 
             if (remoteThrow) {
-                if (BlastBombTrajectory.throwPos(hero.pos, mob.pos) != mob.pos) continue;
-            } else if (!blastAtHero[mob.pos]) {
+                int landing = BlastBombTrajectory.throwPos(hero.pos, mob.pos);
+                if (!Dungeon.level.insideMap(landing)) continue;
+                // An obstructed throw still counts if the actual blast reaches the enemy.
+                if (landing != mob.pos
+                        && !blastReachesTarget(bomb.blastWarningCells(landing), mob.pos)) {
+                    continue;
+                }
+            } else if (!blastReachesTarget(blastAtHero, mob.pos)) {
                 continue;
             }
 
