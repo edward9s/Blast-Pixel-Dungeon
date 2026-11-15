@@ -14,6 +14,12 @@ def replace(source: str, old: str, new: str, label: str) -> str:
 def patch(path: Path) -> None:
     source = path.read_text(encoding="utf-8")
     source = replace(source,
+        "import com.shatteredpixel.shatteredpixeldungeon.windows.WndBag;\n",
+        "import com.shatteredpixel.shatteredpixeldungeon.windows.WndBag;\n"
+        "import com.shatteredpixel.shatteredpixeldungeon.windows.WndQuickBag;\n",
+        "quick-use bag import")
+
+    source = replace(source,
         "\tprivate ResumeIndicator resume;\n",
         """\tprivate ResumeIndicator resume;
 \tprivate com.spd.blast.BlastRemoteBombTag blastRemote;
@@ -165,6 +171,13 @@ def patch(path: Path) -> None:
         "\t\tcellSelector.enable(Dungeon.hero.ready);",
         "\t\tcellSelector.enable(Dungeon.hero.ready || com.spd.blast.BlastSettings.testAutoPlay());",
         "manual map selection enabled")
+
+    source = replace(source,
+        "\t\t\tInventoryPane.refresh();",
+        "\t\t\tInventoryPane.refresh();\n"
+        "\t\t\tWndBag.refreshOpen();\n"
+        "\t\t\tWndQuickBag.refreshOpen();",
+        "refresh already-open bag window")
 
     path.write_text(source, encoding="utf-8")
     print(f"patched {path}: remote bomb and Bomb Maniac edge tags")

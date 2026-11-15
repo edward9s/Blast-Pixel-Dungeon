@@ -48,6 +48,8 @@ done
 python "$patches/patch_heap.py" "$root/items/Heap.java"
 python "$patches/patch_item_sprite.py" "$root/sprites/ItemSprite.java"
 python "$patches/patch_item_slot.py" "$root/ui/ItemSlot.java"
+python "$patches/patch_wnd_bag.py" "$root/windows/WndBag.java"
+python "$patches/patch_wnd_quick_bag.py" "$root/windows/WndQuickBag.java"
 python "$patches/patch_loot_indicator.py" "$root/ui/LootIndicator.java"
 python "$patches/patch_wndjournal.py" "$root/windows/WndJournal.java"
 python "$patches/patch_game_scene.py" "$root/scenes/GameScene.java"
