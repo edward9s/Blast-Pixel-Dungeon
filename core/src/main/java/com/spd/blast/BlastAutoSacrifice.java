@@ -6,6 +6,24 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.SacrificialFire;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroAction;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.CrystalSpire;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.CrystalWisp;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.DM100;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.DM200;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.DM300;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Elemental;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Eye;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.FungalSentry;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.GnollGeomancer;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.GnollSapper;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.GnollTrickster;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Necromancer;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Scorpio;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Shaman;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Tengu;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Warlock;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.YogDzewa;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.YogFist;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
 
@@ -58,6 +76,17 @@ public final class BlastAutoSacrifice {
         if (fire.cur == null || fire.cur.length != level.length()
                 || safe.length != level.length() || distances.length != level.length()) {
             throw new IllegalStateException("Invalid sacrificial fire navigation state");
+        }
+
+        // Never wait for ranged enemies to approach the altar.
+        // Let regular combat handle every visible threat until they are defeated.
+        for (Mob mob : level.mobs) {
+            if (eligible(hero, mob) && isRangedEnemy(mob.getClass())) {
+                trackedEnemy = null;
+                waitingSince = Float.NaN;
+                stalledTurns = 0;
+                return Action.NONE;
+            }
         }
 
         // A marked enemy within one tile of active flame is an eligible sacrifice.
@@ -135,7 +164,7 @@ public final class BlastAutoSacrifice {
         }
 
         // Stay on the fire: melee pursuers stop adjacent, inside the marked area.
-        // A bounded wait avoids endless idling against stationary ranged mobs.
+        // A bounded wait avoids endless idling against stationary melee mobs.
         hero.spendAndNext(Actor.TICK);
         return Action.WAIT;
     }
@@ -144,6 +173,28 @@ public final class BlastAutoSacrifice {
         return mob.isAlive() && mob.alignment == Char.Alignment.ENEMY
                 && mob.invisible <= 0 && hero.fieldOfView[mob.pos]
                 && !hero.isCharmedBy(mob) && !mob.isInvulnerable(Hero.class);
+    }
+
+    /** Native SPD enemy types with ranged spells, projectiles, or area attacks. */
+    static boolean isRangedEnemy(Class<? extends Mob> type) {
+        return DM100.class.isAssignableFrom(type)
+                || DM200.class.isAssignableFrom(type)
+                || DM300.class.isAssignableFrom(type)
+                || Warlock.class.isAssignableFrom(type)
+                || Shaman.class.isAssignableFrom(type)
+                || GnollTrickster.class.isAssignableFrom(type)
+                || Scorpio.class.isAssignableFrom(type)
+                || Eye.class.isAssignableFrom(type)
+                || Elemental.class.isAssignableFrom(type)
+                || CrystalWisp.class.isAssignableFrom(type)
+                || FungalSentry.class.isAssignableFrom(type)
+                || GnollGeomancer.class.isAssignableFrom(type)
+                || GnollSapper.class.isAssignableFrom(type)
+                || CrystalSpire.class.isAssignableFrom(type)
+                || Necromancer.class.isAssignableFrom(type)
+                || Tengu.class.isAssignableFrom(type)
+                || YogFist.class.isAssignableFrom(type)
+                || YogDzewa.class.isAssignableFrom(type);
     }
 
     static boolean shouldAbandon(float waited, int stalledTurns) {
