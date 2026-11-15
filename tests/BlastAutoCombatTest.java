@@ -1,5 +1,6 @@
 package com.spd.blast;
 
+import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Rat;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Thief;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Bandit;
@@ -63,6 +64,20 @@ public final class BlastAutoCombatTest {
                 "existing reach-weapon attacks on ordinary mobs");
         check(false, BlastAutoPlay.canMeleeTarget(false, true, false),
                 "native melee attack still required");
+
+        check(false, BlastAutoPlay.highEvasion(false, 19, 10),
+                "ordinary evasion");
+        check(true, BlastAutoPlay.highEvasion(false, 20, 10),
+                "exactly twice hero accuracy");
+        check(true, BlastAutoPlay.highEvasion(true, 1, 100),
+                "wraith special case");
+
+        check(true, BlastAutoPlay.avoidEvasiveNeutral(Char.Alignment.NEUTRAL, true),
+                "high-evasion neutral is ignored");
+        check(false, BlastAutoPlay.avoidEvasiveNeutral(Char.Alignment.ENEMY, true),
+                "high-evasion enemy is eligible for wands");
+        check(false, BlastAutoPlay.avoidEvasiveNeutral(Char.Alignment.NEUTRAL, false),
+                "ordinary neutral behavior is unchanged");
 
         System.out.println("BlastAutoCombatTest passed");
     }
