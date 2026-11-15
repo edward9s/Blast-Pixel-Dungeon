@@ -84,15 +84,20 @@ public final class BlastAutoPickup {
     }
 
     static boolean isPickupType(Item item) {
-        return item instanceof Gold || item instanceof Dewdrop || item instanceof Plant.Seed
+        return item instanceof BlastPickup || item instanceof Gold
+                || item instanceof Dewdrop || item instanceof Plant.Seed
                 || item instanceof Scroll || item instanceof Potion
                 || item instanceof Runestone;
     }
 
+    /** Floor pickups and gold apply directly without occupying backpack slots. */
+    static boolean bypassesBackpack(Item item) {
+        return item instanceof Gold || item instanceof BlastPickup;
+    }
+
     /** Avoid chasing full-inventory items or unusable dew. */
     private static boolean canCollect(Hero hero, Item item) {
-        // Gold credits the wallet directly; it never occupies backpack space.
-        if (item instanceof Gold) return true;
+        if (bypassesBackpack(item)) return true;
         if (item instanceof Dewdrop) {
             Waterskin waterskin = hero.belongings.getItem(Waterskin.class);
             if (waterskin != null && !waterskin.isFull()) return true;
