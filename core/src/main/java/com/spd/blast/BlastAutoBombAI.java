@@ -88,7 +88,8 @@ public final class BlastAutoBombAI {
 
         if (regrowth) {
             // Find an exit *before* placing; a sealed corridor must not trap AI.
-            if (nearestEscape(safe, distances, blast) < 0) return false;
+            int exit = nearestEscape(safe, distances, blast);
+            if (hero.rooted || exit < 0 || distances[exit] > MAX_RETREAT_TURNS) return false;
             Bomb placed = maniac.blastAutoPlace();
             if (placed == null) return false;
             regrowthBomb = placed;
@@ -154,12 +155,12 @@ public final class BlastAutoBombAI {
             return true;
         }
 
-        if (++retreatTurns > MAX_RETREAT_TURNS) {
+        if (hero.rooted || ++retreatTurns > MAX_RETREAT_TURNS) {
             abandonRegrowth();
             return false;
         }
         int exit = nearestEscape(safe, distances, blast);
-        if (exit < 0) {
+        if (exit < 0 || distances[exit] > MAX_RETREAT_TURNS - retreatTurns + 1) {
             abandonRegrowth();
             return false;
         }
