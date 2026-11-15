@@ -166,6 +166,12 @@ def patch(path: Path) -> None:
         "\t\tcellSelector.enable(Dungeon.hero.ready || com.spd.blast.BlastSettings.testAutoPlay());",
         "manual map selection enabled")
 
+    source = replace(source,
+        "\t\t\tInventoryPane.refresh();",
+        "\t\t\tInventoryPane.refresh();\n"
+        "\t\t\tWndBag.refreshOpen();",
+        "refresh already-open bag window")
+
     path.write_text(source, encoding="utf-8")
     print(f"patched {path}: remote bomb and Bomb Maniac edge tags")
 
