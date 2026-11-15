@@ -32,6 +32,27 @@ public final class BlastAutoFarmingTest {
         plantAgain(false, true, true, true);
         plantAgain(true, true, true, false);
 
+        // Require at least ten reachable, growable cells under the actual blast.
+        if (BlastAutoFarming.sufficientArea(0)
+                || BlastAutoFarming.sufficientArea(9)
+                || !BlastAutoFarming.sufficientArea(10)
+                || !BlastAutoFarming.sufficientArea(15)) {
+            throw new AssertionError("Incorrect minimum farming area threshold");
+        }
+        for (int ground : new int[]{Terrain.EMPTY, Terrain.EMPTY_DECO,
+                Terrain.EMBERS, Terrain.GRASS, Terrain.FURROWED_GRASS}) {
+            if (!BlastAutoFarming.canGrow(ground)) {
+                throw new AssertionError("Expected growable terrain: " + ground);
+            }
+        }
+        for (int ground : new int[]{Terrain.WALL, Terrain.CHASM, Terrain.WATER,
+                Terrain.EXIT, Terrain.ENTRANCE, Terrain.HIGH_GRASS,
+                Terrain.LOCKED_DOOR, Terrain.TRAP, Terrain.EMPTY_WELL}) {
+            if (BlastAutoFarming.canGrow(ground)) {
+                throw new AssertionError("Non-growable terrain: " + ground);
+            }
+        }
+
         crop(true, Terrain.HIGH_GRASS, null);
         crop(false, Terrain.GRASS, null);
         crop(false, Terrain.EMPTY, null);
