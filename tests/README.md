@@ -65,7 +65,7 @@ java -cp "/tmp/blast-tests:$BLAST_TEST_CLASSPATH" com.spd.blast.BlastAutoBombAIT
 pickups (`BlastRadiusPickup` and `BlastHastePickup`). The two special
 pickups remain non-stackable and are handled by `BlastAutoPickupPolicy`;
 the portable picker receives this policy as a parameter and contains no
-Blast-specific type checks. Gold and instant pickups bypass backpack capacity;
+Blast-specific type checks. Gold, journal keys, and instant pickups bypass backpack capacity;
 ordinary inventory and dew restrictions remain unchanged.
 
 ```sh
@@ -109,7 +109,9 @@ python scripts/test_wnd_bag_refresh_patch.py
 
 
 `BlastAutoFarmingTest.java` checks the isolated idle farming policy:
-the first Regrowth bomb is allowed, further bombs wait until a crop was
+visible high grass is actively harvested whenever auto-farming is enabled,
+even with no Regrowth bomb, no remote-bomb buff, or timed bomb mode.
+The first Regrowth bomb is allowed, further bombs wait until a crop was
 harvested and the last BombRegrowth cloud dissipated, visible high grass
 and harmless plants qualify for harvest, and harmful plants remain
 excluded. Farming requires at least 10 accessible growable tiles inside the
@@ -121,9 +123,9 @@ and at most 8 exact blast checks per site search. Searches are at least 8
 game ticks apart and a selected destination is cached while travelling. The implementation temporarily selects a RegrowthBomb type,
 detonates it, restores the original selected type via `finally`, and
 reuses the standard auto-pickup priority before crop collection.
-Farming runs only when auto-play and the independent farming checkbox
-are both enabled, no enemy is visible, the hero is grounded and
-remote bomb mode is available.
+Farming harvests when auto-play and the independent farming checkbox
+are enabled, no awake enemy is visible, and the hero is grounded.
+Planting additional crops also requires remote bomb mode and a usable Regrowth bomb.
 
 ```sh
 javac --release 11 -encoding UTF-8 -cp "$BLAST_TEST_CLASSPATH" \
