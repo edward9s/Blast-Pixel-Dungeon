@@ -122,9 +122,9 @@ java -cp "/tmp/blast-tests:$BLAST_TEST_CLASSPATH" com.spd.blast.BlastAutoCombatT
 ```
 
 `BlastAutoFarmingTest.java` checks the isolated idle farming policy:
-visible high grass is harvested only while a usable Regrowth bomb type
-and bomb charge are available. With no Regrowth bomb, auto-farming
-does not deliberately trample high grass.
+visible reachable high grass and beneficial plants are deliberately harvested
+whenever auto-play and auto-farming are enabled, even if no Regrowth bomb or
+remote-bomb buff is available (or bombs are in timed mode).
 The first Regrowth bomb is allowed, further bombs wait until a crop was
 harvested and the last BombRegrowth cloud dissipated, visible high grass
 and harmless plants qualify for harvest, and harmful plants remain
@@ -137,10 +137,10 @@ and at most 8 exact blast checks per site search. Searches are at least 8
 game ticks apart and a selected destination is cached while travelling. The implementation temporarily selects a RegrowthBomb type,
 detonates it, restores the original selected type via `finally`, and
 reuses the standard auto-pickup priority before crop collection.
-Farming requires both auto-play and the independent farming checkbox,
-no visible awake enemy, a grounded hero, and remote bomb mode with a
-usable Regrowth bomb. The bomb requirement applies before intentional
-grass trampling as well as before planting additional crops.
+Farming harvests require auto-play, the independent farming checkbox,
+no visible awake enemy, and a grounded hero. Planting new grass additionally
+requires remote bomb mode and an available Regrowth bomb. Both reuse the
+same safe navigation map; harmful plants and hazardous terrain stay excluded.
 
 ```sh
 javac --release 11 -encoding UTF-8 -cp "$BLAST_TEST_CLASSPATH" \
