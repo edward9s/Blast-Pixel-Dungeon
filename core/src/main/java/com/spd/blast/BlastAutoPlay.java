@@ -493,7 +493,13 @@ public final class BlastAutoPlay {
 
     private static boolean ignored(Mob mob) {
         if (mob != ignoredTarget) return false;
-        if (mob.pos == ignoredTargetCell) return true;
+        // A stationary target becomes urgent again when it actively threatens
+        // the hero at melee range, even if an earlier chase was abandoned.
+        if (mob.pos == ignoredTargetCell) {
+            Hero hero = Dungeon.hero;
+            if (hero == null || mob.state != mob.HUNTING || !mob.isTargeting(hero)
+                    || !Dungeon.level.adjacent(hero.pos, mob.pos)) return true;
+        }
         ignoredTarget = null;
         ignoredTargetCell = -1;
         return false;
