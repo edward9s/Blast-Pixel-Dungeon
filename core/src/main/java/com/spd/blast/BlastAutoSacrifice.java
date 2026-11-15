@@ -83,7 +83,8 @@ public final class BlastAutoSacrifice {
         for (Mob mob : level.mobs) {
             if (mob.isAlive() && mob.alignment == Char.Alignment.ENEMY
                     && mob.invisible <= 0 && hero.fieldOfView[mob.pos]
-                    && !hero.isCharmedBy(mob) && isRangedEnemy(mob.getClass())) {
+                    && !hero.isCharmedBy(mob) && BlastAutoPlay.isAwake(mob)
+                    && isRangedEnemy(mob.getClass())) {
                 trackedEnemy = null;
                 waitingSince = Float.NaN;
                 stalledTurns = 0;
@@ -174,7 +175,8 @@ public final class BlastAutoSacrifice {
     private static boolean eligible(Hero hero, Mob mob) {
         return mob.isAlive() && mob.alignment == Char.Alignment.ENEMY
                 && mob.invisible <= 0 && hero.fieldOfView[mob.pos]
-                && !hero.isCharmedBy(mob) && !mob.isInvulnerable(Hero.class);
+                && !hero.isCharmedBy(mob) && !mob.isInvulnerable(Hero.class)
+                && BlastAutoPlay.isAwake(mob);
     }
 
     /** Native SPD enemy types with ranged spells, projectiles, or area attacks. */
