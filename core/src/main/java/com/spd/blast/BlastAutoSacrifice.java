@@ -21,6 +21,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Necromancer;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Scorpio;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Shaman;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Tengu;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Thief;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Warlock;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.YogDzewa;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.YogFist;
@@ -78,13 +79,13 @@ public final class BlastAutoSacrifice {
             throw new IllegalStateException("Invalid sacrificial fire navigation state");
         }
 
-        // Never wait for ranged enemies to approach the altar.
-        // Let regular combat handle every visible threat until they are defeated.
+        // Ranged enemies and thieves take precedence over sacrificial luring.
+        // Immediate melee danger is handled by the regular combat priority.
         for (Mob mob : level.mobs) {
             if (mob.isAlive() && mob.alignment == Char.Alignment.ENEMY
                     && mob.invisible <= 0 && hero.fieldOfView[mob.pos]
                     && !hero.isCharmedBy(mob) && BlastAutoPlay.isAwake(mob)
-                    && isRangedEnemy(mob.getClass())) {
+                    && (mob instanceof Thief || isRangedEnemy(mob.getClass()))) {
                 trackedEnemy = null;
                 waitingSince = Float.NaN;
                 stalledTurns = 0;
