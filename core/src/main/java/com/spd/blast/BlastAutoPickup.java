@@ -11,11 +11,7 @@ import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.Waterskin;
 import com.shatteredpixel.shatteredpixeldungeon.items.bags.Bag;
-import com.shatteredpixel.shatteredpixeldungeon.items.potions.Potion;
-import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.Scroll;
-import com.shatteredpixel.shatteredpixeldungeon.items.stones.Runestone;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
-import com.shatteredpixel.shatteredpixeldungeon.plants.Plant;
 
 /** Portable SPD floor-loot policy; Blast-specific bombs live elsewhere. */
 public final class BlastAutoPickup {
@@ -84,20 +80,12 @@ public final class BlastAutoPickup {
     }
 
     static boolean isPickupType(Item item) {
-        return item instanceof BlastPickup || item instanceof Gold
-                || item instanceof Dewdrop || item instanceof Plant.Seed
-                || item instanceof Scroll || item instanceof Potion
-                || item instanceof Runestone;
+        return item.stackable;
     }
 
-    /** Floor pickups and gold apply directly without occupying backpack slots. */
-    static boolean bypassesBackpack(Item item) {
-        return item instanceof Gold || item instanceof BlastPickup;
-    }
-
-    /** Avoid chasing full-inventory items or unusable dew. */
+    /** Respect normal pickup limits; gold goes directly to the wallet. */
     private static boolean canCollect(Hero hero, Item item) {
-        if (bypassesBackpack(item)) return true;
+        if (item instanceof Gold) return true;
         if (item instanceof Dewdrop) {
             Waterskin waterskin = hero.belongings.getItem(Waterskin.class);
             if (waterskin != null && !waterskin.isFull()) return true;

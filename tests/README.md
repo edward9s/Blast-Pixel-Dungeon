@@ -60,12 +60,12 @@ javac --release 11 -encoding UTF-8 -cp "$BLAST_TEST_CLASSPATH" \
 java -cp "/tmp/blast-tests:$BLAST_TEST_CLASSPATH" com.spd.blast.BlastAutoBombAITest
 ```
 
-`BlastAutoPickupTest.java` checks the automatic floor-pickup allowlist:
-dew, seeds, scrolls, potions, runestones, gold, and Blast-specific instant
-pickups (BlastRadiusPickup and BlastHastePickup), excluding bombs. It also
-checks that Blast's potion/scroll subclasses are included, and that the
-instant pickups and gold do not require backpack space. The two instant
-pickups are non-stackable; bombs are stackable but remain excluded.
+`BlastAutoPickupTest.java` checks the automatic floor-pickup rule:
+any item with `stackable = true` is eligible, including Blast potion/scroll
+subclasses and ordinary bombs. Non-stackable instant pickups
+(`BlastRadiusPickup`, `BlastHastePickup`) are excluded, preserving their
+original non-stackable behavior. Gold still bypasses backpack capacity;
+ordinary inventory and dew restrictions remain unchanged.
 
 ```sh
 javac --release 11 -encoding UTF-8 -cp "$BLAST_TEST_CLASSPATH" \
