@@ -232,6 +232,12 @@ public final class BlastAutoPlay {
         PathFinder.buildDistanceMap(hero.pos, safe);
         int[] distances = PathFinder.distance.clone();
         if (lastRetryCell != hero.pos) lastRetryCell = -1;
+        // A suspended pursuit expires while the hero handles another threat.
+        if (suspendedTarget != null && ++suspendedTargetTurns > LOST_TARGET_TURNS) {
+            suspendedTarget = null;
+            suspendedTargetCell = -1;
+            suspendedTargetTurns = 0;
+        }
 
         // Extinguish burning in reachable water, but never detour more than four steps.
         // Also leave an active environmental hazard before fighting or collecting loot.
