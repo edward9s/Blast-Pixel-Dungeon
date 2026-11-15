@@ -24,11 +24,11 @@ public final class BlastAutoFarmingTest {
     }
 
     public static void main(String[] args) {
-        // Without an available Regrowth bomb, do not enter the grass-harvest loop.
+        // Bomb readiness affects new planting only; harvest runs without bombs.
         if (BlastAutoFarming.regrowthReady(0, 0)
                 || BlastAutoFarming.regrowthReady(1, -1)
                 || !BlastAutoFarming.regrowthReady(1, 0)) {
-            throw new AssertionError("Farming must require an available Regrowth bomb");
+            throw new AssertionError("Planting must require an available Regrowth bomb");
         }
 
         // First blast is allowed, but the next waits for at least one harvest
@@ -60,7 +60,7 @@ public final class BlastAutoFarmingTest {
             }
         }
 
-        // Once a Regrowth bomb is available, high grass is a harvest target.
+        // Harvest targets remain eligible even when no Regrowth bomb is available.
         crop(true, Terrain.HIGH_GRASS, null);
         crop(false, Terrain.GRASS, null);
         crop(false, Terrain.EMPTY, null);
