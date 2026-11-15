@@ -142,7 +142,9 @@ is reused for combat movement, item collection, roaming, and auto-farming.
 
 The safety policy also excludes active Inferno, VaultFlameTraps, CorrosiveGas,
 ParalyticGas, StenchGas, ConfusionGas, Electricity, StormCloud, Freezing,
-Blizzard, SmokeScreen, Web, GooWarn, and SacrificialFire. Active blob
+Blizzard, SmokeScreen, Web, and GooWarn. SacrificialFire is excluded from
+that hazard list because it does not damage living characters directly; its
+marking aura is handled by the separate auto-play lure tactic. Active blob
 references are captured once per hero action, not retrieved once per map cell.
 While standing in a harmful blob, the hero tries to step onto a safe adjacent
 cell before other automatic actions. Emergency water movement is prioritized
@@ -152,4 +154,25 @@ ahead of bomb tactics, otherwise normal combat priority is preserved.
 javac --release 11 -encoding UTF-8 -cp "$BLAST_TEST_CLASSPATH" \
   -d /tmp/blast-tests tests/BlastAutoEnvironmentTest.java
 java -cp "/tmp/blast-tests:$BLAST_TEST_CLASSPATH" com.spd.blast.BlastAutoEnvironmentTest
+```
+
+`BlastAutoSacrificeTest.java` verifies that the SacrificialFire marking
+aura covers the fire and eight adjacent tiles without wrapping across map
+rows, only a marked enemy still within the aura is attacked, and pursuing
+mobs can be lured into the aura while unrelated distant enemies are ignored.
+The auto-player temporarily occupies a reachable sacrificial flame and waits
+for chasing enemies to step within its marking area. A visible ranged threat immediately disables the sacrifice-luring tactic, so
+normal combat attacks it directly without diverting to the altar. Ranged types
+include SPD spellcasters, projectile users, and stationary ranged attackers;
+subclasses inherit this behavior. A stationary melee enemy cannot cause an
+unlimited wait: three stalled hero turns or twelve game ticks end the attempt
+and suspend new lures for eight game ticks. Safety checks continue
+to exclude every other active damaging or disruptive blob. The lure uses
+the same safe-cell and shortest-distance maps as regular auto-play and
+only activates for fire no more than six safe steps from the hero.
+
+```sh
+javac --release 11 -encoding UTF-8 -cp "$BLAST_TEST_CLASSPATH" \
+  -d /tmp/blast-tests tests/BlastAutoSacrificeTest.java
+java -cp "/tmp/blast-tests:$BLAST_TEST_CLASSPATH" com.spd.blast.BlastAutoSacrificeTest
 ```
