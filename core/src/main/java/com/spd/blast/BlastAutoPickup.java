@@ -11,6 +11,7 @@ import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.Waterskin;
 import com.shatteredpixel.shatteredpixeldungeon.items.bags.Bag;
+import com.shatteredpixel.shatteredpixeldungeon.items.keys.Key;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
 
 import java.util.function.Predicate;
@@ -90,9 +91,13 @@ public final class BlastAutoPickup {
         return item.stackable || instantPickup.test(item);
     }
 
-    /** Instant pickups and gold need no backpack space. */
+    /** Keys go to the journal, and gold and instant pickups use no backpack slots. */
+    static boolean bypassesBackpack(Item item, Predicate<Item> instantPickup) {
+        return item instanceof Key || item instanceof Gold || instantPickup.test(item);
+    }
+
     private static boolean canCollect(Hero hero, Item item, Predicate<Item> instantPickup) {
-        if (instantPickup.test(item) || item instanceof Gold) return true;
+        if (bypassesBackpack(item, instantPickup)) return true;
         if (item instanceof Dewdrop) {
             Waterskin waterskin = hero.belongings.getItem(Waterskin.class);
             if (waterskin != null && !waterskin.isFull()) return true;
