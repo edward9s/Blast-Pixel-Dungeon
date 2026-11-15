@@ -50,14 +50,21 @@ public final class BlastAutoFarming {
             currentLevel = Dungeon.level;
         }
         if (!BlastSettings.testAutoPlay() || !BlastSettings.autoFarming()
-                || hero.flying || hasVisibleEnemy(hero)) return Action.NONE;
+                || BlastRemoteBomb.isTimedMode() || hero.flying
+                || hero.buff(BlastRemoteBomb.class) == null
+                || hasVisibleEnemy(hero)) return Action.NONE;
 
         Level level = Dungeon.level;
         if (safe.length != level.length() || distances.length != level.length()) {
             throw new IllegalArgumentException("Invalid farming distance map");
         }
 
-        // Harvest safe visible grass regardless of whether a Regrowth bomb is available.
+        // Farming, including intentional grass trampling, needs an available Regrowth bomb.
+        BlastBombManiac maniac = BlastBombManiac.current();
+        if (maniac == null) return Action.NONE;
+        int index = findRegrowthType(maniac);
+        if (!regrowthReady(maniac.remaining(), index)) return Action.NONE;
+
         int nearest = nearestCrop(hero, safe, distances);
         if (nearest >= 0) {
             int next = nearest == hero.pos ? hero.pos
@@ -76,18 +83,9 @@ public final class BlastAutoFarming {
             farmingSite = farmingBlastCell = -1;
         }
 
-        // Bomb-specific checks must not prevent ordinary grass harvesting.
-        if (BlastRemoteBomb.isTimedMode() || hero.buff(BlastRemoteBomb.class) == null) {
-            return Action.NONE;
-        }
-
         // An earlier manual Regrowth blast should finish before farming begins.
         if (regrowthActive(level)) return Action.NONE;
 
-        BlastBombManiac maniac = BlastBombManiac.current();
-        if (maniac == null || maniac.remaining() == 0) return Action.NONE;
-        int index = findRegrowthType(maniac);
-        if (index < 0) return Action.NONE;
         RegrowthBomb bomb = (RegrowthBomb) maniac.bombAt(index);
         boolean remoteThrow = BlastSettings.testRemoteThrow();
 
@@ -135,6 +133,10 @@ public final class BlastAutoFarming {
         farmingSite = farmingBlastCell = -1;
         if (!remoteThrow) hero.spendAndNext(1f);
         return Action.BOMB;
+    }
+
+    static boolean regrowthReady(int remainingBombs, int regrowthIndex) {
+        return remainingBombs > 0 && regrowthIndex >= 0;
     }
 
     static boolean canPlantAgain(boolean planted, boolean harvested, boolean cloudActive) {
