@@ -17,6 +17,7 @@ public final class BlastAutoSacrifice {
     private static final int MAX_FIRE_ROUTE = 6;
     private static final int MAX_ENEMY_DISTANCE = 7;
     private static final int MAX_STALLED_TURNS = 3;
+    private static final float MAX_WAIT_TICKS = 12f;
     private static final float RETRY_INTERVAL = 8f;
 
     private static Hero currentHero;
@@ -25,6 +26,7 @@ public final class BlastAutoSacrifice {
     private static int previousDistance;
     private static int stalledTurns;
     private static float retryAfter;
+    private static float waitingSince = Float.NaN;
 
     private BlastAutoSacrifice() {}
 
@@ -35,6 +37,7 @@ public final class BlastAutoSacrifice {
         previousDistance = Integer.MAX_VALUE;
         stalledTurns = 0;
         retryAfter = 0f;
+        waitingSince = Float.NaN;
     }
 
     /**
@@ -75,6 +78,7 @@ public final class BlastAutoSacrifice {
         if (attackable != null) {
             hero.curAction = new HeroAction.Attack(attackable);
             trackedEnemy = null;
+            waitingSince = Float.NaN;
             return Action.QUEUED;
         }
 
@@ -110,9 +114,11 @@ public final class BlastAutoSacrifice {
             hero.curAction = new HeroAction.Move(BlastAutoPlay.firstStep(site, safe, distances));
             trackedEnemy = null;
             stalledTurns = 0;
+            waitingSince = Float.NaN;
             return Action.QUEUED;
         }
 
+        if (Float.isNaN(waitingSince)) waitingSince = Actor.now();
         int distance = level.distance(hero.pos, target.pos);
         if (trackedEnemy != target || distance < previousDistance) {
             stalledTurns = 0;
@@ -121,8 +127,9 @@ public final class BlastAutoSacrifice {
         }
         trackedEnemy = target;
         previousDistance = distance;
-        if (stalledTurns >= MAX_STALLED_TURNS) {
+        if (shouldAbandon(Actor.now() - waitingSince, stalledTurns)) {
             trackedEnemy = null;
+            waitingSince = Float.NaN;
             retryAfter = Actor.now() + RETRY_INTERVAL;
             return Action.NONE;
         }
@@ -137,6 +144,10 @@ public final class BlastAutoSacrifice {
         return mob.isAlive() && mob.alignment == Char.Alignment.ENEMY
                 && mob.invisible <= 0 && hero.fieldOfView[mob.pos]
                 && !hero.isCharmedBy(mob) && !mob.isInvulnerable(Hero.class);
+    }
+
+    static boolean shouldAbandon(float waited, int stalledTurns) {
+        return waited >= MAX_WAIT_TICKS || stalledTurns >= MAX_STALLED_TURNS;
     }
 
     static boolean readyToSacrifice(boolean inFireArea, boolean marked) {
