@@ -27,7 +27,24 @@ def patch(path: Path) -> None:
     print(f"patched {path}: automatic wand targeting")
 
 
+def patch_staff(path: Path) -> None:
+    source = path.read_text(encoding="utf-8")
+    anchor = "\tpublic MagesStaff() {"
+    count = source.count(anchor)
+    if count != 1:
+        raise SystemExit(f"{path}: expected one MagesStaff constructor anchor, found {count}")
+    addition = (
+        "\t/** Expose the imbued wand while preserving the staff's curse restriction. */\n"
+        "\tpublic Wand blastAutoPlayWand() {\n"
+        "\t\treturn cursed || hasCurseEnchant() ? null : wand;\n"
+        "\t}\n\n"
+    )
+    path.write_text(source.replace(anchor, addition + anchor, 1), encoding="utf-8")
+    print(f"patched {path}: imbued wand access for auto-play")
+
+
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        raise SystemExit("usage: patch_auto_play_wand.py <Wand.java>")
+    if len(sys.argv) != 3:
+        raise SystemExit("usage: patch_auto_play_wand.py <Wand.java> <MagesStaff.java>")
     patch(Path(sys.argv[1]))
+    patch_staff(Path(sys.argv[2]))

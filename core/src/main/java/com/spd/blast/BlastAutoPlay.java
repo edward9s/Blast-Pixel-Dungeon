@@ -9,8 +9,8 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Necromancer;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Wraith;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
+import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.MagesStaff;
 import com.shatteredpixel.shatteredpixeldungeon.items.wands.Wand;
-import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfDisintegration;
 import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfFrost;
 import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfMagicMissile;
 import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfPrismaticLight;
@@ -189,20 +189,26 @@ public final class BlastAutoPlay {
             return false;
         }
 
+        // The mage's equipped staff can contain a charged wand.
+        if (hero.belongings.weapon() instanceof MagesStaff) {
+            MagesStaff staff = (MagesStaff) hero.belongings.weapon();
+            if (castWand(hero, target, staff.blastAutoPlayWand())) return true;
+        }
         for (Item item : hero.belongings) {
-            // Only direct damage wands with predictable single-target effects.
-            // Transfusion damages undead, but charms living targets instead.
-            if (!(item instanceof WandOfMagicMissile
-                    || item instanceof WandOfFrost
-                    || item instanceof WandOfPrismaticLight
-                    || item instanceof WandOfDisintegration
-                    || (item instanceof WandOfTransfusion
-                        && target.properties().contains(Char.Property.UNDEAD)))) {
-                continue;
-            }
-            if (((Wand) item).blastAutoZap(hero, target.pos)) return true;
+            if (item instanceof Wand && castWand(hero, target, (Wand) item)) return true;
         }
         return false;
+    }
+
+    private static boolean castWand(Hero hero, Mob target, Wand wand) {
+        if (wand == null || !(wand instanceof WandOfMagicMissile
+                || wand instanceof WandOfFrost
+                || wand instanceof WandOfPrismaticLight
+                || (wand instanceof WandOfTransfusion
+                    && target.properties().contains(Char.Property.UNDEAD)))) {
+            return false;
+        }
+        return wand.blastAutoZap(hero, target.pos);
     }
 
     private static void resetForLevel(Hero hero) {
