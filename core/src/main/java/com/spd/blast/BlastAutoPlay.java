@@ -344,7 +344,8 @@ public final class BlastAutoPlay {
         }
 
         // Collect reachable floor loot after visible enemies have been handled.
-        if (BlastAutoPickup.chooseAction(hero, safe, distances)) return false;
+        if (BlastAutoPickup.chooseAction(hero, safe, distances,
+                BlastAutoPickupPolicy::isInstantPickup)) return false;
 
         if (attackerTurns > 0) {
             attackerTurns--;

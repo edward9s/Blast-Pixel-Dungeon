@@ -13,6 +13,8 @@ import com.shatteredpixel.shatteredpixeldungeon.items.Waterskin;
 import com.shatteredpixel.shatteredpixeldungeon.items.bags.Bag;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
 
+import java.util.function.Predicate;
+
 /** Portable SPD floor-loot policy; Blast-specific bombs live elsewhere. */
 public final class BlastAutoPickup {
     private static final int RETRY_TURNS = 20;
@@ -33,12 +35,16 @@ public final class BlastAutoPickup {
     }
 
     /** One action at a time, using the existing distance map and native pickup. */
-    public static boolean chooseAction(Hero hero, boolean[] safe, int[] distances) {
+    public static boolean chooseAction(Hero hero, boolean[] safe, int[] distances,
+                                       Predicate<Item> instantPickup) {
         Level level = Dungeon.level;
         if (currentHero != hero || currentLevel != level) {
             reset();
             currentHero = hero;
             currentLevel = level;
+        }
+        if (instantPickup == null) {
+            throw new IllegalArgumentException("Instant-pickup policy is required");
         }
         if (safe.length != level.length() || distances.length != level.length()) {
             throw new IllegalArgumentException("Invalid auto-pickup distance map");
@@ -53,7 +59,8 @@ public final class BlastAutoPickup {
 
             // The native pickup takes the top item, not an arbitrary lower item.
             Item item = heap.peek();
-            if (!isPickupType(item) || !canCollect(hero, item)) continue;
+            if (!isPickupType(item, instantPickup)
+                    || !canCollect(hero, item, instantPickup)) continue;
 
             int cell = heap.pos;
             if (!level.insideMap(cell) || !safe[cell]
@@ -79,13 +86,13 @@ public final class BlastAutoPickup {
         return true;
     }
 
-    static boolean isPickupType(Item item) {
-        return item.stackable;
+    static boolean isPickupType(Item item, Predicate<Item> instantPickup) {
+        return item.stackable || instantPickup.test(item);
     }
 
-    /** Respect normal pickup limits; gold goes directly to the wallet. */
-    private static boolean canCollect(Hero hero, Item item) {
-        if (item instanceof Gold) return true;
+    /** Instant pickups and gold need no backpack space. */
+    private static boolean canCollect(Hero hero, Item item, Predicate<Item> instantPickup) {
+        if (instantPickup.test(item) || item instanceof Gold) return true;
         if (item instanceof Dewdrop) {
             Waterskin waterskin = hero.belongings.getItem(Waterskin.class);
             if (waterskin != null && !waterskin.isFull()) return true;

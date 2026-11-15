@@ -17,6 +17,8 @@ public abstract class BlastPickup extends Item {
     private static final int DUPLICATE_GOLD = 10;
 
     {
+        // Each drop applies its effect immediately; different copies stay separate.
+        stackable = false;
         dropsDownHeap = true;
     }
 
