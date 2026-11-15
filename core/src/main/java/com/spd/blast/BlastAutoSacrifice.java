@@ -12,7 +12,7 @@ import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
 /** Lure pursuing enemies into SacrificialFire's marking area before attacking. */
 public final class BlastAutoSacrifice {
 
-    enum Action { NONE, MOVE, WAIT }
+    enum Action { NONE, QUEUED, WAIT }
 
     private static final int MAX_FIRE_ROUTE = 6;
     private static final int MAX_ENEMY_DISTANCE = 7;
@@ -39,7 +39,7 @@ public final class BlastAutoSacrifice {
 
     /**
      * Uses the existing safe-cell and distance maps. WAIT has already advanced
-     * the actor, MOVE has queued a normal HeroAction; NONE keeps original combat.
+     * the actor, QUEUED has queued a normal HeroAction; NONE keeps original combat.
      */
     static Action chooseAction(Hero hero, boolean[] safe, int[] distances) {
         Level level = Dungeon.level;
@@ -48,7 +48,7 @@ public final class BlastAutoSacrifice {
             currentHero = hero;
             currentLevel = level;
         }
-        if (hero.rooted || Actor.now() < retryAfter) return Action.NONE;
+        if (hero.rooted) return Action.NONE;
 
         SacrificialFire fire = (SacrificialFire) level.blobs.get(SacrificialFire.class);
         if (fire == null || fire.volume <= 0) return Action.NONE;
@@ -75,8 +75,10 @@ public final class BlastAutoSacrifice {
         if (attackable != null) {
             hero.curAction = new HeroAction.Attack(attackable);
             trackedEnemy = null;
-            return Action.MOVE;
+            return Action.QUEUED;
         }
+
+        if (Actor.now() < retryAfter) return Action.NONE;
 
         // Pick a reachable fire cell close to both hero and a pursuing enemy.
         // No separate path search is needed.
@@ -108,7 +110,7 @@ public final class BlastAutoSacrifice {
             hero.curAction = new HeroAction.Move(BlastAutoPlay.firstStep(site, safe, distances));
             trackedEnemy = null;
             stalledTurns = 0;
-            return Action.MOVE;
+            return Action.QUEUED;
         }
 
         int distance = level.distance(hero.pos, target.pos);

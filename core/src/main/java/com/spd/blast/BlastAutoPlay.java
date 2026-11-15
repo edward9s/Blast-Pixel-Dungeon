@@ -239,7 +239,7 @@ public final class BlastAutoPlay {
         // Lure pursuing enemies into Sacrificial Fire before using direct attacks.
         BlastAutoSacrifice.Action sacrifice = BlastAutoSacrifice.chooseAction(hero, safe, distances);
         if (sacrifice == BlastAutoSacrifice.Action.WAIT) return true;
-        if (sacrifice == BlastAutoSacrifice.Action.MOVE) return false;
+        if (sacrifice == BlastAutoSacrifice.Action.QUEUED) return false;
 
         // Blast-specific tactics are isolated from the portable AI policy.
         if (BlastAutoBombAI.act(hero)) return true;
