@@ -212,6 +212,10 @@ def patch(path: Path) -> None:
         s,
         "\t\tboolean actResult;\n\t\tif (curAction == null) {",
         "\t\tif (com.spd.blast.BlastSettings.testAutoPlay()\n"
+        "\t\t\t\t&& com.spd.blast.BlastAutoPlay.performBombInput(this)) {\n"
+        "\t\t\treturn false;\n"
+        "\t\t}\n"
+        "\t\tif (com.spd.blast.BlastSettings.testAutoPlay()\n"
         "\t\t\t\t&& com.spd.blast.BlastAutoPlay.pauseForManualInput(this)) {\n"
         "\t\t\treturn false;\n"
         "\t\t}\n"
