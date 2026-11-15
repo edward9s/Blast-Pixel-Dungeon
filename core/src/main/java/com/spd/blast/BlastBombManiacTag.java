@@ -69,7 +69,8 @@ public final class BlastBombManiacTag extends Tag {
                 layout();
             }
         }
-        boolean ready = Dungeon.hero != null && Dungeon.hero.ready;
+        boolean ready = Dungeon.hero != null
+                && (Dungeon.hero.ready || BlastSettings.testAutoPlay());
         icon.alpha(ready ? 1f : 0.4f);
         remaining.alpha(ready ? 1f : 0.4f);
         refreshCrosshair();
@@ -79,9 +80,11 @@ public final class BlastBombManiacTag extends Tag {
     @Override
     protected void onClick() {
         BlastBombManiac buff = BlastBombManiac.current();
-        if (buff == null || Dungeon.hero == null || !Dungeon.hero.ready) return;
+        if (buff == null || Dungeon.hero == null
+                || (!Dungeon.hero.ready && !BlastSettings.testAutoPlay())) return;
         super.onClick();
         if (BlastBombManiac.aimedThrowEnabled()) buff.aim();
+        else if (BlastSettings.testAutoPlay()) BlastAutoPlay.requestBombPlacement();
         else buff.place();
         refreshCrosshair();
     }
@@ -109,7 +112,8 @@ public final class BlastBombManiacTag extends Tag {
 
     @Override
     protected boolean onLongClick() {
-        if (BlastBombManiac.current() == null || Dungeon.hero == null || !Dungeon.hero.ready) {
+        if (BlastBombManiac.current() == null || Dungeon.hero == null
+                || (!Dungeon.hero.ready && !BlastSettings.testAutoPlay())) {
             return false;
         }
         GameScene.centerNextWndOnInvPane();
