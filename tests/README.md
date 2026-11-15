@@ -75,10 +75,12 @@ java -cp "/tmp/blast-tests:$BLAST_TEST_CLASSPATH" com.spd.blast.BlastAutoPickupT
 ```
 
 
-`BlastAutoBombAITest.java` also checks Regrowth's 12-tick minimum reuse interval
-and the refusal to repeat the effect while an existing BombRegrowth cloud is active.
-Regrowth also skips targets already rooted. This applies only to Regrowth bombs;
-other eligible non-destructive bombs are unchanged.
+`BlastAutoBombAITest.java` also checks Regrowth target selection: targets
+that are already rooted or stand in active Regrowth are ineligible. The
+bomb AI checks `Blob.volumeAt` only at each target's position for both
+`BombRegrowth` and native `Regrowth`. There is no reuse cooldown and
+Regrowth elsewhere in the level does not block an eligible target.
+Only Regrowth bombs use this restriction; other eligible bombs are unchanged.
 
 `AutoPlayPlantSafetyTest.java` verifies that automatic movement avoids SPD
 plants with harmful or disruptive effects (Blindweed, Fadeleaf, Firebloom,

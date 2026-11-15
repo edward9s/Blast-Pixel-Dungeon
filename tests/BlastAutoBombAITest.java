@@ -5,7 +5,7 @@ import com.shatteredpixel.shatteredpixeldungeon.items.bombs.Bomb;
 import com.shatteredpixel.shatteredpixeldungeon.items.bombs.RegrowthBomb;
 import com.shatteredpixel.shatteredpixeldungeon.items.bombs.ShrapnelBomb;
 
-/** Regression checks for safe auto-bomb selection and Regrowth repetition. */
+/** Headless checks for non-destructive bomb selection and local Regrowth targeting. */
 public final class BlastAutoBombAITest {
     private static void check(boolean expected, Bomb bomb) {
         if (BlastAutoBombAI.itemPreserving(bomb) != expected) {
@@ -13,9 +13,9 @@ public final class BlastAutoBombAITest {
         }
     }
 
-    private static void ready(boolean expected, float now, float lastUse, boolean cloudActive) {
-        if (BlastAutoBombAI.regrowthReady(now, lastUse, cloudActive) != expected) {
-            throw new AssertionError("Unexpected Regrowth retry eligibility");
+    private static void regrowth(boolean expected, boolean rooted, boolean effectAtTarget) {
+        if (BlastAutoBombAI.regrowthReady(rooted, effectAtTarget) != expected) {
+            throw new AssertionError("Unexpected Regrowth targeting policy");
         }
     }
 
@@ -25,11 +25,11 @@ public final class BlastAutoBombAITest {
         check(true, new ShrapnelBomb());
         check(false, new Bomb());
 
-        ready(true, 0f, Float.NEGATIVE_INFINITY, false);
-        ready(false, 5f, 0f, false);
-        ready(false, 11f, 0f, false);
-        ready(true, 12f, 0f, false);
-        ready(false, 100f, 0f, true);
+        // Neither rooted nor under Regrowth: the target is eligible immediately.
+        regrowth(true, false, false);
+        regrowth(false, true, false);
+        regrowth(false, false, true);
+        regrowth(false, true, true);
         System.out.println("BlastAutoBombAITest passed");
     }
 }

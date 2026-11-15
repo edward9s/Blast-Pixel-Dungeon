@@ -1,33 +1,22 @@
 package com.spd.blast;
 
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
-import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
+import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.Blob;
+import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.Regrowth;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.MobSpawner;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Necromancer;
 import com.shatteredpixel.shatteredpixeldungeon.items.bombs.Bomb;
 import com.shatteredpixel.shatteredpixeldungeon.items.bombs.RegrowthBomb;
-import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
 
 /** Blast-only bomb tactics, isolated from the portable auto-play controller. */
 public final class BlastAutoBombAI {
-    private static final float REGROWTH_REUSE_TICKS = 12f;
-
-    private static Hero trackedHero;
-    private static Level trackedLevel;
-    private static float lastRegrowthAt = Float.NEGATIVE_INFINITY;
-
     private BlastAutoBombAI() {}
 
     /** Returns true only when an automated bomb has started or spent a turn. */
     public static boolean act(Hero hero) {
-        if (trackedHero != hero || trackedLevel != Dungeon.level) {
-            trackedHero = hero;
-            trackedLevel = Dungeon.level;
-            lastRegrowthAt = Float.NEGATIVE_INFINITY;
-        }
         if (!BlastSettings.testAutoPlay()
                 || BlastRemoteBomb.isTimedMode()
                 || hero.buff(BlastRemoteBomb.class) == null
@@ -41,12 +30,6 @@ public final class BlastAutoBombAI {
         if (!itemPreserving(bomb)) return false;
 
         boolean regrowth = bomb instanceof RegrowthBomb;
-        if (regrowth) {
-            BombRegrowth cloud = (BombRegrowth) Dungeon.level.blobs.get(BombRegrowth.class);
-            if (!regrowthReady(Actor.now(), lastRegrowthAt,
-                    cloud != null && cloud.volume > 0)) return false;
-        }
-
         boolean remoteThrow = BlastSettings.testRemoteThrow();
         boolean[] blastAtHero = remoteThrow ? null : bomb.blastWarningCells(hero.pos);
         Mob target = findTarget(hero, blastAtHero, remoteThrow, regrowth);
@@ -57,14 +40,9 @@ public final class BlastAutoBombAI {
         boolean[] blast = remoteThrow ? bomb.blastWarningCells(center) : blastAtHero;
         if (containsRareMob(blast)) return false;
 
-        if (remoteThrow) {
-            boolean launched = maniac.blastAutoThrowAndDetonate(target.pos);
-            if (launched && regrowth) lastRegrowthAt = Actor.now();
-            return launched;
-        }
+        if (remoteThrow) return maniac.blastAutoThrowAndDetonate(target.pos);
 
         if (maniac.blastAutoPlaceAndDetonate()) {
-            if (regrowth) lastRegrowthAt = Actor.now();
             // Automatic attacks must advance time even when remote placement is free.
             hero.spendAndNext(1f);
             return true;
@@ -76,9 +54,14 @@ public final class BlastAutoBombAI {
         return !bomb.explodesDestructively();
     }
 
-    /** Do not repeat a persistent rooting effect or fire it every hero turn. */
-    static boolean regrowthReady(float now, float lastUse, boolean cloudActive) {
-        return !cloudActive && now - lastUse >= REGROWTH_REUSE_TICKS;
+    /** An existing Regrowth cloud or root already covers the target. */
+    static boolean regrowthReady(boolean rooted, boolean regrowthAtTarget) {
+        return !rooted && !regrowthAtTarget;
+    }
+
+    private static boolean regrowthAt(int cell) {
+        return Blob.volumeAt(cell, BombRegrowth.class) > 0
+                || Blob.volumeAt(cell, Regrowth.class) > 0;
     }
 
     private static Mob findTarget(Hero hero, boolean[] blastAtHero, boolean remoteThrow,
@@ -89,7 +72,8 @@ public final class BlastAutoBombAI {
             if (!mob.isAlive() || mob.alignment != Char.Alignment.ENEMY
                     || !hero.fieldOfView[mob.pos] || mob.invisible > 0
                     || hero.isCharmedBy(mob) || mob.isInvulnerable(Hero.class)
-                    || isRare(mob) || (regrowth && mob.rooted)) continue;
+                    || isRare(mob)) continue;
+            if (regrowth && !regrowthReady(mob.rooted, regrowthAt(mob.pos))) continue;
 
             if (remoteThrow) {
                 if (BlastBombTrajectory.throwPos(hero.pos, mob.pos) != mob.pos) continue;
