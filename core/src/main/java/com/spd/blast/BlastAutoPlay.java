@@ -6,10 +6,13 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroAction;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.MobSpawner;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Necromancer;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Wraith;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.Sheep;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
+import com.shatteredpixel.shatteredpixeldungeon.items.bombs.Bomb;
+import com.shatteredpixel.shatteredpixeldungeon.items.bombs.RegrowthBomb;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.MagesStaff;
 import com.shatteredpixel.shatteredpixeldungeon.items.wands.Wand;
 import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfFrost;
@@ -203,6 +206,9 @@ public final class BlastAutoPlay {
         hero.lastAction = null;
         hero.resting = false;
 
+        // Blast-specific attack takes priority before ordinary pathfinding or wands.
+        if (useAutoBomb(hero)) return true;
+
         boolean[] safe = safeCells(hero);
         // Compute reachability once, rather than doing up to nine searches per mob.
         PathFinder.buildDistanceMap(hero.pos, safe);
@@ -327,6 +333,70 @@ public final class BlastAutoPlay {
 
         int step = roamStep(hero, safe, distances);
         if (step >= 0) hero.curAction = new HeroAction.Move(step);
+        return false;
+    }
+
+    /**
+     * Try a safe, item-preserving remote bomb before ordinary auto-play combat.
+     * The rare-mob definition is shared with BlastBombKick and BlastBombDodge.
+     */
+    private static boolean useAutoBomb(Hero hero) {
+        if (BlastRemoteBomb.isTimedMode()
+                || (hero.buff(BlastIndestructible.class) == null
+                    && hero.buff(BlastTestBuffs.Indestructible.class) == null)) return false;
+
+        BlastBombManiac maniac = BlastBombManiac.current();
+        if (maniac == null || maniac.remaining() == 0) return false;
+
+        Bomb bomb = maniac.selectedBomb();
+        if (bomb instanceof RegrowthBomb || bomb.explodesDestructively()) return false;
+
+        boolean remoteThrow = BlastSettings.testRemoteThrow();
+        boolean[] atHero = remoteThrow ? null : bomb.blastWarningCells(hero.pos);
+        Mob target = null;
+        int bestDistance = Integer.MAX_VALUE;
+
+        for (Mob mob : Dungeon.level.mobs) {
+            if (!mob.isAlive() || mob.alignment != Char.Alignment.ENEMY
+                    || !hero.fieldOfView[mob.pos] || mob.invisible > 0
+                    || hero.isCharmedBy(mob) || mob.isInvulnerable(Hero.class)
+                    || MobSpawner.RARE_ALTS.containsValue(mob.getClass())) continue;
+
+            if (remoteThrow) {
+                // Do not launch a bomb that would land before the selected enemy.
+                if (BlastBombTrajectory.throwPos(hero.pos, mob.pos) != mob.pos) continue;
+            } else if (!atHero[mob.pos]) {
+                continue;
+            }
+
+            int distance = Dungeon.level.distance(hero.pos, mob.pos);
+            if (target == null
+                    || (mob instanceof Necromancer && !(target instanceof Necromancer))
+                    || ((mob instanceof Necromancer) == (target instanceof Necromancer)
+                        && distance < bestDistance)) {
+                target = mob;
+                bestDistance = distance;
+            }
+        }
+
+        if (target == null) return false;
+
+        // Also avoid collateral damage to rare mobs; they have special bomb behavior.
+        int blastCenter = remoteThrow ? target.pos : hero.pos;
+        boolean[] blast = remoteThrow ? bomb.blastWarningCells(blastCenter) : atHero;
+        for (Mob mob : Dungeon.level.mobs) {
+            if (mob.isAlive() && MobSpawner.RARE_ALTS.containsValue(mob.getClass())
+                    && blast[mob.pos]) return false;
+        }
+
+        if (remoteThrow) return maniac.blastAutoThrowAndDetonate(target.pos);
+
+        if (maniac.blastAutoPlaceAndDetonate()) {
+            // Immediate place/detonate is free for manual use; spend one AI turn
+            // so repeated automated bombs cannot form a zero-time actor loop.
+            hero.spendAndNext(1f);
+            return true;
+        }
         return false;
     }
 
