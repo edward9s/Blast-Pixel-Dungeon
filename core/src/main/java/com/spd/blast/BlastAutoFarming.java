@@ -1,6 +1,7 @@
 package com.spd.blast;
 
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.Blob;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
@@ -12,14 +13,22 @@ import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
 import com.shatteredpixel.shatteredpixeldungeon.plants.Plant;
 import com.watabou.utils.PathFinder;
 
-/** Blast-only idle farming. The portable auto-play and pickup logic remain independent. */
+/** Blast-only idle farming. Portable auto-play and pickup remain independent. */
 public final class BlastAutoFarming {
     enum Action { NONE, MOVE, BOMB }
+
+    static final int MIN_GROWABLE_CELLS = 10;
+    private static final int SAMPLE_RADIUS = 3;
+    private static final int MAX_SITE_CHECKS = 8;
+    private static final float SEARCH_INTERVAL = 8f;
 
     private static Hero currentHero;
     private static Level currentLevel;
     private static boolean planted;
     private static boolean harvested;
+    private static int farmingSite = -1;
+    private static int farmingBlastCell = -1;
+    private static float nextSearchAt = Float.NEGATIVE_INFINITY;
 
     private BlastAutoFarming() {}
 
@@ -28,9 +37,11 @@ public final class BlastAutoFarming {
         currentLevel = null;
         planted = false;
         harvested = false;
+        farmingSite = farmingBlastCell = -1;
+        nextSearchAt = Float.NEGATIVE_INFINITY;
     }
 
-    /** Select one farming action, or NONE when regular roaming should continue. */
+    /** Select one farming action; idle/roaming remains the caller's responsibility. */
     static Action chooseAction(Hero hero, boolean[] safe, int[] distances) {
         if (currentHero != hero || currentLevel != Dungeon.level) {
             reset();
@@ -53,23 +64,50 @@ public final class BlastAutoFarming {
                 int next = nearest == hero.pos ? hero.pos
                         : BlastAutoPlay.firstStep(nearest, safe, distances);
                 hero.curAction = new HeroAction.Move(next);
-                // An action toward an actual crop advances the harvest stage.
                 if (harvestable(level.map[next], level.plants.get(next))) harvested = true;
                 return Action.MOVE;
             }
             if (!canPlantAgain(planted, harvested, regrowthActive(level))) return Action.NONE;
+            planted = false;
+            harvested = false;
+            farmingSite = farmingBlastCell = -1;
         }
+
+        // An earlier manual Regrowth blast should finish before farming begins.
+        if (regrowthActive(level)) return Action.NONE;
 
         BlastBombManiac maniac = BlastBombManiac.current();
         if (maniac == null || maniac.remaining() == 0) return Action.NONE;
         int index = findRegrowthType(maniac);
         if (index < 0) return Action.NONE;
-
+        RegrowthBomb bomb = (RegrowthBomb) maniac.bombAt(index);
         boolean remoteThrow = BlastSettings.testRemoteThrow();
-        int destination = remoteThrow ? throwDestination(hero, safe) : hero.pos;
-        if (destination < 0 || (!remoteThrow
-                && (level.pit[hero.pos]
-                    || BlastBombCollision.hasLitBomb(level, hero.pos)))) return Action.NONE;
+
+        if (farmingSite >= 0
+                && (!safe[farmingSite] || distances[farmingSite] == Integer.MAX_VALUE)) {
+            farmingSite = farmingBlastCell = -1;
+        }
+        if (farmingSite < 0) {
+            if (Actor.now() < nextSearchAt) return Action.NONE;
+            nextSearchAt = Actor.now() + SEARCH_INTERVAL;
+            findFarmingSite(level, safe, distances, bomb, remoteThrow);
+            if (farmingSite < 0) return Action.NONE;
+        }
+        if (hero.pos != farmingSite) {
+            hero.curAction = new HeroAction.Move(
+                    BlastAutoPlay.firstStep(farmingSite, safe, distances));
+            return Action.MOVE;
+        }
+
+        int destination = farmingBlastCell;
+        if ((!remoteThrow && (level.pit[hero.pos]
+                || BlastBombCollision.hasLitBomb(level, hero.pos)))
+                || (remoteThrow && BlastBombTrajectory.throwPos(hero.pos, destination) != destination)
+                || countGrowable(bomb.blastWarningCells(destination), level, safe, distances,
+                        hero.pos) < MIN_GROWABLE_CELLS) {
+            farmingSite = farmingBlastCell = -1;
+            return Action.NONE;
+        }
 
         int previous = maniac.selectedIndex();
         boolean launched;
@@ -84,6 +122,7 @@ public final class BlastAutoFarming {
         if (!launched) return Action.NONE;
         planted = true;
         harvested = false;
+        farmingSite = farmingBlastCell = -1;
         if (!remoteThrow) hero.spendAndNext(1f);
         return Action.BOMB;
     }
@@ -95,6 +134,13 @@ public final class BlastAutoFarming {
     static boolean harvestable(int terrain, Plant plant) {
         return terrain == Terrain.HIGH_GRASS
                 || (plant != null && !AutoPlayPlantSafety.isHarmful(plant));
+    }
+
+    /** Regrowth upgrades ground only on these five terrain types. */
+    static boolean canGrow(int terrain) {
+        return terrain == Terrain.EMPTY || terrain == Terrain.EMPTY_DECO
+                || terrain == Terrain.EMBERS || terrain == Terrain.GRASS
+                || terrain == Terrain.FURROWED_GRASS;
     }
 
     private static boolean hasVisibleEnemy(Hero hero) {
@@ -117,7 +163,7 @@ public final class BlastAutoFarming {
         return -1;
     }
 
-    /** Avoid a stationary action if phasing, traps or vegetation forbid access. */
+    /** Use the existing route map and avoid harmful plants and traps. */
     private static int nearestCrop(Hero hero, boolean[] safe, int[] distances) {
         Level level = Dungeon.level;
         int target = -1;
@@ -135,13 +181,104 @@ public final class BlastAutoFarming {
         return target;
     }
 
-    private static int throwDestination(Hero hero, boolean[] safe) {
-        Level level = Dungeon.level;
-        for (int offset : PathFinder.NEIGHBOURS8) {
-            int cell = hero.pos + offset;
-            if (level.insideMap(cell) && safe[cell] && hero.fieldOfView[cell]
-                    && BlastBombTrajectory.throwPos(hero.pos, cell) == cell) return cell;
+    /** Cheap 7x7 local screen: O(1) area per candidate, independent of blast radius. */
+    static int localGrowable(Level level, int center, int standCell,
+                             boolean[] safe, int[] distances) {
+        int width = level.width();
+        int x = center % width;
+        int y = center / width;
+        int count = 0;
+        int radius = SAMPLE_RADIUS;
+        int squaredLimit = (2 * radius + 1) * (2 * radius + 1);
+        for (int dy = -radius; dy <= radius; dy++) {
+            int yy = y + dy;
+            if (yy < 0 || yy >= level.height()) continue;
+            for (int dx = -radius; dx <= radius; dx++) {
+                int xx = x + dx;
+                if (xx < 0 || xx >= width
+                        || 4 * (dx * dx + dy * dy) > squaredLimit) continue;
+                int cell = yy * width + xx;
+                if (cell != standCell && safe[cell] && distances[cell] != Integer.MAX_VALUE
+                        && level.plants.get(cell) == null && canGrow(level.map[cell])) count++;
+            }
         }
-        return -1;
+        return count;
+    }
+
+    /** Actual blast footprint accounts for walls, radius upgrades, and accessible crops. */
+    static int countGrowable(boolean[] blast, Level level, boolean[] safe, int[] distances,
+                             int standCell) {
+        if (blast.length != level.length()) {
+            throw new IllegalArgumentException("Invalid farming blast footprint");
+        }
+        int count = 0;
+        for (int cell = 0; cell < blast.length; cell++) {
+            if (cell != standCell && blast[cell] && safe[cell]
+                    && distances[cell] != Integer.MAX_VALUE
+                    && level.plants.get(cell) == null && canGrow(level.map[cell])) count++;
+        }
+        return count;
+    }
+
+    /** Scan only every eight game ticks; evaluate at most eight exact bomb footprints. */
+    private static void findFarmingSite(Level level, boolean[] safe, int[] distances,
+                                        RegrowthBomb bomb, boolean remoteThrow) {
+        int[] candidates = new int[MAX_SITE_CHECKS];
+        int[] centers = new int[MAX_SITE_CHECKS];
+        int[] scores = new int[MAX_SITE_CHECKS];
+        int[] steps = new int[MAX_SITE_CHECKS];
+        int found = 0;
+
+        for (int site = 0; site < level.length(); site++) {
+            if (!safe[site] || distances[site] == Integer.MAX_VALUE || level.pit[site]) continue;
+
+            int center = site;
+            int score = -1;
+            if (remoteThrow) {
+                for (int offset : PathFinder.NEIGHBOURS8) {
+                    int cell = site + offset;
+                    if (!level.insideMap(cell) || !safe[cell]) continue;
+                    int local = localGrowable(level, cell, site, safe, distances);
+                    if (local > score) {
+                        score = local;
+                        center = cell;
+                    }
+                }
+            } else {
+                score = localGrowable(level, site, site, safe, distances);
+            }
+            if (score < MIN_GROWABLE_CELLS) continue;
+
+            int insertion = found;
+            while (insertion > 0 && (distances[site] < steps[insertion - 1]
+                    || (distances[site] == steps[insertion - 1]
+                        && score > scores[insertion - 1]))) insertion--;
+            if (insertion >= MAX_SITE_CHECKS) continue;
+            if (found < MAX_SITE_CHECKS) found++;
+            for (int i = found - 1; i > insertion; i--) {
+                candidates[i] = candidates[i - 1];
+                centers[i] = centers[i - 1];
+                scores[i] = scores[i - 1];
+                steps[i] = steps[i - 1];
+            }
+            candidates[insertion] = site;
+            centers[insertion] = center;
+            scores[insertion] = score;
+            steps[insertion] = distances[site];
+        }
+
+        for (int i = 0; i < found; i++) {
+            int site = candidates[i];
+            int center = centers[i];
+            if (BlastBombCollision.hasLitBomb(level, site)
+                    || (remoteThrow && BlastBombTrajectory.throwPos(site, center) != center)) {
+                continue;
+            }
+            if (countGrowable(bomb.blastWarningCells(center), level, safe, distances, site)
+                    < MIN_GROWABLE_CELLS) continue;
+            farmingSite = site;
+            farmingBlastCell = center;
+            return;
+        }
     }
 }
