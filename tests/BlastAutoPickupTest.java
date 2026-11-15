@@ -2,6 +2,10 @@ package com.spd.blast;
 
 import com.shatteredpixel.shatteredpixeldungeon.items.Dewdrop;
 import com.shatteredpixel.shatteredpixeldungeon.items.Gold;
+import com.shatteredpixel.shatteredpixeldungeon.items.keys.CrystalKey;
+import com.shatteredpixel.shatteredpixeldungeon.items.keys.GoldenKey;
+import com.shatteredpixel.shatteredpixeldungeon.items.keys.IronKey;
+import com.shatteredpixel.shatteredpixeldungeon.items.keys.WornKey;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.bombs.Bomb;
 import com.shatteredpixel.shatteredpixeldungeon.items.potions.PotionOfHealing;
@@ -24,6 +28,10 @@ public final class BlastAutoPickupTest {
     public static void main(String[] args) {
         check(true, new Dewdrop());
         check(true, new Gold());
+        check(true, new GoldenKey());
+        check(true, new IronKey());
+        check(true, new CrystalKey());
+        check(true, new WornKey());
         check(true, new Sungrass.Seed());
         check(true, new ScrollOfIdentify());
         check(true, new PotionOfHealing());
@@ -39,6 +47,19 @@ public final class BlastAutoPickupTest {
         }
         check(true, radius);
         check(true, haste);
+
+        // Keys are journal entries and remain collectible with a full backpack.
+        for (Item key : new Item[]{new GoldenKey(), new IronKey(),
+                new CrystalKey(), new WornKey()}) {
+            if (!BlastAutoPickup.bypassesBackpack(key, BLAST_INSTANT)) {
+                throw new AssertionError("Key incorrectly needs backpack space: "
+                        + key.getClass().getName());
+            }
+        }
+        if (!BlastAutoPickup.bypassesBackpack(new Gold(), BLAST_INSTANT)
+                || BlastAutoPickup.bypassesBackpack(new Bomb(), BLAST_INSTANT)) {
+            throw new AssertionError("Incorrect backpack bypass rule");
+        }
 
         // Portable auto-pickup with no Blast policy excludes both non-stackables.
         Predicate<Item> noInstantPickups = item -> false;
