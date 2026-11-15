@@ -16,7 +16,8 @@ def patch(path: Path) -> None:
     source = replace(source,
         "import com.shatteredpixel.shatteredpixeldungeon.windows.WndBag;\n",
         "import com.shatteredpixel.shatteredpixeldungeon.windows.WndBag;\n"
-        "import com.shatteredpixel.shatteredpixeldungeon.windows.WndQuickBag;\n",
+        "import com.shatteredpixel.shatteredpixeldungeon.windows.WndQuickBag;\n"
+        "import com.shatteredpixel.shatteredpixeldungeon.windows.WndSettings;\n",
         "quick-use bag import")
 
     source = replace(source,
@@ -159,13 +160,16 @@ def patch(path: Path) -> None:
         "\tpublic static boolean interfaceBlockingHero(){",
         "\tpublic static boolean manualInputPending(){\n"
         "\t\tif (scene == null) return false;\n"
+        "\t\tfor (Gizmo member : scene.members) {\n"
+        "\t\t\tif (member instanceof WndGame || member instanceof WndSettings) return true;\n"
+        "\t\t}\n"
         "\t\tif (cellSelector.listener != null && cellSelector.listener != defaultCellListener) return true;\n"
         "\t\tif (scene.inventory != null && scene.inventory.isSelecting()) return true;\n"
         "\t\treturn WndBag.INSTANCE instanceof WndBag\n"
         "\t\t\t\t&& ((WndBag) WndBag.INSTANCE).getSelector() != null;\n"
         "\t}\n\n"
         "\tpublic static boolean interfaceBlockingHero(){",
-        "manual targeting while auto-play")
+        "manual targeting and game menu during auto-play")
 
     source = replace(source,
         "\t\tcellSelector.enable(Dungeon.hero.ready);",
