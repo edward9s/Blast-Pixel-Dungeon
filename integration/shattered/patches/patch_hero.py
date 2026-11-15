@@ -223,13 +223,21 @@ def patch(path: Path) -> None:
         "\t\t\t\t&& !com.spd.blast.BlastAutoPlay.manualActionActive(this)\n"
         "\t\t\t\t&& com.spd.blast.BlastAutoPlay.chooseAction(this)) {\n"
         "\t\t\treturn false;\n"
+        "\t\t}\n"
+        // The AI may have no legal move while temporary fire or gas blocks every exit.
+        // Spend real game time so environmental blobs and other actors can advance.
+        "\t\tif (com.spd.blast.BlastSettings.testAutoPlay()\n"
+        "\t\t\t\t&& !com.spd.blast.BlastAutoPlay.manualActionActive(this)\n"
+        "\t\t\t\t&& curAction == null) {\n"
+        "\t\t\tspendAndNext(TICK);\n"
+        "\t\t\treturn false;\n"
         "\t\t}\n\n"
         "\t\tboolean actResult;\n\t\tif (curAction == null) {",
         "Hero.act automatic actions"
     )
 
-    # A single retry can recover from a stale blocked move. If no action was
-    # chosen, leave the hero ready rather than spinning on an idle turn.
+    # A single retry can recover from a stale blocked move; later turns with
+    # no legal action are advanced by the regular auto-play idle wait above.
     s = replace_once(
         s,
         "\tprivate void ready() {\n",
