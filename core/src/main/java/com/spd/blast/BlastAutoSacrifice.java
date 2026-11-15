@@ -79,18 +79,29 @@ public final class BlastAutoSacrifice {
             throw new IllegalStateException("Invalid sacrificial fire navigation state");
         }
 
-        // Ranged enemies and thieves take precedence over sacrificial luring.
-        // Immediate melee danger is handled by the regular combat priority.
+        // Visible ranged enemies bypass the altar. A thief also does, unless
+        // an adjacent melee pursuer poses an immediate threat.
+        boolean visibleThief = false;
+        boolean immediateMeleeThreat = false;
         for (Mob mob : level.mobs) {
-            if (mob.isAlive() && mob.alignment == Char.Alignment.ENEMY
-                    && mob.invisible <= 0 && hero.fieldOfView[mob.pos]
-                    && !hero.isCharmedBy(mob) && BlastAutoPlay.isAwake(mob)
-                    && (mob instanceof Thief || isRangedEnemy(mob.getClass()))) {
+            if (!eligible(hero, mob)) continue;
+            if (isRangedEnemy(mob.getClass())) {
                 trackedEnemy = null;
                 waitingSince = Float.NaN;
                 stalledTurns = 0;
                 return Action.NONE;
             }
+            if (mob instanceof Thief) visibleThief = true;
+            if (level.adjacent(hero.pos, mob.pos)
+                    && mob.state == mob.HUNTING && mob.isTargeting(hero)) {
+                immediateMeleeThreat = true;
+            }
+        }
+        if (visibleThief && !immediateMeleeThreat) {
+            trackedEnemy = null;
+            waitingSince = Float.NaN;
+            stalledTurns = 0;
+            return Action.NONE;
         }
 
         // A marked enemy within one tile of active flame is an eligible sacrifice.
