@@ -108,6 +108,19 @@ python scripts/test_wnd_bag_refresh_patch.py
 ```
 
 
+`BlastAutoCombatTest.java` checks that sleeping mobs are not combat targets,
+while wandering and hunting mobs can be targeted. It also tests bounded
+last-seen-position pursuit: the AI tries a reachable location for at most
+eight unseen turns, then temporarily ignores an unmoving target to avoid
+oscillating between enemies and floor loot. The ignore ends if the enemy
+moves or damages the hero. The controller reuses the existing distance map.
+
+```sh
+javac --release 11 -encoding UTF-8 -cp "$BLAST_TEST_CLASSPATH" \
+  -d /tmp/blast-tests tests/BlastAutoCombatTest.java
+java -cp "/tmp/blast-tests:$BLAST_TEST_CLASSPATH" com.spd.blast.BlastAutoCombatTest
+```
+
 `BlastAutoFarmingTest.java` checks the isolated idle farming policy:
 visible high grass is actively harvested whenever auto-farming is enabled,
 even with no Regrowth bomb, no remote-bomb buff, or timed bomb mode.
