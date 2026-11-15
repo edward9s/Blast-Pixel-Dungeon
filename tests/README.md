@@ -51,6 +51,8 @@ python scripts/test_update_patches.py
 
 `BlastAutoBombAITest.java` checks that Regrowth, Arcane and Shrapnel
 bombs share the non-destructive automatic attack path, while a normal bomb does not.
+For remote throws, the real bomb landing position determines whether the blast
+can hit an enemy; a direct hit with the thrown bomb is not required.
 During auto-play, only the hero is exempt from BombRegrowth rooting; all other
 grounded characters keep the existing effect. Compile and run against patched SPD:
 
@@ -113,7 +115,15 @@ while wandering and hunting mobs can be targeted. It also tests bounded
 last-seen-position pursuit: the AI tries a reachable location for at most
 eight unseen turns, then temporarily ignores an unmoving target to avoid
 oscillating between enemies and floor loot. The ignore ends if the enemy
-moves or damages the hero. The controller reuses the existing distance map.
+moves, threatens the hero in melee, or damages the hero. In normal combat,
+an actively attacking adjacent melee opponent takes first priority, then
+thieves (including bandits) and ranged enemies, then ordinary melee mobs.
+Safe path length breaks ties within each tier. Ranged enemies must be
+approached to adjacent melee range for non-bomb attacks, even with a
+long-reach weapon or charged wand. When bomb immunity is active, the
+existing bomb AI can strike remotely if the actual blast footprint reaches
+a target, subject to existing safety restrictions. The controller reuses
+the existing distance map.
 
 ```sh
 javac --release 11 -encoding UTF-8 -cp "$BLAST_TEST_CLASSPATH" \
