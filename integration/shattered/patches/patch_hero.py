@@ -206,14 +206,22 @@ def patch(path: Path) -> None:
         "Hero.act automatic actions"
     )
 
-    # Resume after a blocked attack/move. Spending a turn avoids zero-time loops.
+    # A single retry can recover from a stale blocked move. If no action was
+    # chosen, leave the hero ready rather than spinning on an idle turn.
+    s = replace_once(
+        s,
+        "\tprivate void ready() {\n",
+        "\tprivate void ready() {\n"
+        "\t\tboolean blastRetry = com.spd.blast.BlastSettings.testAutoPlay()\n"
+        "\t\t\t\t&& curAction != null\n"
+        "\t\t\t\t&& com.spd.blast.BlastAutoPlay.retryBlockedAction(this);\n",
+        "Hero.ready bounded auto retry"
+    )
     s = replace_once(
         s,
         "\t\tGameScene.ready();\n\t\t//check statistics to see if vault warned?",
         "\t\tGameScene.ready();\n"
-        "\t\tif (com.spd.blast.BlastSettings.testAutoPlay()) {\n"
-        "\t\t\tspendAndNext(TICK);\n"
-        "\t\t}\n"
+        "\t\tif (blastRetry) spendAndNext(TICK);\n"
         "\t\t//check statistics to see if vault warned?",
         "Hero.ready automatic continuation"
     )
