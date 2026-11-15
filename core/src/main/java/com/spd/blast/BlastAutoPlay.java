@@ -72,10 +72,7 @@ public final class BlastAutoPlay {
         lastAttacker = null;
         attackerCell = -1;
         attackerTurns = 0;
-        forgetCombatTarget();
-        suspendedTarget = null;
-        suspendedTargetCell = -1;
-        suspendedTargetTurns = 0;
+        resetPursuitMemory();
         ignoredTarget = null;
         ignoredTargetCell = -1;
         lastRetryCell = -1;
@@ -115,7 +112,7 @@ public final class BlastAutoPlay {
         if (!BlastSettings.testAutoPlay()) return;
         resetForLevel(hero);
         manualAction = true;
-        forgetCombatTarget();
+        resetPursuitMemory();
         roamCell = -1;
         lastRetryCell = -1;
     }
@@ -138,7 +135,7 @@ public final class BlastAutoPlay {
         hero.curAction = null;
         hero.lastAction = null;
         hero.resting = false;
-        forgetCombatTarget();
+        resetPursuitMemory();
         roamCell = -1;
     }
 
@@ -310,7 +307,7 @@ public final class BlastAutoPlay {
             boolean adjacent = Dungeon.level.adjacent(hero.pos, mob.pos);
             // Ranged enemies must be approached into melee range, even if
             // the hero can attack from farther away with an extended weapon.
-            boolean canMelee = hero.canAttack(mob) && (!ranged || adjacent);
+            boolean canMelee = canMeleeTarget(ranged, adjacent, hero.canAttack(mob));
             int goal = canMelee ? -1 : nearCell(hero.pos, mob.pos, safe, distances);
             if (!canMelee && (goal < 0 || hero.rooted)) continue;
 
@@ -458,10 +455,7 @@ public final class BlastAutoPlay {
         lastAttacker = null;
         attackerCell = -1;
         attackerTurns = 0;
-        forgetCombatTarget();
-        suspendedTarget = null;
-        suspendedTargetCell = -1;
-        suspendedTargetTurns = 0;
+        resetPursuitMemory();
         ignoredTarget = null;
         ignoredTargetCell = -1;
         lastRetryCell = -1;
@@ -471,6 +465,11 @@ public final class BlastAutoPlay {
         BlastAutoPickup.reset();
         BlastAutoFarming.reset();
         BlastAutoSacrifice.reset();
+    }
+
+    /** A ranged enemy must be adjacent before an ordinary melee attack is issued. */
+    static boolean canMeleeTarget(boolean rangedEnemy, boolean adjacent, boolean canAttack) {
+        return canAttack && (!rangedEnemy || adjacent);
     }
 
     /** Priority tiers are independent of distance; route length breaks ties. */
@@ -518,6 +517,13 @@ public final class BlastAutoPlay {
         combatTarget = null;
         combatTargetCell = -1;
         lostTargetTurns = 0;
+    }
+
+    private static void resetPursuitMemory() {
+        forgetCombatTarget();
+        suspendedTarget = null;
+        suspendedTargetCell = -1;
+        suspendedTargetTurns = 0;
     }
 
     private static void abandonCombatTarget() {
