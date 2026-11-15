@@ -66,6 +66,7 @@ public final class BlastAutoPlay {
         waitingForInput = false;
         pendingBombInputs.clear();
         BlastAutoBombAI.reset();
+        BlastAutoPickup.reset();
 
         Hero hero = Dungeon.hero;
         if (hero == null || Dungeon.level == null) return;
@@ -321,6 +322,9 @@ public final class BlastAutoPlay {
             return false;
         }
 
+        // Collect reachable floor loot after visible enemies have been handled.
+        if (BlastAutoPickup.chooseAction(hero, safe, distances)) return false;
+
         if (attackerTurns > 0) {
             attackerTurns--;
             if (lastAttacker != null && lastAttacker.isAlive()
@@ -381,6 +385,7 @@ public final class BlastAutoPlay {
         waitingForInput = false;
         pendingBombInputs.clear();
         BlastAutoBombAI.reset();
+        BlastAutoPickup.reset();
     }
 
     private static boolean[] safeCells(Hero hero) {
