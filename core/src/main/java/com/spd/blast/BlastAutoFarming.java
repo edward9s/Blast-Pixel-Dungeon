@@ -14,6 +14,8 @@ import com.watabou.utils.PathFinder;
 
 /** Blast-only idle farming. The portable auto-play and pickup logic remain independent. */
 public final class BlastAutoFarming {
+    enum Action { NONE, MOVE, BOMB }
+
     private static Hero currentHero;
     private static Level currentLevel;
     private static boolean planted;
@@ -28,11 +30,8 @@ public final class BlastAutoFarming {
         harvested = false;
     }
 
-    /**
-     * Returns true if a farming bomb was launched or a movement action was queued.
-     * The caller returns hero.curAction == null to distinguish an asynchronous bomb.
-     */
-    public static boolean act(Hero hero, boolean[] safe, int[] distances) {
+    /** Select one farming action, or NONE when regular roaming should continue. */
+    static Action chooseAction(Hero hero, boolean[] safe, int[] distances) {
         if (currentHero != hero || currentLevel != Dungeon.level) {
             reset();
             currentHero = hero;
@@ -41,7 +40,7 @@ public final class BlastAutoFarming {
         if (!BlastSettings.testAutoPlay() || !BlastSettings.autoFarming()
                 || BlastRemoteBomb.isTimedMode() || hero.flying
                 || hero.buff(BlastRemoteBomb.class) == null
-                || hasVisibleEnemy(hero)) return false;
+                || hasVisibleEnemy(hero)) return Action.NONE;
 
         Level level = Dungeon.level;
         if (safe.length != level.length() || distances.length != level.length()) {
@@ -56,21 +55,21 @@ public final class BlastAutoFarming {
                 hero.curAction = new HeroAction.Move(next);
                 // An action toward an actual crop advances the harvest stage.
                 if (harvestable(level.map[next], level.plants.get(next))) harvested = true;
-                return true;
+                return Action.MOVE;
             }
-            if (!canPlantAgain(planted, harvested, regrowthActive(level))) return false;
+            if (!canPlantAgain(planted, harvested, regrowthActive(level))) return Action.NONE;
         }
 
         BlastBombManiac maniac = BlastBombManiac.current();
-        if (maniac == null || maniac.remaining() == 0) return false;
+        if (maniac == null || maniac.remaining() == 0) return Action.NONE;
         int index = findRegrowthType(maniac);
-        if (index < 0) return false;
+        if (index < 0) return Action.NONE;
 
         boolean remoteThrow = BlastSettings.testRemoteThrow();
         int destination = remoteThrow ? throwDestination(hero, safe) : hero.pos;
         if (destination < 0 || (!remoteThrow
                 && (level.pit[hero.pos]
-                    || BlastBombCollision.hasLitBomb(level, hero.pos)))) return false;
+                    || BlastBombCollision.hasLitBomb(level, hero.pos)))) return Action.NONE;
 
         int previous = maniac.selectedIndex();
         boolean launched;
@@ -82,11 +81,11 @@ public final class BlastAutoFarming {
         } finally {
             maniac.select(previous);
         }
-        if (!launched) return false;
+        if (!launched) return Action.NONE;
         planted = true;
         harvested = false;
         if (!remoteThrow) hero.spendAndNext(1f);
-        return true;
+        return Action.BOMB;
     }
 
     static boolean canPlantAgain(boolean planted, boolean harvested, boolean cloudActive) {

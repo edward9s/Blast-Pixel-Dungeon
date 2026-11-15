@@ -360,9 +360,10 @@ public final class BlastAutoPlay {
         }
 
         // Blast-only idle farming runs after combat and floor-loot collection.
-        if (BlastAutoFarming.act(hero, safe, distances)) {
-            return hero.curAction == null;
-        }
+        BlastAutoFarming.Action farmingAction =
+                BlastAutoFarming.chooseAction(hero, safe, distances);
+        if (farmingAction == BlastAutoFarming.Action.BOMB) return true;
+        if (farmingAction == BlastAutoFarming.Action.MOVE) return false;
 
         int step = roamStep(hero, safe, distances);
         if (step >= 0) hero.curAction = new HeroAction.Move(step);
