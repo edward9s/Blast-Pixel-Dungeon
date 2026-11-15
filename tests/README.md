@@ -130,3 +130,26 @@ javac --release 11 -encoding UTF-8 -cp "$BLAST_TEST_CLASSPATH" \
   -d /tmp/blast-tests tests/BlastAutoFarmingTest.java
 java -cp "/tmp/blast-tests:$BLAST_TEST_CLASSPATH" com.spd.blast.BlastAutoFarmingTest
 ```
+
+
+`BlastAutoEnvironmentTest.java` verifies Blast-only environmental avoidance:
+active Fire and ToxicGas cells are unsafe, inactive cells remain traversable,
+and the auto-playing hero seeks water while burning only when it is reachable
+through safe terrain within four steps. Water behind hazardous tiles, beyond
+four steps, or unreachable is ignored. SPD's Burning buff removes the effect
+after the grounded hero reaches water. The same hazard-aware distance map
+is reused for combat movement, item collection, roaming, and auto-farming.
+
+The safety policy also excludes active Inferno, VaultFlameTraps, CorrosiveGas,
+ParalyticGas, StenchGas, ConfusionGas, Electricity, StormCloud, Freezing,
+Blizzard, SmokeScreen, Web, GooWarn, and SacrificialFire. Active blob
+references are captured once per hero action, not retrieved once per map cell.
+While standing in a harmful blob, the hero tries to step onto a safe adjacent
+cell before other automatic actions. Emergency water movement is prioritized
+ahead of bomb tactics, otherwise normal combat priority is preserved.
+
+```sh
+javac --release 11 -encoding UTF-8 -cp "$BLAST_TEST_CLASSPATH" \
+  -d /tmp/blast-tests tests/BlastAutoEnvironmentTest.java
+java -cp "/tmp/blast-tests:$BLAST_TEST_CLASSPATH" com.spd.blast.BlastAutoEnvironmentTest
+```

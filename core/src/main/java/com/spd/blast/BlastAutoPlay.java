@@ -3,6 +3,8 @@ package com.spd.blast;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
+import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.Blob;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Burning;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroAction;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
@@ -204,11 +206,34 @@ public final class BlastAutoPlay {
         hero.lastAction = null;
         hero.resting = false;
 
-        boolean[] safe = safeCells(hero);
+        Blob[] hazards = BlastAutoEnvironment.activeHazards(Dungeon.level);
+        boolean[] safe = safeCells(hero, hazards);
         // Compute reachability once, rather than doing up to nine searches per mob.
         PathFinder.buildDistanceMap(hero.pos, safe);
         int[] distances = PathFinder.distance.clone();
         if (lastRetryCell != hero.pos) lastRetryCell = -1;
+
+        // Extinguish burning in reachable water, but never detour more than four steps.
+        // Also leave an active environmental hazard before fighting or collecting loot.
+        if (!hero.rooted) {
+            if (hero.buff(Burning.class) != null && !hero.flying) {
+                int waterCell = BlastAutoEnvironment.nearbyWater(
+                        hero.pos, Dungeon.level.water, safe, distances);
+                if (waterCell >= 0) {
+                    hero.curAction = new HeroAction.Move(firstStep(waterCell, safe, distances));
+                    return false;
+                }
+            }
+            if (BlastAutoEnvironment.hazardousAt(hero.pos, hazards)) {
+                for (int offset : PathFinder.NEIGHBOURS8) {
+                    int cell = hero.pos + offset;
+                    if (Dungeon.level.insideMap(cell) && safe[cell] && distances[cell] == 1) {
+                        hero.curAction = new HeroAction.Move(cell);
+                        return false;
+                    }
+                }
+            }
+        }
 
         // Blast-specific tactics are isolated from the portable AI policy.
         if (BlastAutoBombAI.act(hero)) return true;
@@ -416,7 +441,7 @@ public final class BlastAutoPlay {
         BlastAutoFarming.reset();
     }
 
-    private static boolean[] safeCells(Hero hero) {
+    private static boolean[] safeCells(Hero hero, Blob[] hazards) {
         Level level = Dungeon.level;
         boolean[] safe = Dungeon.findPassable(hero, level.passable, hero.fieldOfView, true).clone();
         boolean phaseEnabled = BlastMovement.enabled();
@@ -428,7 +453,8 @@ public final class BlastAutoPlay {
             safe[cell] = known && level.insideMap(cell) && traversable
                     && !level.pit[cell]
                     && level.traps.get(cell) == null
-                    && !AutoPlayPlantSafety.isHarmful(level.plants.get(cell));
+                    && !AutoPlayPlantSafety.isHarmful(level.plants.get(cell))
+                    && !BlastAutoEnvironment.hazardousAt(cell, hazards);
         }
 
         // Inspect occupied cells only; per-cell Actor.findChar() is unnecessary.
@@ -439,7 +465,8 @@ public final class BlastAutoPlay {
                     && level.insideMap(cell)
                     && (level.visited[cell] || level.mapped[cell] || hero.fieldOfView[cell])
                     && !level.pit[cell] && level.traps.get(cell) == null
-                    && !AutoPlayPlantSafety.isHarmful(level.plants.get(cell))) {
+                    && !AutoPlayPlantSafety.isHarmful(level.plants.get(cell))
+                    && !BlastAutoEnvironment.hazardousAt(cell, hazards)) {
                 safe[cell] = true;
             } else {
                 safe[cell] = false;
