@@ -48,3 +48,24 @@ Smoke-test both UI patch anchors:
 ```sh
 python scripts/test_update_patches.py
 ```
+
+`BlastAutoBombAITest.java` checks that Regrowth, Arcane and Shrapnel
+bombs share the non-destructive automatic attack path, while a normal bomb does not.
+During auto-play, only the hero is exempt from BombRegrowth rooting; all other
+grounded characters keep the existing effect. Compile and run against patched SPD:
+
+```sh
+javac --release 11 -encoding UTF-8 -cp "$BLAST_TEST_CLASSPATH" \
+  -d /tmp/blast-tests tests/BlastAutoBombAITest.java
+java -cp "/tmp/blast-tests:$BLAST_TEST_CLASSPATH" com.spd.blast.BlastAutoBombAITest
+```
+
+`BlastAutoPickupTest.java` checks the automatic floor-pickup allowlist:
+dew, seeds, scrolls, potions, runestones, and gold, excluding bombs.
+Gold is collected into the wallet without using backpack capacity.
+
+```sh
+javac --release 11 -encoding UTF-8 -cp "$BLAST_TEST_CLASSPATH" \
+  -d /tmp/blast-tests tests/BlastAutoPickupTest.java
+java -cp "/tmp/blast-tests:$BLAST_TEST_CLASSPATH" com.spd.blast.BlastAutoPickupTest
+```

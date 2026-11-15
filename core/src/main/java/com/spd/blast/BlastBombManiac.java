@@ -7,6 +7,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Buff;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
+import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.bombs.Bomb;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.CellSelector;
@@ -235,10 +236,23 @@ public final class BlastBombManiac extends Buff {
         if (!BlastSettings.testAutoPlay()) {
             throw new IllegalStateException("Automatic bomb throw requires auto-play mode");
         }
-        return throwAt(destination);
+        return throwAt(destination, false);
+    }
+
+    /** The AI waits for the throw animation before detonating this exact bomb. */
+    public boolean blastAutoThrowAndDetonate(int destination) {
+        if (!BlastSettings.testAutoPlay() || !BlastSettings.testRemoteThrow()
+                || BlastRemoteBomb.isTimedMode()) {
+            throw new IllegalStateException("Automatic throw-and-detonate requires remote throw mode");
+        }
+        return throwAt(destination, true);
     }
 
     private boolean throwAt(int destination) {
+        return throwAt(destination, false);
+    }
+
+    private boolean throwAt(int destination, boolean autoDetonate) {
         final Hero hero = Dungeon.hero;
         final boolean timed = BlastRemoteBomb.isTimedMode();
         if (!aimedThrowEnabled() || hero == null
@@ -275,7 +289,9 @@ public final class BlastBombManiac extends Buff {
                     }
                 }
                 bomb.blastThrowLit(cell);
-                hero.spendAndNext(timed ? 1f : 0f);
+                if (autoDetonate) detonateAutoBomb(bomb, cell);
+                // Automated attacks must advance time even when remote throws are free.
+                hero.spendAndNext(autoDetonate ? 1f : timed ? 1f : 0f);
             }
         };
         MissileSprite missile = (MissileSprite) hero.sprite.parent.recycle(MissileSprite.class);
@@ -287,20 +303,52 @@ public final class BlastBombManiac extends Buff {
         return true;
     }
 
+    /** Detonate only the newly deployed bomb, preserving older remote fuses. */
+    private static void detonateAutoBomb(Bomb bomb, int cell) {
+        if (!(bomb.fuse instanceof BlastRemoteBomb.RemoteFuse)) {
+            throw new IllegalStateException("Automatic bomb has no remote fuse");
+        }
+        Heap heap = Dungeon.level.heaps.get(cell);
+        if (heap == null || !heap.items.contains(bomb)) {
+            throw new IllegalStateException("Automatic bomb was not deployed at " + cell);
+        }
+        BlastRemoteBomb.RemoteFuse fuse = (BlastRemoteBomb.RemoteFuse) bomb.fuse;
+        if (!fuse.isArmed(bomb)) {
+            throw new IllegalStateException("Automatic bomb remote fuse is not armed");
+        }
+        fuse.detonateIfPresent(Dungeon.level);
+    }
+
+    /** Place and immediately detonate one bomb during the AI's actor turn. */
+    public boolean blastAutoPlaceAndDetonate() {
+        if (!BlastSettings.testAutoPlay() || BlastSettings.testRemoteThrow()
+                || BlastRemoteBomb.isTimedMode()) {
+            throw new IllegalStateException("Automatic place-and-detonate requires remote mode");
+        }
+        Bomb bomb = placeBomb(true);
+        if (bomb == null) return false;
+        detonateAutoBomb(bomb, Dungeon.hero.pos);
+        return true;
+    }
+
     /** Place a remote-armed bomb on the Hero's cell without spending a turn. */
     public void place() {
+        placeBomb(false);
+    }
+
+    private Bomb placeBomb(boolean automatic) {
         Hero hero = Dungeon.hero;
-        if (aimedThrowEnabled() || target != hero || hero == null
+        if ((!automatic && aimedThrowEnabled()) || target != hero || hero == null
                 || (!hero.ready && !BlastSettings.testAutoPlay())
-                || Dungeon.level == null || GameScene.showingWindow()) return;
+                || Dungeon.level == null || (!automatic && GameScene.showingWindow())) return null;
         if (remaining() == 0) {
             GLog.w(BlastMessages.get("bomb_maniac.no_charges"));
-            return;
+            return null;
         }
         int cell = hero.pos;
         if (Dungeon.level.pit[cell] || BlastBombCollision.hasLitBomb(Dungeon.level, cell)) {
             GLog.w(BlastMessages.get("bomb_maniac.blocked"));
-            return;
+            return null;
         }
         if (activeBombs == Integer.MAX_VALUE) {
             throw new IllegalStateException("Active bomb overflow");
@@ -309,6 +357,7 @@ public final class BlastBombManiac extends Buff {
         bomb.blastSetManiacCharge(true);
         activeBombs++;
         bomb.blastThrowLit(cell);
+        return bomb;
     }
 
     @Override

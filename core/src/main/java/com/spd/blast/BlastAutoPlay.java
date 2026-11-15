@@ -65,6 +65,7 @@ public final class BlastAutoPlay {
         manualAction = false;
         waitingForInput = false;
         pendingBombInputs.clear();
+        BlastAutoPickup.reset();
 
         Hero hero = Dungeon.hero;
         if (hero == null || Dungeon.level == null) return;
@@ -209,6 +210,9 @@ public final class BlastAutoPlay {
         int[] distances = PathFinder.distance.clone();
         if (lastRetryCell != hero.pos) lastRetryCell = -1;
 
+        // Blast-specific tactics are isolated from the portable AI policy.
+        if (BlastAutoBombAI.act(hero)) return true;
+
         Mob invulnerable = null;
         Mob necromancer = null;
         int necromancerDistance = Integer.MAX_VALUE;
@@ -267,6 +271,32 @@ public final class BlastAutoPlay {
             }
         }
 
+        // Rooted heroes may attack but cannot follow movement or pickup orders.
+        // Advance one actual actor turn if no usable attack is available.
+        if (hero.rooted) {
+            if (necromancer != null && hero.fieldOfView[necromancer.pos]) {
+                if (useWand(hero, necromancer)) return true;
+                if (hero.canAttack(necromancer)) {
+                    hero.curAction = new HeroAction.Attack(necromancer);
+                    return false;
+                }
+            }
+            for (Mob mob : Dungeon.level.mobs) {
+                if (mob.isAlive() && mob.alignment != Char.Alignment.ALLY
+                        && mob.invisible == 0 && hero.fieldOfView[mob.pos]
+                        && !mob.isInvulnerable(Hero.class) && !hero.isCharmedBy(mob)
+                        && useWand(hero, mob)) {
+                    return true;
+                }
+            }
+            if (attackable != null) {
+                hero.curAction = new HeroAction.Attack(attackable);
+                return false;
+            }
+            hero.spendAndNext(Actor.TICK);
+            return true;
+        }
+
         if (invulnerable == null && attackerTurns > 0 && lastAttacker != null
                 && lastAttacker.isAlive() && lastAttacker.isInvulnerable(Hero.class)) {
             int step = retreatStep(hero, lastAttacker.pos, safe, distances);
@@ -312,6 +342,9 @@ public final class BlastAutoPlay {
             hero.curAction = new HeroAction.Move(firstStep(approachCell, safe, distances));
             return false;
         }
+
+        // Collect reachable floor loot after visible enemies have been handled.
+        if (BlastAutoPickup.chooseAction(hero, safe, distances)) return false;
 
         if (attackerTurns > 0) {
             attackerTurns--;
@@ -372,6 +405,7 @@ public final class BlastAutoPlay {
         manualAction = false;
         waitingForInput = false;
         pendingBombInputs.clear();
+        BlastAutoPickup.reset();
     }
 
     private static boolean[] safeCells(Hero hero) {
@@ -427,7 +461,7 @@ public final class BlastAutoPlay {
     }
 
     /** Follow the existing distance map backwards instead of running another search. */
-    private static int firstStep(int goal, boolean[] safe, int[] distances) {
+    static int firstStep(int goal, boolean[] safe, int[] distances) {
         int cell = goal;
         if (distances[cell] == Integer.MAX_VALUE || distances[cell] == 0) {
             throw new IllegalArgumentException("Unreachable or current auto-play destination: " + goal);
