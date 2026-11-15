@@ -23,6 +23,7 @@ public final class BlastSettings {
     private static final String REMOTE_THROW = "blast_test_remote_throw";
     private static final String DEMOLITION = "blast_test_demolition";
     private static final String AUTO_PLAY = "blast_test_auto_play";
+    private static final String AUTO_FARMING = "blast_auto_farming";
     private static final String ENCHANTMENT_STONE_REVERSE_ALCHEMY = "blast_test_enchantment_stone_reverse_alchemy";
 
     private BlastSettings() {}
@@ -100,6 +101,14 @@ public final class BlastSettings {
 
     public static void setTestAutoPlay(boolean value) {
         GameSettings.put(AUTO_PLAY, value);
+    }
+
+    public static boolean autoFarming() {
+        return GameSettings.getBoolean(AUTO_FARMING, false);
+    }
+
+    public static void setAutoFarming(boolean value) {
+        GameSettings.put(AUTO_FARMING, value);
     }
 
     public static boolean enchantmentStoneReverseAlchemy() {
