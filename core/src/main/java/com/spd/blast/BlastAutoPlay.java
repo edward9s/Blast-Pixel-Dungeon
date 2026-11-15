@@ -18,6 +18,7 @@ import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfPrismaticLight
 import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfTransfusion;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
+import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
 import com.watabou.utils.PathFinder;
 import com.watabou.utils.Random;
 
@@ -33,6 +34,8 @@ public final class BlastAutoPlay {
     private static int attackerCell = -1;
     private static int attackerTurns;
     private static int lastRetryCell = -1;
+    private static boolean manualAction;
+    private static boolean waitingForInput;
 
     private BlastAutoPlay() {}
 
@@ -44,6 +47,8 @@ public final class BlastAutoPlay {
         attackerCell = -1;
         attackerTurns = 0;
         lastRetryCell = -1;
+        manualAction = false;
+        waitingForInput = false;
 
         Hero hero = Dungeon.hero;
         if (hero == null || Dungeon.level == null) return;
@@ -63,6 +68,52 @@ public final class BlastAutoPlay {
         lastAttacker = attacker;
         attackerCell = attacker.pos;
         attackerTurns = ATTACKER_MEMORY_TURNS;
+    }
+
+    /** Preserve player control until a complete multi-turn HeroAction finishes. */
+    public static void beginManualAction(Hero hero) {
+        if (!BlastSettings.testAutoPlay()) return;
+        resetForLevel(hero);
+        manualAction = true;
+        roamCell = -1;
+        lastRetryCell = -1;
+    }
+
+    public static boolean manualActionActive(Hero hero) {
+        return currentHero == hero && manualAction;
+    }
+
+    public static boolean finishManualAction(Hero hero) {
+        if (!manualActionActive(hero) || hero.curAction != null) return false;
+        manualAction = false;
+        return true;
+    }
+
+    /** An explicit item action supersedes the last AI movement order. */
+    public static void beginItemAction(Hero hero) {
+        if (!BlastSettings.testAutoPlay()) return;
+        resetForLevel(hero);
+        manualAction = false;
+        hero.curAction = null;
+        hero.lastAction = null;
+        hero.resting = false;
+        roamCell = -1;
+    }
+
+    /** Target selection pauses the actor; ordinary windows do not. */
+    public static boolean pauseForManualInput(Hero hero) {
+        if (!GameScene.manualInputPending()) return false;
+        waitingForInput = true;
+        hero.ready = true;
+        return true;
+    }
+
+    /** The render loop wakes the actor after a selection ends or is cancelled. */
+    public static void resumeIfInputFinished() {
+        if (!waitingForInput || GameScene.manualInputPending()) return;
+        waitingForInput = false;
+        Hero hero = Dungeon.hero;
+        if (BlastSettings.testAutoPlay() && hero != null && hero.ready) hero.next();
     }
 
     /** Retry a blocked action once at the same location, then stop idle looping. */
@@ -236,6 +287,8 @@ public final class BlastAutoPlay {
         attackerCell = -1;
         attackerTurns = 0;
         lastRetryCell = -1;
+        manualAction = false;
+        waitingForInput = false;
     }
 
     private static boolean[] safeCells(Hero hero) {
