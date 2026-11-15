@@ -27,7 +27,6 @@ public final class BlastAutoBombAI {
         if (maniac == null || maniac.remaining() == 0) return false;
 
         Bomb bomb = maniac.selectedBomb();
-        if (!itemPreserving(bomb)) return false;
 
         boolean regrowth = bomb instanceof RegrowthBomb;
         boolean remoteThrow = BlastSettings.testRemoteThrow();
@@ -48,10 +47,6 @@ public final class BlastAutoBombAI {
             return true;
         }
         return false;
-    }
-
-    static boolean itemPreserving(Bomb bomb) {
-        return !bomb.explodesDestructively();
     }
 
     static boolean blastReachesTarget(boolean[] blast, int targetCell) {
