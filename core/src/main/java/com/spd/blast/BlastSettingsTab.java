@@ -2,8 +2,6 @@ package com.spd.blast;
 
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
-import com.shatteredpixel.shatteredpixeldungeon.messages.Languages;
-import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.PixelScene;
 import com.shatteredpixel.shatteredpixeldungeon.ui.CheckBox;
 import com.shatteredpixel.shatteredpixeldungeon.ui.OptionSlider;
@@ -176,6 +174,9 @@ public final class BlastSettingsTab extends Component {
                 testInfiniteBomb, indestructible, freeMovement, remoteThrow,
                 demolition, autoPlay, enchantmentReverseAlchemy
         };
+        for (CheckBox option : testOptions) {
+            option.multiline = true;
+        }
 
         radiusLabel = PixelScene.renderTextBlock(BlastMessages.get("settings.radius"), 7);
         add(radiusLabel);
@@ -278,24 +279,24 @@ public final class BlastSettingsTab extends Component {
 
         float bottom = debugLog.bottom();
         if (BlastSettings.showTests()) {
-            boolean twoColumns = width >= 200
-                    || Messages.lang() == Languages.CHI_TRAD
-                    || Messages.lang() == Languages.CHI_SMPL;
-            if (twoColumns) {
-                float columnWidth = (width - GAP) / 2f;
-                for (int i = 0; i < testOptions.length; i++) {
-                    int row = i / 2;
-                    int column = i % 2;
-                    testOptions[i].setRect(column * (columnWidth + GAP),
-                            bottom + GAP + row * (BUTTON_HEIGHT + GAP),
-                            columnWidth, BUTTON_HEIGHT);
+            float columnWidth = (width - GAP) / 2f;
+            for (int i = 0; i < testOptions.length; i += 2) {
+                CheckBox left = testOptions[i];
+                CheckBox right = i + 1 < testOptions.length ? testOptions[i + 1] : null;
+                float top = bottom + GAP;
+
+                left.setRect(0, top, columnWidth, BUTTON_HEIGHT);
+                float rowHeight = Math.max(BUTTON_HEIGHT, left.reqHeight());
+                if (right != null) {
+                    right.setRect(columnWidth + GAP, top, columnWidth, BUTTON_HEIGHT);
+                    rowHeight = Math.max(rowHeight, right.reqHeight());
                 }
-                bottom += ((testOptions.length + 1) / 2) * (BUTTON_HEIGHT + GAP);
-            } else {
-                for (CheckBox option : testOptions) {
-                    option.setRect(0, bottom + GAP, width, BUTTON_HEIGHT);
-                    bottom = option.bottom();
+
+                left.setRect(0, top, columnWidth, rowHeight);
+                if (right != null) {
+                    right.setRect(columnWidth + GAP, top, columnWidth, rowHeight);
                 }
+                bottom = top + rowHeight;
             }
 
             if (radiusLabel.visible) {

@@ -39,10 +39,12 @@ class CompactSettingsTests(unittest.TestCase):
         source = TAB.read_text(encoding="utf-8")
         self.assertIn("testOptions = new CheckBox[]{", source)
         self.assertIn("demolition, autoPlay, enchantmentReverseAlchemy", source)
-        self.assertIn("Messages.lang() == Languages.CHI_TRAD", source)
-        self.assertIn("Messages.lang() == Languages.CHI_SMPL", source)
-        self.assertIn("int row = i / 2;", source)
-        self.assertIn("int column = i % 2;", source)
+        self.assertNotIn("Messages.lang()", source)
+        self.assertNotIn("Languages.CHI_TRAD", source)
+        self.assertIn("option.multiline = true;", source)
+        self.assertIn("i += 2", source)
+        self.assertIn("left.reqHeight()", source)
+        self.assertIn("right.reqHeight()", source)
         self.assertIn("if (BlastSettings.showTests())", source)
         self.assertIn("if (radiusLabel.visible)", source)
         self.assertIn("if (heightChanged != null) heightChanged.run()", source)
@@ -71,6 +73,12 @@ class CompactSettingsTests(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn("blast.settings.enchantment_reverse=附魔逆合成", traditional)
+        japanese = (ROOT / "messages/misc_ja.properties").read_text(encoding="utf-8")
+        korean = (ROOT / "messages/misc_ko.properties").read_text(encoding="utf-8")
+        self.assertIn("blast.settings.enchantment_reverse=付呪逆錬金", japanese)
+        self.assertIn("blast.settings.enchantment_reverse=부여석 역연금", korean)
+        self.assertNotIn("enchantment_reverse=Enchantment stone reversal", japanese)
+        self.assertNotIn("enchantment_reverse=Enchantment stone reversal", korean)
 
 
 if __name__ == "__main__":
