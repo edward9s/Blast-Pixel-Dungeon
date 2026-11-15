@@ -162,7 +162,7 @@ rows, only a marked enemy still within the aura is attacked, and pursuing
 mobs can be lured into the aura while unrelated distant enemies are ignored.
 The auto-player temporarily occupies a reachable sacrificial flame and waits
 for chasing enemies to step within its marking area. A stationary or ranged
-enemy cannot cause an unlimited wait: three stalled hero turns end the
+enemy cannot cause an unlimited wait: three stalled hero turns or twelve game ticks end the
 attempt and suspend new lures for eight game ticks. Safety checks continue
 to exclude every other active damaging or disruptive blob. The lure uses
 the same safe-cell and shortest-distance maps as regular auto-play and

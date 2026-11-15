@@ -40,6 +40,10 @@ public final class BlastAutoSacrificeTest {
         check(false, BlastAutoSacrifice.shouldLure(false, false),
                 "do not lure inactive distant enemy");
 
+        check(false, BlastAutoSacrifice.shouldAbandon(11f, 2), "short moving pursuit");
+        check(true, BlastAutoSacrifice.shouldAbandon(12f, 0), "absolute lure timeout");
+        check(true, BlastAutoSacrifice.shouldAbandon(0f, 3), "stationary pursuit timeout");
+
         try {
             BlastAutoSacrifice.nearFlame(new int[10], width - 1, 2);
             throw new AssertionError("Invalid fire dimensions must fail");
