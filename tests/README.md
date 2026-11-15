@@ -51,6 +51,8 @@ python scripts/test_update_patches.py
 
 `BlastAutoBombAITest.java` checks that Regrowth, Arcane and Shrapnel
 bombs share the non-destructive automatic attack path, while a normal bomb does not.
+For remote throws, the real bomb landing position determines whether the blast
+can hit an enemy; a direct hit with the thrown bomb is not required.
 During auto-play, only the hero is exempt from BombRegrowth rooting; all other
 grounded characters keep the existing effect. Compile and run against patched SPD:
 
@@ -65,7 +67,7 @@ java -cp "/tmp/blast-tests:$BLAST_TEST_CLASSPATH" com.spd.blast.BlastAutoBombAIT
 pickups (`BlastRadiusPickup` and `BlastHastePickup`). The two special
 pickups remain non-stackable and are handled by `BlastAutoPickupPolicy`;
 the portable picker receives this policy as a parameter and contains no
-Blast-specific type checks. Gold and instant pickups bypass backpack capacity;
+Blast-specific type checks. Gold, journal keys, and instant pickups bypass backpack capacity;
 ordinary inventory and dew restrictions remain unchanged.
 
 ```sh
@@ -108,8 +110,41 @@ python scripts/test_wnd_bag_refresh_patch.py
 ```
 
 
+`BlastAutoCombatTest.java` checks that sleeping mobs are not combat targets,
+while wandering and hunting mobs can be targeted. It also tests bounded
+last-seen-position pursuit: the AI tries a reachable location for at most
+eight unseen turns, then temporarily ignores an unmoving target to avoid
+oscillating between enemies and floor loot. The ignore ends if the enemy
+moves, threatens the hero in melee, or damages the hero. In normal combat,
+an actively attacking adjacent melee opponent takes first priority, then
+thieves (including bandits) and ranged enemies, then ordinary melee mobs.
+Safe path length breaks ties within each tier. Ranged enemies must be
+approached to adjacent melee range for non-bomb attacks, even with a
+long-reach weapon or charged wand. When bomb immunity is active, the
+existing bomb AI can strike remotely if the actual blast footprint reaches
+a target, subject to existing safety restrictions. The controller reuses
+the existing distance map.
+
+```sh
+javac --release 11 -encoding UTF-8 -cp "$BLAST_TEST_CLASSPATH" \
+  -d /tmp/blast-tests tests/BlastAutoCombatTest.java
+java -cp "/tmp/blast-tests:$BLAST_TEST_CLASSPATH" com.spd.blast.BlastAutoCombatTest
+```
+
+`test_auto_play_target_priority.py` verifies that the combat priority
+selection is reached before old-target pursuit or floor pickup, ranged
+opponents require adjacency for ordinary attacks, and bomb selection uses
+the actual landing blast footprint while preserving rare-mob safety checks.
+
+```sh
+python -m unittest discover -s tests -p test_auto_play_target_priority.py
+```
+
 `BlastAutoFarmingTest.java` checks the isolated idle farming policy:
-the first Regrowth bomb is allowed, further bombs wait until a crop was
+visible reachable high grass and beneficial plants are deliberately harvested
+whenever auto-play and auto-farming are enabled, even if no Regrowth bomb or
+remote-bomb buff is available (or bombs are in timed mode).
+The first Regrowth bomb is allowed, further bombs wait until a crop was
 harvested and the last BombRegrowth cloud dissipated, visible high grass
 and harmless plants qualify for harvest, and harmful plants remain
 excluded. Farming requires at least 10 accessible growable tiles inside the
@@ -121,14 +156,24 @@ and at most 8 exact blast checks per site search. Searches are at least 8
 game ticks apart and a selected destination is cached while travelling. The implementation temporarily selects a RegrowthBomb type,
 detonates it, restores the original selected type via `finally`, and
 reuses the standard auto-pickup priority before crop collection.
-Farming runs only when auto-play and the independent farming checkbox
-are both enabled, no enemy is visible, the hero is grounded and
-remote bomb mode is available.
+Farming harvests require auto-play, the independent farming checkbox,
+no visible awake enemy, and a grounded hero. Planting new grass additionally
+requires remote bomb mode and an available Regrowth bomb. Both reuse the
+same safe navigation map; harmful plants and hazardous terrain stay excluded.
 
 ```sh
 javac --release 11 -encoding UTF-8 -cp "$BLAST_TEST_CLASSPATH" \
   -d /tmp/blast-tests tests/BlastAutoFarmingTest.java
 java -cp "/tmp/blast-tests:$BLAST_TEST_CLASSPATH" com.spd.blast.BlastAutoFarmingTest
+```
+
+`test_auto_farming_harvest.py` guards the independent harvest path:
+harvesting safely reachable tall grass and beneficial plants must run before
+any bomb-mode, bomb-inventory, or Regrowth-type checks, while preserving
+grounded-hero and awake-enemy safety gates.
+
+```sh
+python -m unittest discover -s tests -p test_auto_farming_harvest.py
 ```
 
 

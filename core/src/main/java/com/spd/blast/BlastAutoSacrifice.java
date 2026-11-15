@@ -21,6 +21,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Necromancer;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Scorpio;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Shaman;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Tengu;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Thief;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Warlock;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.YogDzewa;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.YogFist;
@@ -78,17 +79,31 @@ public final class BlastAutoSacrifice {
             throw new IllegalStateException("Invalid sacrificial fire navigation state");
         }
 
-        // Never wait for ranged enemies to approach the altar.
-        // Let regular combat handle every visible threat until they are defeated.
+        // Visible ranged enemies bypass the altar. A thief also does, unless
+        // an adjacent melee pursuer poses an immediate threat.
+        boolean visibleThief = false;
+        boolean immediateMeleeThreat = false;
         for (Mob mob : level.mobs) {
-            if (mob.isAlive() && mob.alignment == Char.Alignment.ENEMY
-                    && mob.invisible <= 0 && hero.fieldOfView[mob.pos]
-                    && !hero.isCharmedBy(mob) && isRangedEnemy(mob.getClass())) {
+            if (!mob.isAlive() || mob.alignment != Char.Alignment.ENEMY
+                    || mob.invisible > 0 || !hero.fieldOfView[mob.pos]
+                    || hero.isCharmedBy(mob) || !BlastAutoPlay.isAwake(mob)) continue;
+            if (isRangedEnemy(mob.getClass())) {
                 trackedEnemy = null;
                 waitingSince = Float.NaN;
                 stalledTurns = 0;
                 return Action.NONE;
             }
+            if (mob instanceof Thief) visibleThief = true;
+            if (level.adjacent(hero.pos, mob.pos)
+                    && mob.state == mob.HUNTING && mob.isTargeting(hero)) {
+                immediateMeleeThreat = true;
+            }
+        }
+        if (visibleThief && !immediateMeleeThreat) {
+            trackedEnemy = null;
+            waitingSince = Float.NaN;
+            stalledTurns = 0;
+            return Action.NONE;
         }
 
         // A marked enemy within one tile of active flame is an eligible sacrifice.
@@ -174,7 +189,8 @@ public final class BlastAutoSacrifice {
     private static boolean eligible(Hero hero, Mob mob) {
         return mob.isAlive() && mob.alignment == Char.Alignment.ENEMY
                 && mob.invisible <= 0 && hero.fieldOfView[mob.pos]
-                && !hero.isCharmedBy(mob) && !mob.isInvulnerable(Hero.class);
+                && !hero.isCharmedBy(mob) && !mob.isInvulnerable(Hero.class)
+                && BlastAutoPlay.isAwake(mob);
     }
 
     /** Native SPD enemy types with ranged spells, projectiles, or area attacks. */

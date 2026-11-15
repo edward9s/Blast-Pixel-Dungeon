@@ -9,6 +9,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroAction;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Necromancer;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Thief;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Wraith;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.Sheep;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
@@ -29,6 +30,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 public final class BlastAutoPlay {
 
     private static final int ATTACKER_MEMORY_TURNS = 8;
+    private static final int LOST_TARGET_TURNS = 8;
 
     private static Hero currentHero;
     private static Level currentLevel;
@@ -36,6 +38,14 @@ public final class BlastAutoPlay {
     private static Char lastAttacker;
     private static int attackerCell = -1;
     private static int attackerTurns;
+    private static Mob combatTarget;
+    private static int combatTargetCell = -1;
+    private static int lostTargetTurns;
+    private static Mob suspendedTarget;
+    private static int suspendedTargetCell = -1;
+    private static int suspendedTargetTurns;
+    private static Mob ignoredTarget;
+    private static int ignoredTargetCell = -1;
     private static int lastRetryCell = -1;
     private static volatile boolean manualAction;
     private static volatile boolean waitingForInput;
@@ -62,6 +72,9 @@ public final class BlastAutoPlay {
         lastAttacker = null;
         attackerCell = -1;
         attackerTurns = 0;
+        resetPursuitMemory();
+        ignoredTarget = null;
+        ignoredTargetCell = -1;
         lastRetryCell = -1;
         manualAction = false;
         waitingForInput = false;
@@ -85,6 +98,10 @@ public final class BlastAutoPlay {
         Char attacker = (Char) source;
         if (attacker == hero || attacker.alignment == Char.Alignment.ALLY) return;
         resetForLevel(hero);
+        if (ignoredTarget == attacker) {
+            ignoredTarget = null;
+            ignoredTargetCell = -1;
+        }
         lastAttacker = attacker;
         attackerCell = attacker.pos;
         attackerTurns = ATTACKER_MEMORY_TURNS;
@@ -95,6 +112,7 @@ public final class BlastAutoPlay {
         if (!BlastSettings.testAutoPlay()) return;
         resetForLevel(hero);
         manualAction = true;
+        resetPursuitMemory();
         roamCell = -1;
         lastRetryCell = -1;
     }
@@ -117,6 +135,7 @@ public final class BlastAutoPlay {
         hero.curAction = null;
         hero.lastAction = null;
         hero.resting = false;
+        resetPursuitMemory();
         roamCell = -1;
     }
 
@@ -213,6 +232,12 @@ public final class BlastAutoPlay {
         PathFinder.buildDistanceMap(hero.pos, safe);
         int[] distances = PathFinder.distance.clone();
         if (lastRetryCell != hero.pos) lastRetryCell = -1;
+        // A suspended pursuit expires while the hero handles another threat.
+        if (suspendedTarget != null && ++suspendedTargetTurns > LOST_TARGET_TURNS) {
+            suspendedTarget = null;
+            suspendedTargetCell = -1;
+            suspendedTargetTurns = 0;
+        }
 
         // Extinguish burning in reachable water, but never detour more than four steps.
         // Also leave an active environmental hazard before fighting or collecting loot.
@@ -245,24 +270,22 @@ public final class BlastAutoPlay {
         if (BlastAutoBombAI.act(hero)) return true;
 
         Mob invulnerable = null;
-        Mob necromancer = null;
-        int necromancerDistance = Integer.MAX_VALUE;
-        int necromancerGoal = -1;
-        Mob attackable = null;
-        int attackDistance = Integer.MAX_VALUE;
-        int approachCell = -1;
-        int approachLength = Integer.MAX_VALUE;
+        Mob hiddenNecromancer = null;
+        int hiddenNecromancerGoal = -1;
+        int hiddenNecromancerSteps = Integer.MAX_VALUE;
+        Mob selected = null;
+        int selectedGoal = -1;
+        boolean selectedCanMelee = false;
+        int selectedPriority = Integer.MAX_VALUE;
+        int selectedSteps = Integer.MAX_VALUE;
+        int selectedDistance = Integer.MAX_VALUE;
 
         for (Mob mob : Dungeon.level.mobs) {
             if (!mob.isAlive() || mob.alignment == Char.Alignment.ALLY
-                    || mob.invisible > 0) {
-                continue;
-            }
+                    || mob.invisible > 0 || !isAwake(mob) || ignored(mob)
+                    || hero.isCharmedBy(mob)) continue;
 
             boolean visible = hero.fieldOfView[mob.pos];
-            // Inspect unseen necromancers, but leave every other enemy sight-limited.
-            if (!visible && !(mob instanceof Necromancer)) continue;
-
             if (mob.isInvulnerable(Hero.class)) {
                 if (visible && (invulnerable == null
                         || Dungeon.level.distance(hero.pos, mob.pos)
@@ -272,105 +295,101 @@ public final class BlastAutoPlay {
                 continue;
             }
 
-            if (hero.isCharmedBy(mob)) continue;
-
-            int distance = Dungeon.level.distance(hero.pos, mob.pos);
-            if (mob instanceof Necromancer && distance < necromancerDistance) {
-                // Reuse this turn's distance map; occupied skeletons remain blocked.
-                int goal = nearCell(hero.pos, mob.pos, safe, distances);
-                if (goal >= 0 || (visible && hero.canAttack(mob))) {
-                    necromancer = mob;
-                    necromancerDistance = distance;
-                    necromancerGoal = goal;
-                }
-            }
-
-            // Unseen necromancers are navigation targets only, never attack targets.
-            if (!visible) continue;
-            if (hero.canAttack(mob)) {
-                if (attackable == null || distance < attackDistance) {
-                    attackable = mob;
-                    attackDistance = distance;
+            // Preserve the pre-existing hidden-necromancer fallback without
+            // letting an unseen target override any visible threat.
+            if (!visible) {
+                if (mob instanceof Necromancer && !hero.rooted) {
+                    int goal = nearCell(hero.pos, mob.pos, safe, distances);
+                    if (goal >= 0 && distances[goal] < hiddenNecromancerSteps) {
+                        hiddenNecromancer = mob;
+                        hiddenNecromancerGoal = goal;
+                        hiddenNecromancerSteps = distances[goal];
+                    }
                 }
                 continue;
             }
 
-            int cell = nearCell(hero.pos, mob.pos, safe, distances);
-            if (cell >= 0 && distances[cell] < approachLength) {
-                approachLength = distances[cell];
-                approachCell = cell;
+            boolean ranged = BlastAutoSacrifice.isRangedEnemy(mob.getClass());
+            boolean adjacent = Dungeon.level.adjacent(hero.pos, mob.pos);
+            // Ranged enemies must be approached into melee range, even if
+            // the hero can attack from farther away with an extended weapon.
+            boolean canMelee = canMeleeTarget(ranged, adjacent, hero.canAttack(mob));
+            int goal = canMelee ? -1 : nearCell(hero.pos, mob.pos, safe, distances);
+            if (!canMelee && (goal < 0 || hero.rooted)) continue;
+
+            int priority = combatPriority(mob,
+                    !ranged && adjacent && mob.state == mob.HUNTING
+                            && mob.isTargeting(hero));
+            int steps = canMelee ? 0 : distances[goal];
+            int distance = Dungeon.level.distance(hero.pos, mob.pos);
+            if (betterTarget(priority, steps, distance,
+                    selectedPriority, selectedSteps, selectedDistance)) {
+                selected = mob;
+                selectedGoal = goal;
+                selectedCanMelee = canMelee;
+                selectedPriority = priority;
+                selectedSteps = steps;
+                selectedDistance = distance;
             }
         }
 
-        // Rooted heroes may attack but cannot follow movement or pickup orders.
-        // Advance one actual actor turn if no usable attack is available.
+        // Rooted heroes cannot chase a target, but may attack adjacent enemies
+        // or use the existing high-evasion wand fallback on non-ranged mobs.
         if (hero.rooted) {
-            if (necromancer != null && hero.fieldOfView[necromancer.pos]) {
-                if (useWand(hero, necromancer)) return true;
-                if (hero.canAttack(necromancer)) {
-                    hero.curAction = new HeroAction.Attack(necromancer);
+            if (selected != null) {
+                rememberCombatTarget(selected);
+                if (useWand(hero, selected)) return true;
+                if (selectedCanMelee) {
+                    hero.curAction = new HeroAction.Attack(selected);
                     return false;
                 }
             }
             for (Mob mob : Dungeon.level.mobs) {
                 if (mob.isAlive() && mob.alignment != Char.Alignment.ALLY
                         && mob.invisible == 0 && hero.fieldOfView[mob.pos]
+                        && isAwake(mob) && !ignored(mob)
                         && !mob.isInvulnerable(Hero.class) && !hero.isCharmedBy(mob)
                         && useWand(hero, mob)) {
+                    rememberCombatTarget(mob);
                     return true;
                 }
-            }
-            if (attackable != null) {
-                hero.curAction = new HeroAction.Attack(attackable);
-                return false;
             }
             hero.spendAndNext(Actor.TICK);
             return true;
         }
 
-        if (invulnerable == null && attackerTurns > 0 && lastAttacker != null
-                && lastAttacker.isAlive() && lastAttacker.isInvulnerable(Hero.class)) {
+        if (attackerTurns > 0 && lastAttacker != null
+                && lastAttacker.isAlive() && lastAttacker.isInvulnerable(Hero.class)
+                && (!(lastAttacker instanceof Mob) || isAwake((Mob) lastAttacker))) {
             int step = retreatStep(hero, lastAttacker.pos, safe, distances);
             if (step >= 0) hero.curAction = new HeroAction.Move(step);
             return false;
         }
 
-        if (invulnerable != null) {
+        // Avoid an adjacent invulnerable foe; a distant one cannot pre-empt combat.
+        if (invulnerable != null && Dungeon.level.adjacent(hero.pos, invulnerable.pos)) {
             int step = retreatStep(hero, invulnerable.pos, safe, distances);
             if (step >= 0) hero.curAction = new HeroAction.Move(step);
             return false;
         }
 
-        // Killing the summoner also removes their living summoned minions.
-        // SpectralNecromancer is a subclass of Necromancer.
-        if (necromancer != null) {
-            boolean visible = hero.fieldOfView[necromancer.pos];
-            if (visible && useWand(hero, necromancer)) return true;
-            if (visible && hero.canAttack(necromancer)) {
-                hero.curAction = new HeroAction.Attack(necromancer);
-            } else if (necromancerGoal >= 0) {
-                hero.curAction = new HeroAction.Move(firstStep(necromancerGoal, safe, distances));
+        if (selected != null) {
+            rememberCombatTarget(selected);
+            if (useWand(hero, selected)) return true;
+            if (selectedCanMelee) {
+                hero.curAction = new HeroAction.Attack(selected);
+            } else {
+                hero.curAction = new HeroAction.Move(firstStep(selectedGoal, safe, distances));
             }
             return false;
         }
 
-        // A charged damage wand bypasses the high evasion of wraiths.
-        for (Mob mob : Dungeon.level.mobs) {
-            if (mob.isAlive() && mob.alignment != Char.Alignment.ALLY
-                    && mob.invisible == 0 && hero.fieldOfView[mob.pos]
-                    && !mob.isInvulnerable(Hero.class) && !hero.isCharmedBy(mob)
-                    && useWand(hero, mob)) {
-                return true;
-            }
-        }
+        // Keep pursuing the last observed position before switching to floor loot.
+        if (pursueLastSeenTarget(hero, safe, distances)) return false;
 
-        if (attackable != null) {
-            hero.curAction = new HeroAction.Attack(attackable);
-            return false;
-        }
-
-        if (approachCell >= 0) {
-            hero.curAction = new HeroAction.Move(firstStep(approachCell, safe, distances));
+        if (hiddenNecromancer != null) {
+            hero.curAction = new HeroAction.Move(
+                    firstStep(hiddenNecromancerGoal, safe, distances));
             return false;
         }
 
@@ -381,7 +400,8 @@ public final class BlastAutoPlay {
         if (attackerTurns > 0) {
             attackerTurns--;
             if (lastAttacker != null && lastAttacker.isAlive()
-                    && lastAttacker.alignment != Char.Alignment.ALLY) {
+                    && lastAttacker.alignment != Char.Alignment.ALLY
+                    && (!(lastAttacker instanceof Mob) || isAwake((Mob) lastAttacker))) {
                 int goal = nearCell(hero.pos, attackerCell, safe, distances);
                 if (goal >= 0) {
                     hero.curAction = new HeroAction.Move(firstStep(goal, safe, distances));
@@ -402,6 +422,8 @@ public final class BlastAutoPlay {
     }
 
     private static boolean useWand(Hero hero, Mob target) {
+        // Ranged opponents are always approached for melee, except for bomb attacks.
+        if (BlastAutoSacrifice.isRangedEnemy(target.getClass())) return false;
         // Wraiths have unusually high evasion (5x their attack skill).
         // Include other enemies whose evasion is at least twice our accuracy.
         if (!(target instanceof Wraith)
@@ -439,6 +461,9 @@ public final class BlastAutoPlay {
         lastAttacker = null;
         attackerCell = -1;
         attackerTurns = 0;
+        resetPursuitMemory();
+        ignoredTarget = null;
+        ignoredTargetCell = -1;
         lastRetryCell = -1;
         manualAction = false;
         waitingForInput = false;
@@ -446,6 +471,118 @@ public final class BlastAutoPlay {
         BlastAutoPickup.reset();
         BlastAutoFarming.reset();
         BlastAutoSacrifice.reset();
+    }
+
+    /** A ranged enemy must be adjacent before an ordinary melee attack is issued. */
+    static boolean canMeleeTarget(boolean rangedEnemy, boolean adjacent, boolean canAttack) {
+        return canAttack && (!rangedEnemy || adjacent);
+    }
+
+    /** Priority tiers are independent of distance; route length breaks ties. */
+    static int combatPriority(Mob mob, boolean immediateMeleeThreat) {
+        if (immediateMeleeThreat) return 0;
+        return mob instanceof Thief || BlastAutoSacrifice.isRangedEnemy(mob.getClass())
+                ? 1 : 2;
+    }
+
+    static boolean betterTarget(int priority, int steps, int distance,
+                                int otherPriority, int otherSteps, int otherDistance) {
+        return priority < otherPriority
+                || (priority == otherPriority && (steps < otherSteps
+                || (steps == otherSteps && distance < otherDistance)));
+    }
+
+    /** Sleeping enemies are deliberately left alone by automatic combat. */
+    static boolean isAwake(Mob mob) {
+        return mob.state != mob.SLEEPING;
+    }
+
+    private static boolean ignored(Mob mob) {
+        if (mob != ignoredTarget) return false;
+        // A stationary target becomes urgent again when it actively threatens
+        // the hero at melee range, even if an earlier chase was abandoned.
+        if (mob.pos == ignoredTargetCell) {
+            Hero hero = Dungeon.hero;
+            if (hero == null || mob.state != mob.HUNTING || !mob.isTargeting(hero)
+                    || !Dungeon.level.adjacent(hero.pos, mob.pos)) return true;
+        }
+        ignoredTarget = null;
+        ignoredTargetCell = -1;
+        return false;
+    }
+
+    private static void rememberCombatTarget(Mob mob) {
+        // Keep one hidden target in reserve when combat is interrupted.
+        if (combatTarget != null && combatTarget != mob && suspendedTarget == null
+                && combatTarget.isAlive() && Dungeon.hero != null
+                && !Dungeon.hero.fieldOfView[combatTarget.pos]) {
+            suspendedTarget = combatTarget;
+            suspendedTargetCell = combatTargetCell;
+            suspendedTargetTurns = lostTargetTurns;
+        }
+        combatTarget = mob;
+        combatTargetCell = mob.pos;
+        lostTargetTurns = 0;
+    }
+
+    private static void forgetCombatTarget() {
+        combatTarget = null;
+        combatTargetCell = -1;
+        lostTargetTurns = 0;
+    }
+
+    private static void resetPursuitMemory() {
+        forgetCombatTarget();
+        suspendedTarget = null;
+        suspendedTargetCell = -1;
+        suspendedTargetTurns = 0;
+    }
+
+    private static void abandonCombatTarget() {
+        ignoredTarget = combatTarget;
+        ignoredTargetCell = combatTargetCell;
+        forgetCombatTarget();
+    }
+
+    /** Short, bounded pursuit of the last *visible* position, with no hidden-position lookup. */
+    private static boolean pursueLastSeenTarget(Hero hero, boolean[] safe, int[] distances) {
+        if (combatTarget == null && suspendedTarget != null) {
+            combatTarget = suspendedTarget;
+            combatTargetCell = suspendedTargetCell;
+            lostTargetTurns = suspendedTargetTurns;
+            suspendedTarget = null;
+            suspendedTargetCell = -1;
+            suspendedTargetTurns = 0;
+        }
+        if (combatTarget == null) return false;
+        if (!combatTarget.isAlive() || combatTarget.alignment == Char.Alignment.ALLY
+                || combatTarget.invisible > 0 || !isAwake(combatTarget)
+                || hero.isCharmedBy(combatTarget)
+                || combatTarget.isInvulnerable(Hero.class)) {
+            forgetCombatTarget();
+            return false;
+        }
+        if (hero.fieldOfView[combatTarget.pos]) {
+            // A visible but unapproachable enemy is handled by normal targeting.
+            forgetCombatTarget();
+            return false;
+        }
+
+        int goal = nearCell(hero.pos, combatTargetCell, safe, distances);
+        lostTargetTurns++;
+        if (!canPursue(lostTargetTurns,
+                Dungeon.level.distance(hero.pos, combatTargetCell), goal >= 0)) {
+            // Avoid a repeated enemy/loot oscillation until this enemy moves or hits us.
+            abandonCombatTarget();
+            return false;
+        }
+
+        hero.curAction = new HeroAction.Move(firstStep(goal, safe, distances));
+        return true;
+    }
+
+    static boolean canPursue(int unseenTurns, int distance, boolean reachable) {
+        return reachable && distance > 1 && unseenTurns <= LOST_TARGET_TURNS;
     }
 
     private static boolean[] safeCells(Hero hero, Blob[] hazards) {
