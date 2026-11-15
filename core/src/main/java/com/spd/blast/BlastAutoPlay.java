@@ -68,6 +68,7 @@ public final class BlastAutoPlay {
         pendingBombInputs.clear();
         BlastAutoPickup.reset();
         BlastAutoFarming.reset();
+        BlastAutoSacrifice.reset();
 
         Hero hero = Dungeon.hero;
         if (hero == null || Dungeon.level == null) return;
@@ -234,6 +235,11 @@ public final class BlastAutoPlay {
                 }
             }
         }
+
+        // Lure pursuing enemies into Sacrificial Fire before using direct attacks.
+        BlastAutoSacrifice.Action sacrifice = BlastAutoSacrifice.chooseAction(hero, safe, distances);
+        if (sacrifice == BlastAutoSacrifice.Action.WAIT) return true;
+        if (sacrifice == BlastAutoSacrifice.Action.MOVE) return false;
 
         // Blast-specific tactics are isolated from the portable AI policy.
         if (BlastAutoBombAI.act(hero)) return true;
@@ -439,6 +445,7 @@ public final class BlastAutoPlay {
         pendingBombInputs.clear();
         BlastAutoPickup.reset();
         BlastAutoFarming.reset();
+        BlastAutoSacrifice.reset();
     }
 
     private static boolean[] safeCells(Hero hero, Blob[] hazards) {

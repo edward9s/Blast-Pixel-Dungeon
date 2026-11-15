@@ -10,7 +10,6 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.Freezing;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.GooWarn;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.Inferno;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.ParalyticGas;
-import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.SacrificialFire;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.SmokeScreen;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.StenchGas;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.StormCloud;
@@ -31,7 +30,7 @@ public final class BlastAutoEnvironment {
             ToxicGas.class, CorrosiveGas.class, ParalyticGas.class,
             StenchGas.class, ConfusionGas.class, Electricity.class,
             StormCloud.class, Freezing.class, Blizzard.class,
-            SmokeScreen.class, Web.class, GooWarn.class, SacrificialFire.class);
+            SmokeScreen.class, Web.class, GooWarn.class);
 
     private BlastAutoEnvironment() {}
 
