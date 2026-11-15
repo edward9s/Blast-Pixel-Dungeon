@@ -84,7 +84,9 @@ public final class BlastAutoSacrifice {
         boolean visibleThief = false;
         boolean immediateMeleeThreat = false;
         for (Mob mob : level.mobs) {
-            if (!eligible(hero, mob)) continue;
+            if (!mob.isAlive() || mob.alignment != Char.Alignment.ENEMY
+                    || mob.invisible > 0 || !hero.fieldOfView[mob.pos]
+                    || hero.isCharmedBy(mob) || !BlastAutoPlay.isAwake(mob)) continue;
             if (isRangedEnemy(mob.getClass())) {
                 trackedEnemy = null;
                 waitingSince = Float.NaN;
