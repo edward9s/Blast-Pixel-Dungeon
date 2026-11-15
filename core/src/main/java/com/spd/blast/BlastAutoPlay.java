@@ -65,7 +65,6 @@ public final class BlastAutoPlay {
         manualAction = false;
         waitingForInput = false;
         pendingBombInputs.clear();
-        BlastAutoBombAI.reset();
         BlastAutoPickup.reset();
 
         Hero hero = Dungeon.hero;
@@ -93,7 +92,6 @@ public final class BlastAutoPlay {
         if (!BlastSettings.testAutoPlay()) return;
         resetForLevel(hero);
         manualAction = true;
-        BlastAutoBombAI.cancelRegrowth();
         roamCell = -1;
         lastRetryCell = -1;
     }
@@ -113,7 +111,6 @@ public final class BlastAutoPlay {
         if (!BlastSettings.testAutoPlay()) return;
         resetForLevel(hero);
         manualAction = false;
-        BlastAutoBombAI.cancelRegrowth();
         hero.curAction = null;
         hero.lastAction = null;
         hero.resting = false;
@@ -170,7 +167,6 @@ public final class BlastAutoPlay {
         resetForLevel(hero);
         BombInput input = pendingBombInputs.poll();
         if (input == null) return false;
-        BlastAutoBombAI.cancelRegrowth();
         manualAction = false;
         hero.curAction = null;
         hero.lastAction = null;
@@ -215,8 +211,7 @@ public final class BlastAutoPlay {
         if (lastRetryCell != hero.pos) lastRetryCell = -1;
 
         // Blast-specific tactics are isolated from the portable AI policy.
-        if (BlastAutoBombAI.act(hero, safe, distances)) return true;
-        if (hero.curAction != null) return false;
+        if (BlastAutoBombAI.act(hero)) return true;
 
         Mob invulnerable = null;
         Mob necromancer = null;
@@ -274,6 +269,32 @@ public final class BlastAutoPlay {
                 approachLength = distances[cell];
                 approachCell = cell;
             }
+        }
+
+        // Rooted heroes may attack but cannot follow movement or pickup orders.
+        // Advance one actual actor turn if no usable attack is available.
+        if (hero.rooted) {
+            if (necromancer != null && hero.fieldOfView[necromancer.pos]) {
+                if (useWand(hero, necromancer)) return true;
+                if (hero.canAttack(necromancer)) {
+                    hero.curAction = new HeroAction.Attack(necromancer);
+                    return false;
+                }
+            }
+            for (Mob mob : Dungeon.level.mobs) {
+                if (mob.isAlive() && mob.alignment != Char.Alignment.ALLY
+                        && mob.invisible == 0 && hero.fieldOfView[mob.pos]
+                        && !mob.isInvulnerable(Hero.class) && !hero.isCharmedBy(mob)
+                        && useWand(hero, mob)) {
+                    return true;
+                }
+            }
+            if (attackable != null) {
+                hero.curAction = new HeroAction.Attack(attackable);
+                return false;
+            }
+            hero.spendAndNext(Actor.TICK);
+            return true;
         }
 
         if (invulnerable == null && attackerTurns > 0 && lastAttacker != null
@@ -384,7 +405,6 @@ public final class BlastAutoPlay {
         manualAction = false;
         waitingForInput = false;
         pendingBombInputs.clear();
-        BlastAutoBombAI.reset();
         BlastAutoPickup.reset();
     }
 

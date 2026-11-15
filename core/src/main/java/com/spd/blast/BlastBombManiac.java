@@ -319,27 +319,6 @@ public final class BlastBombManiac extends Buff {
         fuse.detonateIfPresent(Dungeon.level);
     }
 
-    /** Place a remote bomb for a multi-turn Blast-only tactic. */
-    public Bomb blastAutoPlace() {
-        if (!BlastSettings.testAutoPlay() || BlastRemoteBomb.isTimedMode()) {
-            throw new IllegalStateException("Automatic placement requires remote mode");
-        }
-        return placeBomb(true);
-    }
-
-    /** Detonate an earlier automated placement only if its original fuse survives. */
-    public boolean blastAutoDetonate(Bomb bomb, int cell) {
-        if (!BlastSettings.testAutoPlay() || bomb == null || Dungeon.level == null
-                || !Dungeon.level.insideMap(cell)) {
-            throw new IllegalStateException("Invalid automatic bomb detonation");
-        }
-        Heap heap = Dungeon.level.heaps.get(cell);
-        if (heap == null || !heap.items.contains(bomb)
-                || !(bomb.fuse instanceof BlastRemoteBomb.RemoteFuse)) return false;
-        detonateAutoBomb(bomb, cell);
-        return true;
-    }
-
     /** Place and immediately detonate one bomb during the AI's actor turn. */
     public boolean blastAutoPlaceAndDetonate() {
         if (!BlastSettings.testAutoPlay() || BlastSettings.testRemoteThrow()
