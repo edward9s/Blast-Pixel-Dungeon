@@ -264,3 +264,16 @@ Once no useful exploration frontier remains, auto-play keeps roaming to
 random reachable known cells, preferring paths at least three steps long.
 Auto-farming movement clears its previous roaming goal so a completed harvest
 does not immediately send the hero back to an obsolete destination.
+
+`patch_bomb_safety.py` keeps direct flashbang paralysis, immediate frost, bonus holy
+bomb damage, and bomb-generated fire/freezing source-specific. Both the temporary
+and testing Bombproof buffs protect only the hero. Ordinary environmental fire,
+freezing, and enemy attacks retain their original effects; unprotected heroes
+and all other characters retain their normal bomb reactions. The two separate
+hazard blobs still burn/freeze items and affect terrain, and regular fire and
+freezing extinguish both bomb-sourced and non-bomb-sourced opposing blobs.
+
+```sh
+python scripts/test_bomb_safety_patch.py
+python scripts/test_regrowth_bomb_patch.py
+```
