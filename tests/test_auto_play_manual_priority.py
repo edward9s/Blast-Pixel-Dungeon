@@ -83,13 +83,14 @@ class ManualPriorityTests(unittest.TestCase):
         source = AUTO.read_text(encoding="utf-8")
         request = method(source, "public static void requestManualCell(int cell) {")
         execute = method(source, "public static void performManualCell(Hero hero) {")
-        self.assertIn("pendingManualCell.set(cell)", request)
+        self.assertIn("pendingManualCell.set(new ManualCell(hero, level, cell))", request)
         self.assertIn("if (hero.ready) hero.next();", request)
-        self.assertIn("pendingManualCell.getAndSet(-1)", execute)
+        self.assertIn("pendingManualCell.getAndSet(null)", execute)
+        self.assertIn("input.hero != hero || input.level != Dungeon.level", execute)
         self.assertLess(execute.index("hero.lastAction = null"),
-                        execute.index("hero.handle(cell)"))
-        self.assertIn("new AtomicInteger(-1)", source)
-        self.assertGreaterEqual(source.count("pendingManualCell.set(-1)"), 3)
+                        execute.index("hero.handle(input.destination)"))
+        self.assertIn("new AtomicReference<>()", source)
+        self.assertGreaterEqual(source.count("pendingManualCell.set(null)"), 3)
 
     def test_prompt_blocks_manual_action_completion(self):
         code = injection(HERO, "Hero.getCloser chasm confirmation")
