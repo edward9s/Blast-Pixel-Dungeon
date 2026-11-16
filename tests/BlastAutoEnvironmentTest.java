@@ -3,6 +3,8 @@ package com.spd.blast;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.Blob;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.Fire;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.ToxicGas;
+import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
+import com.watabou.utils.Rect;
 
 /** Environment avoidance and bounded safe-water navigation. */
 public final class BlastAutoEnvironmentTest {
@@ -32,6 +34,21 @@ public final class BlastAutoEnvironmentTest {
         check(true, BlastAutoEnvironment.hazardousAt(2, hazards), "poison cloud");
         check(false, BlastAutoEnvironment.hazardousAt(3, hazards), "empty tile");
         check(false, BlastAutoEnvironment.hazardousAt(1, new Blob[2]), "no active blobs");
+
+        int[] terrain = new int[49];
+        terrain[2 + 2 * 7] = Terrain.EMPTY_SP;
+        terrain[3 + 3 * 7] = Terrain.EMPTY_SP;
+        terrain[4 + 2 * 7] = Terrain.EMPTY;
+        terrain[0] = Terrain.EMPTY_SP;
+        terrain[1 + 3 * 7] = Terrain.EMPTY_SP;
+        boolean[] sentryFloors = new boolean[terrain.length];
+        BlastAutoEnvironment.markSentryFloors(
+                terrain, 7, new Rect(1, 1, 5, 5), sentryFloors);
+        check(true, sentryFloors[2 + 2 * 7], "sentry floor blocked");
+        check(true, sentryFloors[3 + 3 * 7], "second sentry floor blocked");
+        check(false, sentryFloors[4 + 2 * 7], "ordinary room floor is safe");
+        check(false, sentryFloors[0], "special floor outside sentry room is safe");
+        check(false, sentryFloors[1 + 3 * 7], "room perimeter stays safe");
 
         boolean[] safe = {true, true, true, true, true, true, true, true};
         boolean[] water = {false, false, false, false, true, true, false, false};

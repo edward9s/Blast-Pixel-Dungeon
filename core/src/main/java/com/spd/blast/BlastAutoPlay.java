@@ -253,7 +253,8 @@ public final class BlastAutoPlay {
         hero.resting = false;
 
         Blob[] hazards = BlastAutoEnvironment.activeHazards(Dungeon.level);
-        boolean[] safe = safeCells(hero, hazards);
+        boolean[] sentryFloors = BlastAutoEnvironment.activeSentryFloors(Dungeon.level);
+        boolean[] safe = safeCells(hero, hazards, sentryFloors);
         // Compute reachability once, rather than doing up to nine searches per mob.
         PathFinder.buildDistanceMap(hero.pos, safe);
         int[] distances = PathFinder.distance.clone();
@@ -276,7 +277,8 @@ public final class BlastAutoPlay {
                     return false;
                 }
             }
-            if (BlastAutoEnvironment.hazardousAt(hero.pos, hazards)) {
+            if (BlastAutoEnvironment.hazardousAt(hero.pos, hazards)
+                    || sentryFloors[hero.pos]) {
                 for (int offset : PathFinder.NEIGHBOURS8) {
                     int cell = hero.pos + offset;
                     if (Dungeon.level.insideMap(cell) && safe[cell] && distances[cell] == 1) {
@@ -650,7 +652,7 @@ public final class BlastAutoPlay {
         return trap == null || !trap.active;
     }
 
-    private static boolean[] safeCells(Hero hero, Blob[] hazards) {
+    private static boolean[] safeCells(Hero hero, Blob[] hazards, boolean[] sentryFloors) {
         Level level = Dungeon.level;
         boolean[] safe = Dungeon.findPassable(hero, level.passable, hero.fieldOfView, true).clone();
         boolean phaseEnabled = BlastMovement.enabled();
@@ -663,7 +665,8 @@ public final class BlastAutoPlay {
                     && !level.pit[cell]
                     && isTrapSafe(level.traps.get(cell))
                     && !AutoPlayPlantSafety.isHarmful(level.plants.get(cell))
-                    && !BlastAutoEnvironment.hazardousAt(cell, hazards);
+                    && !BlastAutoEnvironment.hazardousAt(cell, hazards)
+                    && !sentryFloors[cell];
         }
 
         // Inspect occupied cells only; per-cell Actor.findChar() is unnecessary.
@@ -675,7 +678,8 @@ public final class BlastAutoPlay {
                     && (level.visited[cell] || level.mapped[cell] || hero.fieldOfView[cell])
                     && !level.pit[cell] && isTrapSafe(level.traps.get(cell))
                     && !AutoPlayPlantSafety.isHarmful(level.plants.get(cell))
-                    && !BlastAutoEnvironment.hazardousAt(cell, hazards)) {
+                    && !BlastAutoEnvironment.hazardousAt(cell, hazards)
+                    && !sentryFloors[cell]) {
                 safe[cell] = true;
             } else {
                 safe[cell] = false;

@@ -16,7 +16,13 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.StormCloud;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.ToxicGas;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.VaultFlameTraps;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.Web;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
+import com.shatteredpixel.shatteredpixeldungeon.levels.RegularLevel;
+import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
+import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.Room;
+import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.special.SentryRoom;
+import com.watabou.utils.Rect;
 
 import java.util.Arrays;
 import java.util.List;
@@ -56,6 +62,41 @@ public final class BlastAutoEnvironment {
             if (blob.cur[cell] > 0) return true;
         }
         return false;
+    }
+
+    /** Mark the red sentry's special floor only while its sentry is alive. */
+    static boolean[] activeSentryFloors(Level level) {
+        boolean[] dangerous = new boolean[level.length()];
+        if (!(level instanceof RegularLevel)) return dangerous;
+
+        List<Room> rooms = null;
+        for (Mob mob : level.mobs) {
+            if (!(mob instanceof SentryRoom.Sentry) || !mob.isAlive()) continue;
+            if (rooms == null) rooms = ((RegularLevel) level).rooms();
+            for (Room room : rooms) {
+                if (room instanceof SentryRoom
+                        && room.inside(level.cellToPoint(mob.pos))) {
+                    markSentryFloors(level.map, level.width(), room, dangerous);
+                    break;
+                }
+            }
+        }
+        return dangerous;
+    }
+
+    /** Special floors outside the sentry room must remain traversable. */
+    static void markSentryFloors(int[] terrain, int width, Rect room, boolean[] dangerous) {
+        if (width <= 0 || terrain.length != dangerous.length
+                || terrain.length % width != 0 || room.left < 0 || room.top < 0
+                || room.right >= width || room.bottom >= terrain.length / width) {
+            throw new IllegalArgumentException("Invalid sentry room map");
+        }
+        for (int y = room.top + 1; y < room.bottom; y++) {
+            for (int x = room.left + 1; x < room.right; x++) {
+                int cell = x + y * width;
+                if (terrain[cell] == Terrain.EMPTY_SP) dangerous[cell] = true;
+            }
+        }
     }
 
     /**
