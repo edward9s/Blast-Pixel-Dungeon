@@ -49,6 +49,7 @@ public final class BlastAutoPlay {
     private static int lastRetryCell = -1;
     private static volatile boolean manualAction;
     private static volatile boolean waitingForInput;
+    private static volatile Hero pausedHero;
     private static final ConcurrentLinkedQueue<BombInput> pendingBombInputs = new ConcurrentLinkedQueue<>();
 
     private enum BombAction { PLACE, THROW, DETONATE, TOGGLE }
@@ -78,6 +79,7 @@ public final class BlastAutoPlay {
         lastRetryCell = -1;
         manualAction = false;
         waitingForInput = false;
+        if (!BlastSettings.testAutoPlay()) pausedHero = null;
         pendingBombInputs.clear();
         BlastAutoPickup.reset();
         BlastAutoFarming.reset();
@@ -140,8 +142,28 @@ public final class BlastAutoPlay {
         roaming.reset();
     }
 
-    /** Target selection and the game/settings menus pause auto-play; informational windows do not. */
+    /** Pause is scoped to the current hero and does not change the enabled setting. */
+    public static boolean isPaused() {
+        return BlastSettings.testAutoPlay() && pausedHero != null && pausedHero == Dungeon.hero;
+    }
+
+    public static void togglePause() {
+        if (!BlastSettings.testAutoPlay() || Dungeon.hero == null) {
+            throw new IllegalStateException("Cannot toggle disabled auto play");
+        }
+        boolean resume = isPaused();
+        pausedHero = resume ? null : Dungeon.hero;
+        if (resume && Dungeon.hero.ready && !GameScene.manualInputPending()) {
+            Dungeon.hero.next();
+        }
+    }
+
+    /** Manual targeting pauses auto play; the game menu no longer does. */
     public static boolean pauseForManualInput(Hero hero) {
+        if (isPaused() && !manualActionActive(hero) && pendingBombInputs.isEmpty()) {
+            hero.ready = true;
+            return true;
+        }
         if (!GameScene.manualInputPending()) return false;
         waitingForInput = true;
         hero.ready = true;
@@ -153,7 +175,7 @@ public final class BlastAutoPlay {
         if (!waitingForInput || GameScene.manualInputPending()) return;
         waitingForInput = false;
         Hero hero = Dungeon.hero;
-        if (BlastSettings.testAutoPlay() && hero != null && hero.ready) hero.next();
+        if (BlastSettings.testAutoPlay() && !isPaused() && hero != null && hero.ready) hero.next();
     }
 
     /** Tag commands are applied on the actor thread, never in a render callback. */
