@@ -46,6 +46,19 @@ public final class BlastAutoRoamingTest {
         equal(16, stalledMap.select(stalled, 24), "second stationary attempt");
         equal(32, stalledMap.select(stalled, 24), "third stalled attempt skips goal");
 
+        Map oscillatingMap = new Map();
+        oscillatingMap.safe[23] = true;
+        BlastAutoRoaming oscillating = new BlastAutoRoaming();
+        equal(16, oscillatingMap.select(oscillating, 24), "initial oscillating goal");
+        oscillatingMap.distances[16] = 1;
+        equal(16, oscillatingMap.select(oscillating, 23), "first approach");
+        oscillatingMap.distances[16] = 2;
+        equal(16, oscillatingMap.select(oscillating, 24), "first reversal");
+        oscillatingMap.distances[16] = 1;
+        equal(16, oscillatingMap.select(oscillating, 23), "repeat approach");
+        oscillatingMap.distances[16] = 2;
+        equal(32, oscillatingMap.select(oscillating, 24), "oscillating goal abandoned");
+
         Map map = new Map();
         BlastAutoRoaming roaming = new BlastAutoRoaming();
         equal(16, map.select(roaming, 24), "nearest frontier");
