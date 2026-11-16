@@ -76,7 +76,8 @@ python -m unittest discover -s tests -p test_auto_bomb_destructive.py
 pickups (`BlastRadiusPickup` and `BlastHastePickup`). The two special
 pickups remain non-stackable and are handled by `BlastAutoPickupPolicy`;
 the portable picker receives this policy as a parameter and contains no
-Blast-specific type checks. Gold, journal keys, and instant pickups bypass backpack capacity;
+Blast-specific type checks. Gold, energy crystals, journal keys, and rose petals bypass backpack capacity.
+Rose petals are only selected when the hero holds a Dried Rose below level 10;
 ordinary inventory and dew restrictions remain unchanged.
 
 ```sh
