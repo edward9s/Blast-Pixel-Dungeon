@@ -16,7 +16,7 @@ A bomb-focused mod of [Shattered Pixel Dungeon](https://github.com/00-Evan/shatt
 
 ## Bomb controls and important rules
 
-On Desktop, **B** activates the upper Bomb Maniac Tag and **V** activates the lower bomb-control Tag. Hold either key for about 0.5 seconds to use that Tag's long-press action (bomb setup or mode switching). Both keys can be changed in the game's key bindings settings.
+On Desktop, **B** activates the upper Bomb Maniac Tag and **V** activates the lower bomb-control Tag. When Auto play is enabled, an additional edge Tag toggles run/pause (default **P** key). Opening the game menu does not pause Auto play. Hold either key for about 0.5 seconds to use that Tag's long-press action (bomb setup or mode switching). Both keys can be changed in the game's key bindings settings.
 
 1. **Hold the lower bomb Tag** to change modes when there are no lit bombs on the current floor. You need at least **2 maximum bomb slots** to enter timed mode; with only one slot, holding the Tag explains why switching is unavailable. The starting mode is remote.
 2. **Remote mode:** Tap Bomb Maniac to place at your feet for **zero turns**; tap the lower Tag to detonate the oldest surviving remote bomb. The gold heart remains visible.

@@ -213,7 +213,8 @@ def patch(path: Path) -> None:
         s,
         "\t\tboolean actResult;\n\t\tif (curAction == null) {",
         "\t\tif (com.spd.blast.BlastSettings.testAutoPlay()\n"
-        "\t\t\t\t&& com.spd.blast.BlastAutoPlay.pauseForManualInput(this)) {\n"
+        "\t\t\t\t&& (com.spd.blast.BlastAutoPlay.pauseForUser(this)\n"
+        "\t\t\t\t|| com.spd.blast.BlastAutoPlay.pauseForManualInput(this))) {\n"
         "\t\t\treturn false;\n"
         "\t\t}\n"
         "\t\tif (com.spd.blast.BlastSettings.testAutoPlay()\n"
@@ -221,11 +222,13 @@ def patch(path: Path) -> None:
         "\t\t\treturn false;\n"
         "\t\t}\n"
         "\t\tif (com.spd.blast.BlastSettings.testAutoPlay()\n"
+        "\t\t\t\t&& !com.spd.blast.BlastAutoPlay.isPaused()\n"
         "\t\t\t\t&& !com.spd.blast.BlastAutoPlay.manualActionActive(this)\n"
         "\t\t\t\t&& com.spd.blast.BlastAutoPlay.chooseAction(this)) {\n"
         "\t\t\treturn false;\n"
         "\t\t}\n"
         "\t\tif (com.spd.blast.BlastSettings.testAutoPlay()\n"
+        "\t\t\t\t&& !com.spd.blast.BlastAutoPlay.isPaused()\n"
         "\t\t\t\t&& !com.spd.blast.BlastAutoPlay.manualActionActive(this)\n"
         "\t\t\t\t&& curAction == null) {\n"
         "\t\t\tspendAndNext(TICK);\n"
@@ -242,6 +245,7 @@ def patch(path: Path) -> None:
         "\tprivate void ready() {\n",
         "\tprivate void ready() {\n"
         "\t\tboolean blastRetry = com.spd.blast.BlastSettings.testAutoPlay()\n"
+        "\t\t\t\t&& !com.spd.blast.BlastAutoPlay.isPaused()\n"
         "\t\t\t\t&& !com.spd.blast.BlastAutoPlay.manualActionActive(this)\n"
         "\t\t\t\t&& curAction != null\n"
         "\t\t\t\t&& com.spd.blast.BlastAutoPlay.retryBlockedAction(this);\n",
