@@ -144,6 +144,19 @@ public final class BlastAutoPlay {
         roaming.reset();
     }
 
+    /** A new run starts unpaused, independent of the previous hero. */
+    public static void resetPause() {
+        pausedHero = null;
+    }
+
+    /** Restore a saved run's pause state after its hero has been loaded. */
+    public static void restorePause(Hero hero, boolean paused) {
+        if (paused && hero == null) {
+            throw new IllegalArgumentException("Cannot restore pause without a hero");
+        }
+        pausedHero = paused ? hero : null;
+    }
+
     /** Pause is scoped to the current hero and does not change the enabled setting. */
     public static boolean isPaused() {
         return BlastSettings.testAutoPlay() && pausedHero != null && pausedHero == Dungeon.hero;
