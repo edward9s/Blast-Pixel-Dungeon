@@ -135,9 +135,9 @@ def patch(path: Path) -> None:
     s = replace_once(
         s,
         "\t\treturn actResult;\n\t}",
-        "\t\tif (com.spd.blast.BlastSettings.testAutoPlay()\n"
-        "\t\t\t\t&& com.spd.blast.BlastAutoPlay.finishManualAction(this)) next();\n"
-        "\t\treturn actResult && blastActionAfterUnlock == null;\n\t}",
+        "\t\tboolean blastManualFinished = com.spd.blast.BlastSettings.testAutoPlay()\n"
+        "\t\t\t\t&& com.spd.blast.BlastAutoPlay.finishManualAction(this);\n"
+        "\t\treturn (blastManualFinished || actResult) && blastActionAfterUnlock == null;\n\t}",
         "Hero.act wait for door unlock animation"
     )
     s = replace_once(
