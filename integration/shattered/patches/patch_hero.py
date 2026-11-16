@@ -43,7 +43,7 @@ def patch(path: Path) -> None:
         "\tpublic void damage( int dmg, Object src ) {\n"
         "\t\tif (buff(TimekeepersHourglass.timeStasis.class) != null",
         "\tpublic void damage( int dmg, Object src ) {\n"
-        "\t\tif (com.spd.blast.BlastSettings.testIndestructible()\n"
+        "\t\tif (com.spd.blast.BlastBombSafety.protects(this)\n"
         "\t\t\t\t&& src instanceof com.shatteredpixel.shatteredpixeldungeon.items.bombs.Bomb) {\n"
         "\t\t\treturn;\n"
         "\t\t}\n"
@@ -184,16 +184,6 @@ def patch(path: Path) -> None:
         "\t\t\t\t\tbelongings.getItem(Pickaxe.class) != null &&\n"
         "\t\t\t\t\t!com.spd.blast.BlastMovement.canPhase(cell) &&",
         "Hero.handle mining versus phasing"
-    )
-
-    s = replace_once(
-        s,
-        "com.spd.blast.BlastSettings.testIndestructible()\n"
-        "\t\t\t\t&& src",
-        "(com.spd.blast.BlastSettings.testIndestructible()\n"
-        "\t\t\t\t|| buff(com.spd.blast.BlastIndestructible.class) != null)\n"
-        "\t\t\t\t&& src",
-        "temporary bomb immunity"
     )
 
     # Map taps and directional input retain the native multi-turn HeroAction.

@@ -55,8 +55,9 @@ selected bomb is eligible even if its explosion destroys floor items. Existing
 restrictions for available charges, visible awake enemies, and rare-mob
 protection still apply. For remote throws, the real bomb landing position
 determines whether the blast can hit an enemy; a direct hit is not required.
-During auto-play, only the hero is exempt from BombRegrowth rooting; all other
-grounded characters keep the existing effect. Compile and run against patched SPD:
+With either Bombproof buff, only the hero is exempt from BombRegrowth rooting;
+all other grounded characters keep the existing effect. Auto-play alone grants
+no bomb-effect immunity. Compile and run against patched SPD:
 
 ```sh
 javac --release 11 -encoding UTF-8 -cp "$BLAST_TEST_CLASSPATH" \
@@ -263,3 +264,16 @@ Once no useful exploration frontier remains, auto-play keeps roaming to
 random reachable known cells, preferring paths at least three steps long.
 Auto-farming movement clears its previous roaming goal so a completed harvest
 does not immediately send the hero back to an obsolete destination.
+
+`patch_bomb_safety.py` keeps direct flashbang paralysis, immediate frost, bonus holy
+bomb damage, and bomb-generated fire/freezing source-specific. Both the temporary
+and testing Bombproof buffs protect only the hero. Ordinary environmental fire,
+freezing, and enemy attacks retain their original effects; unprotected heroes
+and all other characters retain their normal bomb reactions. The two separate
+hazard blobs still burn/freeze items and affect terrain, and regular fire and
+freezing extinguish both bomb-sourced and non-bomb-sourced opposing blobs.
+
+```sh
+python scripts/test_bomb_safety_patch.py
+python scripts/test_regrowth_bomb_patch.py
+```

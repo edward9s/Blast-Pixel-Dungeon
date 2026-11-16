@@ -6,7 +6,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.ui.BuffIndicator;
 import com.watabou.noosa.Image;
 
-/** Six-turn immunity to damage attributed to bombs. */
+/** Six-turn immunity to harmful bomb effects, including bomb-generated hazards. */
 public final class BlastIndestructible extends FlavourBuff {
     public static final float DURATION = 6f;
 

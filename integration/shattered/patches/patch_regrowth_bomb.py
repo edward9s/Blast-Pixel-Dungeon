@@ -85,7 +85,7 @@ def patch(regrowth_path: Path, bomb_path: Path) -> None:
     # Verify both files before changing either; unexpected upstream changes fail.
     regrowth_path.write_text(regrowth, encoding="utf-8")
     bomb_path.write_text(bomb, encoding="utf-8")
-    print("patched regrowth bomb: ally-safe rooting and stationary herbal healing")
+    print("patched regrowth bomb: Bombproof-aware rooting and stationary herbal healing")
 
 
 if __name__ == "__main__":
