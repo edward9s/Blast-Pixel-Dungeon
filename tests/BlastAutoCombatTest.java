@@ -5,6 +5,11 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Rat;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Thief;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Bandit;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Warlock;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.Blacksmith;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.Ghost;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.Imp;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.Shopkeeper;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.Wandmaker;
 
 /** Regression checks for sleeping-enemy protection and bounded LOS memory. */
 public final class BlastAutoCombatTest {
@@ -78,6 +83,19 @@ public final class BlastAutoCombatTest {
                 "high-evasion enemy is eligible for wands");
         check(false, BlastAutoPlay.avoidEvasiveNeutral(Char.Alignment.NEUTRAL, false),
                 "ordinary neutral behavior is unchanged");
+
+        check(true, BlastAutoPlay.isProtectedNpc(new Shopkeeper()),
+                "shopkeeper must not be auto-attacked");
+        check(true, BlastAutoPlay.isProtectedNpc(new Ghost()),
+                "ghost quest giver must not be auto-attacked");
+        check(true, BlastAutoPlay.isProtectedNpc(new Wandmaker()),
+                "wandmaker must not be auto-attacked");
+        check(true, BlastAutoPlay.isProtectedNpc(new Blacksmith()),
+                "blacksmith must not be auto-attacked");
+        check(true, BlastAutoPlay.isProtectedNpc(new Imp()),
+                "imp must not be auto-attacked");
+        check(false, BlastAutoPlay.isProtectedNpc(new Rat()),
+                "ordinary enemies remain eligible");
 
         System.out.println("BlastAutoCombatTest passed");
     }

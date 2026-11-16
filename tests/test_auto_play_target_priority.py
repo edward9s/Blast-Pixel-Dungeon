@@ -35,6 +35,26 @@ class AutoTargetPriorityTests(unittest.TestCase):
             wand,
         )
 
+    def test_quest_and_service_npcs_are_excluded_from_combat(self):
+        combat = COMBAT.read_text(encoding="utf-8")
+        bombs = BOMBS.read_text(encoding="utf-8")
+        sacrifice = (ROOT / "core/src/main/java/com/spd/blast/BlastAutoSacrifice.java").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("return mob instanceof NPC;", combat)
+        self.assertIn("|| isProtectedNpc(mob)", combat)
+        self.assertIn("&& !isProtectedNpc(mob)", combat)
+        self.assertIn("|| isProtectedNpc(combatTarget)", combat)
+        self.assertIn("|| attacker instanceof NPC", combat)
+        self.assertIn("&& !(lastAttacker instanceof NPC)", combat)
+        self.assertIn("if (isProtectedNpc(target)) return false;", combat)
+
+        self.assertIn("containsProtectedMob(blast)", bombs)
+        self.assertIn("isRare(mob) || BlastAutoPlay.isProtectedNpc(mob)", bombs)
+        self.assertIn("|| BlastAutoPlay.isProtectedNpc(mob)", bombs)
+        self.assertIn("!BlastAutoPlay.isProtectedNpc(mob)", sacrifice)
+
     def test_bomb_targeting_uses_actual_landing_footprint(self):
         source = BOMBS.read_text(encoding="utf-8")
         self.assertIn("int center = remoteThrow ? BlastBombTrajectory.throwPos(", source)
@@ -42,7 +62,7 @@ class AutoTargetPriorityTests(unittest.TestCase):
             "blastReachesTarget(bomb.blastWarningCells(landing), mob.pos)",
             source,
         )
-        self.assertIn("containsRareMob(blast)", source)
+        self.assertIn("containsProtectedMob(blast)", source)
         self.assertIn("BlastRemoteBomb.isTimedMode()", source)
 
 

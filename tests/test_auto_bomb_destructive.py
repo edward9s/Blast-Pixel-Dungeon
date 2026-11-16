@@ -32,7 +32,7 @@ class AutoBombDestructiveTests(unittest.TestCase):
             "hero.buff(BlastTestBuffs.Indestructible.class)",
             "maniac.remaining() == 0",
             "if (target == null) return false;",
-            "if (containsRareMob(blast)) return false;",
+            "if (containsProtectedMob(blast)) return false;",
         ):
             with self.subTest(check=check):
                 self.assertIn(check, action)
