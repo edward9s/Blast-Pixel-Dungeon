@@ -32,10 +32,10 @@ public final class BlastAutoEnvironment {
     static final int MAX_WATER_STEPS = 4;
 
     private static final List<Class<? extends Blob>> HAZARD_TYPES = Arrays.asList(
-            Fire.class, Inferno.class, VaultFlameTraps.class,
+            Fire.class, BombFire.class, Inferno.class, VaultFlameTraps.class,
             ToxicGas.class, CorrosiveGas.class, ParalyticGas.class,
             StenchGas.class, ConfusionGas.class, Electricity.class,
-            StormCloud.class, Freezing.class, Blizzard.class,
+            StormCloud.class, Freezing.class, BombFreezing.class, Blizzard.class,
             SmokeScreen.class, Web.class, GooWarn.class);
 
     private BlastAutoEnvironment() {}

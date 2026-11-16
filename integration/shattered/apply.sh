@@ -48,6 +48,7 @@ python "$patches/patch_wnd_info_cell.py" "$root/windows/WndInfoCell.java"
 for kind in Firebomb FrostBomb HolyBomb SmokeBomb RegrowthBomb WoollyBomb ArcaneBomb FlashBangBomb; do
   python "$patches/patch_bomb_ranges.py" "$root/items/bombs/$kind.java"
 done
+python "$patches/patch_bomb_safety.py" "$root"
 python "$patches/patch_heap.py" "$root/items/Heap.java"
 python "$patches/patch_item_sprite.py" "$root/sprites/ItemSprite.java"
 python "$patches/patch_item_slot.py" "$root/ui/ItemSlot.java"

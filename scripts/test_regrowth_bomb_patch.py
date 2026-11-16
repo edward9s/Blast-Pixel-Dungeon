@@ -36,7 +36,7 @@ BOMB = (
 
 def main() -> None:
     java = JAVA.read_text(encoding="utf-8")
-    assert "return true;" in java
+    assert "return !BlastBombSafety.protects(target);" in java
     assert "protected boolean shouldRoot(Char target)" in java
 
     with tempfile.TemporaryDirectory() as temporary:

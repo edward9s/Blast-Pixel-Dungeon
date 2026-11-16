@@ -55,8 +55,9 @@ selected bomb is eligible even if its explosion destroys floor items. Existing
 restrictions for available charges, visible awake enemies, and rare-mob
 protection still apply. For remote throws, the real bomb landing position
 determines whether the blast can hit an enemy; a direct hit is not required.
-During auto-play, only the hero is exempt from BombRegrowth rooting; all other
-grounded characters keep the existing effect. Compile and run against patched SPD:
+With either Bombproof buff, only the hero is exempt from BombRegrowth rooting;
+all other grounded characters keep the existing effect. Auto-play alone grants
+no bomb-effect immunity. Compile and run against patched SPD:
 
 ```sh
 javac --release 11 -encoding UTF-8 -cp "$BLAST_TEST_CLASSPATH" \
