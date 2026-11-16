@@ -151,26 +151,25 @@ the actual landing blast footprint while preserving rare-mob safety checks.
 python -m unittest discover -s tests -p test_auto_play_target_priority.py
 ```
 
-`BlastAutoFarmingTest.java` checks the isolated idle farming policy:
-visible reachable high grass and beneficial plants are deliberately harvested
-whenever auto-play and auto-farming are enabled, even if no Regrowth bomb or
-remote-bomb buff is available (or bombs are in timed mode).
-The first Regrowth bomb is allowed, further bombs wait until a crop was
-harvested and the last BombRegrowth cloud dissipated, visible high grass
-and harmless plants qualify for harvest, and harmful plants remain
-excluded. Farming requires at least 10 accessible growable tiles inside the
-actual wall-occluded Regrowth blast. Suitable terrain is EMPTY, EMPTY_DECO,
+`BlastAutoFarmingTest.java` checks optional idle Regrowth planting and the
+ordinary auto-play crop classification. Auto-play always seeks reachable high
+grass and beneficial plants after combat, pickup, and interaction, even when
+auto-farming is disabled or Regrowth bombs are unavailable. Harmful plants
+are excluded. The first Regrowth bomb is allowed; further bombs wait until
+a crop was harvested and the last BombRegrowth cloud dissipated.
+Farming requires at least 10 accessible growable tiles inside the actual
+wall-occluded Regrowth blast. Suitable terrain is EMPTY, EMPTY_DECO,
 EMBERS, GRASS, or FURROWED_GRASS; walls, water, exits, traps, chasms and
 existing high grass do not count as new growth. Farming selects a reachable
-location with enough space before detonation, using a fixed 7x7 coarse check
-and at most 8 exact blast checks per site search. Searches are at least 8
-game ticks apart and a selected destination is cached while travelling. The implementation temporarily selects a RegrowthBomb type,
-detonates it, restores the original selected type via `finally`, and
-reuses the standard auto-pickup priority before crop collection.
-Farming harvests require auto-play, the independent farming checkbox,
-no visible awake enemy, and a grounded hero. Planting new grass additionally
-requires remote bomb mode and an available Regrowth bomb. Both reuse the
-same safe navigation map; harmful plants and hazardous terrain stay excluded.
+location with enough space before detonation, using a fixed 7x7 coarse
+check and at most 8 exact blast checks per site search. Searches are at
+least 8 game ticks apart and a selected destination is cached while
+travelling. The implementation temporarily selects a RegrowthBomb type,
+detonates it, and restores the original selected type via `finally`.
+Optional auto-farming alone controls placing new Regrowth bombs, which
+also requires remote bomb mode and an available bomb. Both features reuse
+the safe navigation map, skip visible awake enemies, and require a grounded
+hero.
 
 ```sh
 javac --release 11 -encoding UTF-8 -cp "$BLAST_TEST_CLASSPATH" \
@@ -178,10 +177,10 @@ javac --release 11 -encoding UTF-8 -cp "$BLAST_TEST_CLASSPATH" \
 java -cp "/tmp/blast-tests:$BLAST_TEST_CLASSPATH" com.spd.blast.BlastAutoFarmingTest
 ```
 
-`test_auto_farming_harvest.py` guards the independent harvest path:
-harvesting safely reachable tall grass and beneficial plants must run before
-any bomb-mode, bomb-inventory, or Regrowth-type checks, while preserving
-grounded-hero and awake-enemy safety gates.
+`test_auto_farming_harvest.py` guards the shared auto-play harvest path:
+harvesting safe tall grass and beneficial plants runs before optional farming
+and roaming, without requiring the farming setting or bomb inventory.
+Regrowth planting still tracks completed harvest decisions.
 
 ```sh
 python -m unittest discover -s tests -p test_auto_farming_harvest.py
@@ -246,7 +245,7 @@ javac --release 11 -encoding UTF-8 -cp "$BLAST_TEST_CLASSPATH" \
 java -cp "/tmp/blast-tests:$BLAST_TEST_CLASSPATH" com.spd.blast.BlastAutoRoamingTest
 ```
 
-`BlastAutoHarvestTest.java` verifies that auto-farming retains a selected crop
+`BlastAutoHarvestTest.java` verifies that auto-play retains a selected crop
 when movement around a wall temporarily hides it, then revalidates the crop
 after it becomes visible again. This prevents harvest-versus-roam oscillation.
 `BlastAutoRoamingTest.java` additionally checks that a roaming goal is rejected
@@ -262,7 +261,7 @@ java -cp "/tmp/blast-tests:$BLAST_TEST_CLASSPATH" com.spd.blast.BlastAutoRoaming
 
 Once no useful exploration frontier remains, auto-play keeps roaming to
 random reachable known cells, preferring paths at least three steps long.
-Auto-farming movement clears its previous roaming goal so a completed harvest
+Harvesting and auto-farming movement clear previous roaming goals so a completed harvest
 does not immediately send the hero back to an obsolete destination.
 
 `patch_bomb_safety.py` keeps direct flashbang paralysis, immediate frost, bonus holy
