@@ -57,6 +57,19 @@ class AutoPlayPauseTagTests(unittest.TestCase):
         hero_patch = HERO_PATCH.read_text(encoding="utf-8")
         self.assertIn("!com.spd.blast.BlastAutoPlay.isPaused()", hero_patch)
 
+    def test_pause_restores_native_map_input(self):
+        code = injected_java(HERO_PATCH, "Hero.act automatic actions")
+        self.assertLess(code.index("BlastAutoPlay.pauseForManualInput(this)"),
+                        code.index("BlastAutoPlay.pauseForUser(this)"))
+        self.assertIn("BlastAutoPlay.pauseForUser(this)) {\\n\\t\\t\\tready();", code)
+        self.assertLess(code.index("BlastAutoPlay.pauseForUser(this)"),
+                        code.index("BlastAutoPlay.performBombInput(this)"))
+        pause = AUTO_PLAY.read_text(encoding="utf-8").split(
+            "public static boolean pauseForUser(Hero hero)", 1
+        )[1].split("public static boolean pauseForManualInput", 1)[0]
+        self.assertNotIn("hero.ready = true", pause)
+        self.assertIn("return isPaused() && !manualActionActive(hero)", pause)
+
     def test_manual_actions_and_resume(self):
         source = AUTO_PLAY.read_text(encoding="utf-8")
         self.assertIn("if (!isPaused() || manualActionActive(hero) || !pendingBombInputs.isEmpty()) return false;", source)
