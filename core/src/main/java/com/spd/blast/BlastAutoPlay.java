@@ -178,13 +178,14 @@ public final class BlastAutoPlay {
      */
     public static void requestManualCell(int cell) {
         Hero hero = Dungeon.hero;
-        if (!BlastSettings.testAutoPlay() || hero == null || Dungeon.level == null) {
+        Level level = Dungeon.level;
+        if (!BlastSettings.testAutoPlay() || hero == null || level == null) {
             throw new IllegalStateException("Cannot request manual movement without auto-play");
         }
-        if (!Dungeon.level.insideMap(cell)) {
+        if (!level.insideMap(cell)) {
             throw new IllegalArgumentException("Invalid manual destination: " + cell);
         }
-        pendingManualCell.set(new ManualCell(hero, Dungeon.level, cell));
+        pendingManualCell.set(new ManualCell(hero, level, cell));
         if (hero.ready) hero.next();
     }
 
