@@ -1,7 +1,9 @@
 package com.spd.blast;
 
 import com.shatteredpixel.shatteredpixeldungeon.items.Dewdrop;
+import com.shatteredpixel.shatteredpixeldungeon.items.EnergyCrystal;
 import com.shatteredpixel.shatteredpixeldungeon.items.Gold;
+import com.shatteredpixel.shatteredpixeldungeon.items.artifacts.DriedRose;
 import com.shatteredpixel.shatteredpixeldungeon.items.keys.CrystalKey;
 import com.shatteredpixel.shatteredpixeldungeon.items.keys.GoldenKey;
 import com.shatteredpixel.shatteredpixeldungeon.items.keys.IronKey;
@@ -28,6 +30,8 @@ public final class BlastAutoPickupTest {
     public static void main(String[] args) {
         check(true, new Dewdrop());
         check(true, new Gold());
+        check(true, new EnergyCrystal());
+        check(true, new DriedRose.Petal());
         check(true, new GoldenKey());
         check(true, new IronKey());
         check(true, new CrystalKey());
@@ -57,8 +61,21 @@ public final class BlastAutoPickupTest {
             }
         }
         if (!BlastAutoPickup.bypassesBackpack(new Gold(), BLAST_INSTANT)
+                || !BlastAutoPickup.bypassesBackpack(new EnergyCrystal(), BLAST_INSTANT)
+                || !BlastAutoPickup.bypassesBackpack(new DriedRose.Petal(), BLAST_INSTANT)
                 || BlastAutoPickup.bypassesBackpack(new Bomb(), BLAST_INSTANT)) {
             throw new AssertionError("Incorrect backpack bypass rule");
+        }
+
+        // Petals only upgrade a rose that is present and below its native level cap.
+        DriedRose rose = new DriedRose();
+        if (BlastAutoPickup.canUpgradeRose(null)
+                || !BlastAutoPickup.canUpgradeRose(rose)) {
+            throw new AssertionError("Rose petal eligibility must require an upgradeable rose");
+        }
+        rose.level(10);
+        if (BlastAutoPickup.canUpgradeRose(rose)) {
+            throw new AssertionError("A max-level rose must not attract auto-pickup");
         }
 
         // Portable auto-pickup with no Blast policy excludes both non-stackables.
