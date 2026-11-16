@@ -84,7 +84,7 @@ public final class BlastAutoSacrifice {
             throw new IllegalStateException("Invalid sacrificial fire navigation state");
         }
         if (!(level instanceof RegularLevel)) return Action.NONE;
-        SacrificeRoom room = ((RegularLevel) level).room(SacrificeRoom.class);
+        SacrificeRoom room = (SacrificeRoom) ((RegularLevel) level).room(SacrificeRoom.class);
         if (room == null || room.entrance() == null) return Action.NONE;
 
         // Visible ranged opponents and thieves remain urgent combat exceptions.
