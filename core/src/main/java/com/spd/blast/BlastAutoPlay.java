@@ -160,11 +160,9 @@ public final class BlastAutoPlay {
         }
     }
 
-    /** User pause stops autonomous turns but leaves explicit commands usable. */
+    /** The Hero.act caller enters native ready() so its map listener is restored. */
     public static boolean pauseForUser(Hero hero) {
-        if (!isPaused() || manualActionActive(hero) || !pendingBombInputs.isEmpty()) return false;
-        hero.ready = true;
-        return true;
+        return isPaused() && !manualActionActive(hero) && pendingBombInputs.isEmpty();
     }
 
     /** Manual targeting pauses auto play; the game menu no longer does. */
