@@ -59,7 +59,8 @@ class AutoPlayPauseTagTests(unittest.TestCase):
 
     def test_manual_actions_and_resume(self):
         source = AUTO_PLAY.read_text(encoding="utf-8")
-        self.assertIn("isPaused() && !manualActionActive(hero) && pendingBombInputs.isEmpty()", source)
+        self.assertIn("if (!isPaused() || manualActionActive(hero) || !pendingBombInputs.isEmpty()) return false;", source)
+        self.assertIn("public static boolean pauseForUser(Hero hero)", source)
         self.assertIn("if (resume && Dungeon.hero.ready && !GameScene.manualInputPending())", source)
         self.assertIn("BlastSettings.testAutoPlay() && !isPaused() && hero != null && hero.ready", source)
 
