@@ -50,6 +50,7 @@ public final class BlastAutoPlay {
     private static int ignoredTargetCell = -1;
     private static int lastRetryCell = -1;
     private static volatile boolean manualAction;
+    private static volatile Hero chasmConfirmationHero;
     private static volatile boolean waitingForInput;
     private static volatile Hero pausedHero;
     private static final ConcurrentLinkedQueue<BombInput> pendingBombInputs = new ConcurrentLinkedQueue<>();
@@ -81,6 +82,7 @@ public final class BlastAutoPlay {
         ignoredTargetCell = -1;
         lastRetryCell = -1;
         manualAction = false;
+        chasmConfirmationHero = null;
         waitingForInput = false;
         if (!BlastSettings.testAutoPlay()) pausedHero = null;
         pendingBombInputs.clear();
@@ -119,6 +121,7 @@ public final class BlastAutoPlay {
         if (!BlastSettings.testAutoPlay()) return;
         resetForLevel(hero);
         manualAction = true;
+        chasmConfirmationHero = null;
         resetPursuitMemory();
         roaming.reset();
         lastRetryCell = -1;
@@ -129,9 +132,24 @@ public final class BlastAutoPlay {
     }
 
     public static boolean finishManualAction(Hero hero) {
-        if (!manualActionActive(hero) || hero.curAction != null) return false;
+        if (!manualActionActive(hero) || hero.curAction != null
+                || chasmConfirmationHero == hero) return false;
         manualAction = false;
         return true;
+    }
+
+    /** Keep the interrupted move until the chasm decision is made. */
+    public static void beginChasmConfirmation(Hero hero) {
+        if (manualActionActive(hero)) chasmConfirmationHero = hero;
+    }
+
+    /** Declining the jump discards its destination and restarts auto-play. */
+    public static void declineChasmConfirmation(Hero hero) {
+        if (chasmConfirmationHero != hero) return;
+        chasmConfirmationHero = null;
+        manualAction = false;
+        hero.lastAction = null;
+        if (hero == Dungeon.hero && BlastSettings.testAutoPlay()) hero.next();
     }
 
     /** An explicit item action supersedes the last AI movement order. */
@@ -139,6 +157,7 @@ public final class BlastAutoPlay {
         if (!BlastSettings.testAutoPlay()) return;
         resetForLevel(hero);
         manualAction = false;
+        chasmConfirmationHero = null;
         hero.curAction = null;
         hero.lastAction = null;
         hero.resting = false;
@@ -541,6 +560,7 @@ public final class BlastAutoPlay {
         ignoredTargetCell = -1;
         lastRetryCell = -1;
         manualAction = false;
+        chasmConfirmationHero = null;
         waitingForInput = false;
         pendingBombInputs.clear();
         BlastAutoPickup.reset();
