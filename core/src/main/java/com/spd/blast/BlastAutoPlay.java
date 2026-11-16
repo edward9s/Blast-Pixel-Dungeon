@@ -158,12 +158,15 @@ public final class BlastAutoPlay {
         }
     }
 
+    /** User pause stops autonomous turns but leaves explicit commands usable. */
+    public static boolean pauseForUser(Hero hero) {
+        if (!isPaused() || manualActionActive(hero) || !pendingBombInputs.isEmpty()) return false;
+        hero.ready = true;
+        return true;
+    }
+
     /** Manual targeting pauses auto play; the game menu no longer does. */
     public static boolean pauseForManualInput(Hero hero) {
-        if (isPaused() && !manualActionActive(hero) && pendingBombInputs.isEmpty()) {
-            hero.ready = true;
-            return true;
-        }
         if (!GameScene.manualInputPending()) return false;
         waitingForInput = true;
         hero.ready = true;
