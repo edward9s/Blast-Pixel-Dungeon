@@ -98,9 +98,29 @@ public final class BlastAutoSacrificeTest {
         check(false, BlastAutoSacrifice.isRangedEnemy(Skeleton.class), "Skeleton melee");
         check(false, BlastAutoSacrifice.isRangedEnemy(Ghoul.class), "Ghoul melee");
 
-        check(false, BlastAutoSacrifice.shouldAbandon(11f, 2), "short moving pursuit");
-        check(true, BlastAutoSacrifice.shouldAbandon(12f, 0), "absolute lure timeout");
-        check(true, BlastAutoSacrifice.shouldAbandon(0f, 3), "stationary pursuit timeout");
+        check(false, BlastAutoSacrifice.shouldReposition(11f, 2), "moving pursuit continues");
+        check(true, BlastAutoSacrifice.shouldReposition(12f, 0), "timeout triggers reposition");
+        check(true, BlastAutoSacrifice.shouldReposition(0f, 3), "stall triggers reposition");
+
+        int gridWidth = 12;
+        check(true, BlastAutoSacrifice.outsideEntrance(3, 5, 3, 3, 7, 7,
+                gridWidth, 12) == 5 * gridWidth + 2, "left doorway");
+        check(true, BlastAutoSacrifice.outsideEntrance(7, 5, 3, 3, 7, 7,
+                gridWidth, 12) == 5 * gridWidth + 8, "right doorway");
+        check(true, BlastAutoSacrifice.outsideEntrance(5, 3, 3, 3, 7, 7,
+                gridWidth, 12) == 2 * gridWidth + 5, "top doorway");
+        check(true, BlastAutoSacrifice.outsideEntrance(5, 7, 3, 3, 7, 7,
+                gridWidth, 12) == 8 * gridWidth + 5, "bottom doorway");
+        check(true, BlastAutoSacrifice.insideRoom(5 * gridWidth + 5,
+                gridWidth, 3, 3, 7, 7), "exclude room interior");
+        check(false, BlastAutoSacrifice.insideRoom(5 * gridWidth + 2,
+                gridWidth, 3, 3, 7, 7), "allow outside patrol");
+        try {
+            BlastAutoSacrifice.outsideEntrance(5, 5, 3, 3, 7, 7, gridWidth, 12);
+            throw new AssertionError("Interior point cannot be a doorway");
+        } catch (IllegalArgumentException expected) {
+            // Invalid map geometry should fail immediately.
+        }
 
         try {
             BlastAutoSacrifice.nearFlame(new int[10], width - 1, 2);
