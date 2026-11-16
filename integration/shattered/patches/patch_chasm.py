@@ -16,9 +16,9 @@ def patch(path: Path) -> None:
 
     source = replace_once(
         source,
-        "\t\t\t\t\t\tprotected void onSelect( int index ) {\n"
+        "\t\t\t\t\t\t\tprotected void onSelect( int index ) {\n"
         "\t\t\t\t\t\t\t\tif (index == 0 && elapsed > 0.2f) {",
-        "\t\t\t\t\t\tprotected void onSelect( int index ) {\n"
+        "\t\t\t\t\t\t\tprotected void onSelect( int index ) {\n"
         "\t\t\t\t\t\t\t\tif (index == 1 && elapsed > 0.2f) {\n"
         "\t\t\t\t\t\t\t\t\tcom.spd.blast.BlastAutoPlay.cancelManualConfirmation(hero);\n"
         "\t\t\t\t\t\t\t\t}\n"
