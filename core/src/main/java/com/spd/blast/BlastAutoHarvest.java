@@ -1,5 +1,8 @@
 package com.spd.blast;
 
+import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
+import com.shatteredpixel.shatteredpixeldungeon.plants.Plant;
+
 import java.util.function.IntPredicate;
 
 /** Retain a visible harvest target while navigating around vision-blocking corners. */
@@ -8,6 +11,11 @@ final class BlastAutoHarvest {
 
     void reset() {
         destination = -1;
+    }
+
+    static boolean harvestable(int terrain, Plant plant) {
+        return terrain == Terrain.HIGH_GRASS
+                || (plant != null && !AutoPlayPlantSafety.isHarmful(plant));
     }
 
     int chooseDestination(int position, boolean[] safe, int[] distances, boolean[] visible,
