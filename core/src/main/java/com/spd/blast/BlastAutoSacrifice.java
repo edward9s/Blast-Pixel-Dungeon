@@ -27,25 +27,28 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.YogDzewa;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.YogFist;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
+import com.shatteredpixel.shatteredpixeldungeon.levels.RegularLevel;
+import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.special.SacrificeRoom;
+import com.watabou.utils.Point;
 
-/** Lure pursuing enemies into SacrificialFire's marking area before attacking. */
+/** Keep the sacrifice objective active while recruiting and luring melee enemies. */
 public final class BlastAutoSacrifice {
 
     enum Action { NONE, QUEUED, WAIT }
 
-    private static final int MAX_FIRE_ROUTE = 6;
-    private static final int MAX_ENEMY_DISTANCE = 7;
     private static final int MAX_STALLED_TURNS = 3;
     private static final float MAX_WAIT_TICKS = 12f;
-    private static final float RETRY_INTERVAL = 8f;
+    private static final float REPOSITION_TICKS = 8f;
+    private static final BlastAutoRoaming outsideRoaming = new BlastAutoRoaming();
 
     private static Hero currentHero;
     private static Level currentLevel;
     private static Mob trackedEnemy;
     private static int previousDistance;
     private static int stalledTurns;
-    private static float retryAfter;
+    private static float repositionUntil;
     private static float waitingSince = Float.NaN;
+    private static boolean patrollingOutside;
 
     private BlastAutoSacrifice() {}
 
@@ -55,8 +58,10 @@ public final class BlastAutoSacrifice {
         trackedEnemy = null;
         previousDistance = Integer.MAX_VALUE;
         stalledTurns = 0;
-        retryAfter = 0f;
+        repositionUntil = 0f;
         waitingSince = Float.NaN;
+        patrollingOutside = false;
+        outsideRoaming.reset();
     }
 
     /**
@@ -78,9 +83,11 @@ public final class BlastAutoSacrifice {
                 || safe.length != level.length() || distances.length != level.length()) {
             throw new IllegalStateException("Invalid sacrificial fire navigation state");
         }
+        if (!(level instanceof RegularLevel)) return Action.NONE;
+        SacrificeRoom room = ((RegularLevel) level).room(SacrificeRoom.class);
+        if (room == null || room.entrance() == null) return Action.NONE;
 
-        // Visible ranged enemies bypass the altar. A thief also does, unless
-        // an adjacent melee pursuer poses an immediate threat.
+        // Visible ranged opponents and thieves remain urgent combat exceptions.
         boolean visibleThief = false;
         boolean immediateMeleeThreat = false;
         for (Mob mob : level.mobs) {
@@ -107,8 +114,7 @@ public final class BlastAutoSacrifice {
             return Action.NONE;
         }
 
-        // A marked enemy within one tile of active flame is an eligible sacrifice.
-        // Do not attack unmarked enemies: the marking blob must act first.
+        // Attack only when the enemy has been marked within the flame aura.
         Mob attackable = null;
         int attackDistance = Integer.MAX_VALUE;
         for (Mob mob : level.mobs) {
@@ -126,28 +132,29 @@ public final class BlastAutoSacrifice {
             hero.curAction = new HeroAction.Attack(attackable);
             trackedEnemy = null;
             waitingSince = Float.NaN;
+            patrollingOutside = false;
+            outsideRoaming.clearDestination();
             return Action.QUEUED;
         }
 
-        if (Actor.now() < retryAfter) return Action.NONE;
+        // A stalled lure changes tactics instead of allowing ordinary attacks.
+        if (Actor.now() < repositionUntil) {
+            return searchOutside(hero, room, safe, distances);
+        }
 
-        // Pick a reachable fire cell close to both hero and a pursuing enemy.
-        // No separate path search is needed.
+        // A following enemy must be brought back regardless of its distance.
         int site = -1;
         Mob target = null;
         int bestScore = Integer.MAX_VALUE;
         for (int cell = 0; cell < fire.cur.length; cell++) {
             if (fire.cur[cell] <= 0 || !safe[cell]
                     || distances[cell] == Integer.MAX_VALUE
-                    || distances[cell] > MAX_FIRE_ROUTE
                     || !(level.visited[cell] || hero.fieldOfView[cell])) continue;
             for (Mob mob : level.mobs) {
                 if (!eligible(hero, mob) || !shouldLure(
                         mob.state == mob.HUNTING && mob.isTargeting(hero),
                         nearFlame(fire.cur, level.width(), mob.pos))) continue;
-                int enemyDistance = level.distance(cell, mob.pos);
-                if (enemyDistance > MAX_ENEMY_DISTANCE) continue;
-                int score = distances[cell] + enemyDistance;
+                int score = distances[cell] + level.distance(cell, mob.pos);
                 if (score < bestScore) {
                     bestScore = score;
                     site = cell;
@@ -155,13 +162,23 @@ public final class BlastAutoSacrifice {
                 }
             }
         }
-        if (site < 0) return Action.NONE;
+
+        if (site < 0) {
+            trackedEnemy = null;
+            waitingSince = Float.NaN;
+            // If the altar cannot be reached, defend against adjacent attackers.
+            if (immediateMeleeThreat) return Action.NONE;
+            Action approach = approachUnengagedEnemy(hero, fire.cur, safe, distances);
+            return approach != Action.NONE ? approach : searchOutside(hero, room, safe, distances);
+        }
 
         if (hero.pos != site) {
             hero.curAction = new HeroAction.Move(BlastAutoPlay.firstStep(site, safe, distances));
             trackedEnemy = null;
             stalledTurns = 0;
             waitingSince = Float.NaN;
+            patrollingOutside = false;
+            outsideRoaming.clearDestination();
             return Action.QUEUED;
         }
 
@@ -174,17 +191,108 @@ public final class BlastAutoSacrifice {
         }
         trackedEnemy = target;
         previousDistance = distance;
-        if (shouldAbandon(Actor.now() - waitingSince, stalledTurns)) {
+        if (shouldReposition(Actor.now() - waitingSince, stalledTurns)) {
             trackedEnemy = null;
             waitingSince = Float.NaN;
-            retryAfter = Actor.now() + RETRY_INTERVAL;
-            return Action.NONE;
+            repositionUntil = Actor.now() + REPOSITION_TICKS;
+            patrollingOutside = false;
+            outsideRoaming.clearDestination();
+            return searchOutside(hero, room, safe, distances);
         }
 
-        // Stay on the fire: melee pursuers stop adjacent, inside the marked area.
-        // A bounded wait avoids endless idling against stationary melee mobs.
         hero.spendAndNext(Actor.TICK);
         return Action.WAIT;
+    }
+
+    /** Return through the room entrance, then patrol known exterior terrain. */
+    private static Action searchOutside(Hero hero, SacrificeRoom room,
+                                        boolean[] safe, int[] distances) {
+        Level level = Dungeon.level;
+        Point entrance = room.entrance();
+        int exitCell = outsideEntrance(entrance.x, entrance.y,
+                room.left, room.top, room.right, room.bottom,
+                level.width(), level.height());
+        if (exitCell < 0 || !safe[exitCell]
+                || distances[exitCell] == Integer.MAX_VALUE) return Action.NONE;
+
+        if (!patrollingOutside) {
+            if (hero.pos != exitCell) {
+                hero.curAction = new HeroAction.Move(BlastAutoPlay.firstStep(exitCell, safe, distances));
+                return Action.QUEUED;
+            }
+            patrollingOutside = true;
+            outsideRoaming.clearDestination();
+        }
+
+        boolean[] exterior = safe.clone();
+        for (int cell = 0; cell < exterior.length; cell++) {
+            if (insideRoom(cell, level.width(), room.left, room.top, room.right, room.bottom)) {
+                exterior[cell] = false;
+            }
+        }
+        int destination = outsideRoaming.chooseDestination(hero.pos, level.width(), exterior,
+                distances, level.visited, level.mapped, hero.fieldOfView, level.solid);
+        if (destination >= 0) {
+            hero.curAction = new HeroAction.Move(
+                    BlastAutoPlay.firstStep(destination, safe, distances));
+            return Action.QUEUED;
+        }
+        hero.spendAndNext(Actor.TICK);
+        return Action.WAIT;
+    }
+
+    /** Draw the attention of a visible wandering melee enemy without striking it. */
+    private static Action approachUnengagedEnemy(Hero hero, int[] flames,
+                                                  boolean[] safe, int[] distances) {
+        Level level = Dungeon.level;
+        Mob target = null;
+        int nearest = Integer.MAX_VALUE;
+        for (Mob mob : level.mobs) {
+            if (!eligible(hero, mob) || shouldLure(
+                    mob.state == mob.HUNTING && mob.isTargeting(hero),
+                    nearFlame(flames, level.width(), mob.pos))) continue;
+            int distance = level.distance(hero.pos, mob.pos);
+            if (distance > 2 && distance < nearest) {
+                nearest = distance;
+                target = mob;
+            }
+        }
+        if (target == null) return Action.NONE;
+        int destination = -1;
+        int shortest = Integer.MAX_VALUE;
+        for (int cell = 0; cell < safe.length; cell++) {
+            if (!safe[cell] || distances[cell] <= 0
+                    || distances[cell] == Integer.MAX_VALUE
+                    || level.distance(cell, target.pos) != 2) continue;
+            if (distances[cell] < shortest) {
+                destination = cell;
+                shortest = distances[cell];
+            }
+        }
+        if (destination < 0) return Action.NONE;
+        hero.curAction = new HeroAction.Move(
+                BlastAutoPlay.firstStep(destination, safe, distances));
+        return Action.QUEUED;
+    }
+
+    /** Return the cell immediately outside the single generated room entrance. */
+    static int outsideEntrance(int x, int y, int left, int top, int right, int bottom,
+                                int width, int height) {
+        if (width <= 0 || height <= 0 || left >= right || top >= bottom) {
+            throw new IllegalArgumentException("Invalid sacrifice room bounds");
+        }
+        if (x == left && y > top && y < bottom) x--;
+        else if (x == right && y > top && y < bottom) x++;
+        else if (y == top && x > left && x < right) y--;
+        else if (y == bottom && x > left && x < right) y++;
+        else throw new IllegalArgumentException("Invalid sacrifice room entrance");
+        return x >= 0 && x < width && y >= 0 && y < height ? x + y * width : -1;
+    }
+
+    static boolean insideRoom(int cell, int width, int left, int top, int right, int bottom) {
+        int x = cell % width;
+        int y = cell / width;
+        return x > left && x < right && y > top && y < bottom;
     }
 
     private static boolean eligible(Hero hero, Mob mob) {
@@ -217,7 +325,7 @@ public final class BlastAutoSacrifice {
                 || YogDzewa.class.isAssignableFrom(type);
     }
 
-    static boolean shouldAbandon(float waited, int stalledTurns) {
+    static boolean shouldReposition(float waited, int stalledTurns) {
         return waited >= MAX_WAIT_TICKS || stalledTurns >= MAX_STALLED_TURNS;
     }
 
