@@ -36,6 +36,7 @@ public final class BlastAutoPlay {
     private static Hero currentHero;
     private static Level currentLevel;
     private static final BlastAutoRoaming roaming = new BlastAutoRoaming();
+    private static final BlastAutoHarvest harvesting = new BlastAutoHarvest();
     private static Char lastAttacker;
     private static int attackerCell = -1;
     private static int attackerTurns;
@@ -71,6 +72,7 @@ public final class BlastAutoPlay {
         currentHero = null;
         currentLevel = null;
         roaming.reset();
+        harvesting.reset();
         lastAttacker = null;
         attackerCell = -1;
         attackerTurns = 0;
@@ -461,7 +463,10 @@ public final class BlastAutoPlay {
             }
         }
 
-        // Blast-only idle farming runs after combat and floor-loot collection.
+        // Harvesting belongs to ordinary auto-play even when auto-farming is disabled.
+        if (harvest(hero, safe, distances)) return false;
+
+        // Only planting new grass depends on the separate farming setting.
         BlastAutoFarming.Action farmingAction =
                 BlastAutoFarming.chooseAction(hero, safe, distances);
         if (farmingAction != BlastAutoFarming.Action.NONE) {
@@ -527,6 +532,7 @@ public final class BlastAutoPlay {
         currentHero = hero;
         currentLevel = Dungeon.level;
         roaming.reset();
+        harvesting.reset();
         lastAttacker = null;
         attackerCell = -1;
         attackerTurns = 0;
@@ -772,6 +778,32 @@ public final class BlastAutoPlay {
             }
         }
         return goal < 0 ? -1 : firstStep(goal, safe, distances);
+    }
+
+    /** Target safe high grass and beneficial plants before farming or roaming. */
+    private static boolean harvest(Hero hero, boolean[] safe, int[] distances) {
+        if (hero.flying || hero.rooted || hasVisibleEnemy(hero)) return false;
+
+        Level level = Dungeon.level;
+        int crop = harvesting.chooseDestination(hero.pos, safe, distances,
+                hero.fieldOfView, hero.canSelfTrample(),
+                cell -> BlastAutoHarvest.harvestable(level.map[cell], level.plants.get(cell)));
+        if (crop < 0) return false;
+
+        int next = crop == hero.pos ? hero.pos : firstStep(crop, safe, distances);
+        hero.curAction = new HeroAction.Move(next);
+        BlastAutoFarming.recordHarvest(next);
+        roaming.clearDestination();
+        return true;
+    }
+
+    static boolean hasVisibleEnemy(Hero hero) {
+        for (Mob mob : Dungeon.level.mobs) {
+            if (mob.isAlive() && mob.alignment == Char.Alignment.ENEMY
+                    && mob.invisible <= 0 && hero.fieldOfView[mob.pos]
+                    && isAwake(mob)) return true;
+        }
+        return false;
     }
 
     private static int roamStep(Hero hero, boolean[] safe, int[] distances) {

@@ -2,15 +2,12 @@ package com.spd.blast;
 
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
-import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.Blob;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroAction;
-import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
 import com.shatteredpixel.shatteredpixeldungeon.items.bombs.RegrowthBomb;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
-import com.shatteredpixel.shatteredpixeldungeon.plants.Plant;
 import com.watabou.utils.PathFinder;
 
 /** Blast-only idle farming. Portable auto-play and pickup remain independent. */
@@ -27,7 +24,6 @@ public final class BlastAutoFarming {
     private static boolean planted;
     private static boolean harvested;
     private static int farmingSite = -1;
-    private static final BlastAutoHarvest harvesting = new BlastAutoHarvest();
     private static int farmingBlastCell = -1;
     private static boolean siteUsesRemoteThrow;
     private static float nextSearchAt = Float.NEGATIVE_INFINITY;
@@ -40,7 +36,6 @@ public final class BlastAutoFarming {
         planted = false;
         harvested = false;
         farmingSite = farmingBlastCell = -1;
-        harvesting.reset();
         nextSearchAt = Float.NEGATIVE_INFINITY;
     }
 
@@ -52,23 +47,11 @@ public final class BlastAutoFarming {
             currentLevel = Dungeon.level;
         }
         if (!BlastSettings.testAutoPlay() || !BlastSettings.autoFarming()
-                || hero.flying || hasVisibleEnemy(hero)) return Action.NONE;
+                || hero.flying || BlastAutoPlay.hasVisibleEnemy(hero)) return Action.NONE;
 
         Level level = Dungeon.level;
         if (safe.length != level.length() || distances.length != level.length()) {
             throw new IllegalArgumentException("Invalid farming distance map");
-        }
-
-        // Harvest safe grass and beneficial plants independently of bomb availability.
-        int nearest = nearestCrop(hero, safe, distances);
-        if (nearest >= 0) {
-            int next = nearest == hero.pos ? hero.pos
-                    : BlastAutoPlay.firstStep(nearest, safe, distances);
-            hero.curAction = new HeroAction.Move(next);
-            if (planted && harvestable(level.map[next], level.plants.get(next))) {
-                harvested = true;
-            }
-            return Action.MOVE;
         }
 
         if (planted) {
@@ -143,13 +126,17 @@ public final class BlastAutoFarming {
         return remainingBombs > 0 && regrowthIndex >= 0;
     }
 
-    static boolean canPlantAgain(boolean planted, boolean harvested, boolean cloudActive) {
-        return !planted || (harvested && !cloudActive);
+    /** Track harvesting of a crop produced by the previous Regrowth bomb. */
+    static void recordHarvest(int cell) {
+        if (!planted || currentHero != Dungeon.hero || currentLevel != Dungeon.level) return;
+        Level level = Dungeon.level;
+        if (BlastAutoHarvest.harvestable(level.map[cell], level.plants.get(cell))) {
+            harvested = true;
+        }
     }
 
-    static boolean harvestable(int terrain, Plant plant) {
-        return terrain == Terrain.HIGH_GRASS
-                || (plant != null && !AutoPlayPlantSafety.isHarmful(plant));
+    static boolean canPlantAgain(boolean planted, boolean harvested, boolean cloudActive) {
+        return !planted || (harvested && !cloudActive);
     }
 
     static boolean sufficientArea(int count) {
@@ -163,15 +150,6 @@ public final class BlastAutoFarming {
                 || terrain == Terrain.FURROWED_GRASS;
     }
 
-    private static boolean hasVisibleEnemy(Hero hero) {
-        for (Mob mob : Dungeon.level.mobs) {
-            if (mob.isAlive() && mob.alignment == Char.Alignment.ENEMY
-                    && mob.invisible <= 0 && hero.fieldOfView[mob.pos]
-                    && BlastAutoPlay.isAwake(mob)) return true;
-        }
-        return false;
-    }
-
     private static boolean regrowthActive(Level level) {
         Blob cloud = level.blobs.get(BombRegrowth.class);
         return cloud != null && cloud.volume > 0;
@@ -182,14 +160,6 @@ public final class BlastAutoFarming {
             if (maniac.bombAt(i) instanceof RegrowthBomb) return i;
         }
         return -1;
-    }
-
-    /** Keep a remembered crop through brief line-of-sight loss around corners. */
-    private static int nearestCrop(Hero hero, boolean[] safe, int[] distances) {
-        Level level = Dungeon.level;
-        return harvesting.chooseDestination(hero.pos, safe, distances, hero.fieldOfView,
-                hero.canSelfTrample(), cell -> harvestable(
-                        level.map[cell], level.plants.get(cell)));
     }
 
     /** Cheap 7x7 local screen: O(1) area per candidate, independent of blast radius. */
