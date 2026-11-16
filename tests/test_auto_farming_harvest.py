@@ -1,40 +1,65 @@
 #!/usr/bin/env python3
-"""Verify that auto-farming harvests before applying bomb-only requirements."""
+"""Verify that ordinary auto-play harvests crops before optional Regrowth farming."""
 from pathlib import Path
 import unittest
 
-SOURCE = (
-    Path(__file__).resolve().parents[1]
-    / "core/src/main/java/com/spd/blast/BlastAutoFarming.java"
-)
+ROOT = Path(__file__).resolve().parents[1]
+AUTO_PLAY = ROOT / "core/src/main/java/com/spd/blast/BlastAutoPlay.java"
+FARMING = ROOT / "core/src/main/java/com/spd/blast/BlastAutoFarming.java"
+HARVEST = ROOT / "core/src/main/java/com/spd/blast/BlastAutoHarvest.java"
 
 
-class AutoFarmingHarvestTests(unittest.TestCase):
-    def test_grass_harvest_does_not_depend_on_bomb_mode_or_inventory(self):
-        code = SOURCE.read_text(encoding="utf-8")
-        action = code.split("static Action chooseAction(", 1)[1].split(
-            "static boolean regrowthReady(", 1
+class AutoPlayHarvestTests(unittest.TestCase):
+    def test_harvest_is_part_of_auto_play_without_farming_setting(self):
+        source = AUTO_PLAY.read_text(encoding="utf-8")
+        action = source.split("public static boolean chooseAction(Hero hero)", 1)[1].split(
+            "static boolean highEvasion(", 1
         )[0]
-        harvest = action.index("int nearest = nearestCrop(hero, safe, distances);")
-        move = action.index("return Action.MOVE;", harvest)
-        planting = action.index("BlastRemoteBomb.isTimedMode()", harvest)
-        self.assertLess(harvest, move)
-        self.assertLess(move, planting)
-        self.assertLess(move, action.index("BlastBombManiac.current()", harvest))
-        self.assertLess(move, action.index("findRegrowthType(maniac)", harvest))
+        pickup = action.index("BlastAutoPickup.chooseAction(hero")
+        harvest = action.index("if (harvest(hero, safe, distances)) return false;")
+        farming = action.index("BlastAutoFarming.chooseAction(hero, safe, distances)")
+        roaming = action.index("roamStep(hero, safe, distances)")
+        self.assertLess(pickup, harvest)
+        self.assertLess(harvest, farming)
+        self.assertLess(farming, roaming)
 
-    def test_harvest_still_requires_safe_ground_and_no_awake_enemy(self):
-        code = SOURCE.read_text(encoding="utf-8")
-        action = code.split("static Action chooseAction(", 1)[1].split(
-            "static boolean regrowthReady(", 1
+        harvest_action = source.split("private static boolean harvest(", 1)[1].split(
+            "static boolean hasVisibleEnemy(", 1
         )[0]
-        harvest = action.index("int nearest = nearestCrop(hero, safe, distances);")
-        self.assertLess(action.index("hero.flying || hasVisibleEnemy(hero)"), harvest)
-        crop = code.split("private static int nearestCrop(", 1)[1].split(
-            "static int localGrowable(", 1
+        self.assertIn("harvesting.chooseDestination(", harvest_action)
+        self.assertIn("BlastAutoFarming.recordHarvest(next)", harvest_action)
+        self.assertIn("roaming.clearDestination()", harvest_action)
+        self.assertNotIn("BlastSettings.autoFarming()", harvest_action)
+
+    def test_harvest_observes_safety_rules_and_existing_goal(self):
+        source = AUTO_PLAY.read_text(encoding="utf-8")
+        harvest_action = source.split("private static boolean harvest(", 1)[1].split(
+            "static boolean hasVisibleEnemy(", 1
         )[0]
-        self.assertIn("!safe[cell]", crop)
-        self.assertIn("!harvestable(level.map[cell], level.plants.get(cell))", crop)
+        self.assertIn("hero.flying || hero.rooted || hasVisibleEnemy(hero)", harvest_action)
+        self.assertIn("hero.fieldOfView, hero.canSelfTrample()", harvest_action)
+        self.assertIn("BlastAutoHarvest.harvestable(level.map[cell], level.plants.get(cell))",
+                      harvest_action)
+        self.assertEqual(source.count("harvesting.reset();"), 2)
+
+        classification = HARVEST.read_text(encoding="utf-8")
+        self.assertIn("terrain == Terrain.HIGH_GRASS", classification)
+        self.assertIn("!AutoPlayPlantSafety.isHarmful(plant)", classification)
+        self.assertIn("safe[destination]", classification)
+        self.assertIn("!visible[cell] || !safe[cell]", classification)
+
+    def test_farming_only_chooses_regrowth_and_tracks_harvest(self):
+        farming = FARMING.read_text(encoding="utf-8")
+        action = farming.split("static Action chooseAction(", 1)[1].split(
+            "static void recordHarvest(", 1
+        )[0]
+        self.assertIn("!BlastSettings.autoFarming()", action)
+        self.assertIn("BlastAutoPlay.hasVisibleEnemy(hero)", action)
+        self.assertNotIn("nearestCrop(", farming)
+        self.assertNotIn("harvesting.chooseDestination(", farming)
+        self.assertIn("if (planted)", action)
+        self.assertIn("canPlantAgain(planted, harvested, regrowthActive(level))", action)
+        self.assertIn("if (BlastAutoHarvest.harvestable(", farming)
 
 
 if __name__ == "__main__":
