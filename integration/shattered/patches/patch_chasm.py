@@ -38,18 +38,18 @@ def patch(path: Path) -> None:
 
     source = replace_once(
         source,
+        "\t\t\t\t\t\t\t}\n"
         "\t\t\t\t\t\t}\n"
-        "\t\t\t\t\t}\n"
         "\t\t\t\t);",
-        "\t\t\t\t\t\t}\n"
+        "\t\t\t\t\t\t\t}\n"
         "\n"
-        "\t\t\t\t\t\t@Override\n"
-        "\t\t\t\t\t\tpublic void onBackPressed() {\n"
-        "\t\t\t\t\t\t\tif (elapsed <= 0.2f) return;\n"
-        "\t\t\t\t\t\t\tsuper.onBackPressed();\n"
-        "\t\t\t\t\t\t\tcom.spd.blast.BlastAutoPlay.cancelManualConfirmation(hero);\n"
+        "\t\t\t\t\t\t\t@Override\n"
+        "\t\t\t\t\t\t\tpublic void onBackPressed() {\n"
+        "\t\t\t\t\t\t\t\tif (elapsed <= 0.2f) return;\n"
+        "\t\t\t\t\t\t\t\tsuper.onBackPressed();\n"
+        "\t\t\t\t\t\t\t\tcom.spd.blast.BlastAutoPlay.cancelManualConfirmation(hero);\n"
+        "\t\t\t\t\t\t\t}\n"
         "\t\t\t\t\t\t}\n"
-        "\t\t\t\t\t}\n"
         "\t\t\t\t);",
         "chasm dialog dismissed"
     )
