@@ -69,9 +69,10 @@ public final class BlastAutoEnvironment {
         boolean[] dangerous = new boolean[level.length()];
         if (!(level instanceof RegularLevel)) return dangerous;
 
-        List<Room> rooms = ((RegularLevel) level).rooms();
+        List<Room> rooms = null;
         for (Mob mob : level.mobs) {
             if (!(mob instanceof SentryRoom.Sentry) || !mob.isAlive()) continue;
+            if (rooms == null) rooms = ((RegularLevel) level).rooms();
             for (Room room : rooms) {
                 if (room instanceof SentryRoom
                         && room.inside(level.cellToPoint(mob.pos))) {
