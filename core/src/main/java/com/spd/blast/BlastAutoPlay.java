@@ -601,6 +601,7 @@ public final class BlastAutoPlay {
         lastRetryCell = -1;
         manualAction = false;
         manualConfirmationHero = null;
+        pendingManualCell.set(-1);
         waitingForInput = false;
         pendingBombInputs.clear();
         BlastAutoPickup.reset();
