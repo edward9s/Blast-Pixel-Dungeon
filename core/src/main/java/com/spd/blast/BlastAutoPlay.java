@@ -11,6 +11,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Necromancer;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Thief;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Wraith;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.NPC;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.Sheep;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.MagesStaff;
@@ -99,6 +100,7 @@ public final class BlastAutoPlay {
         if (!BlastSettings.testAutoPlay() || !(source instanceof Char)) return;
         Char attacker = (Char) source;
         if (attacker == hero || attacker.alignment == Char.Alignment.ALLY
+                || attacker instanceof NPC
                 || (attacker instanceof Mob && avoidEvasiveNeutral(hero, (Mob) attacker))) return;
         resetForLevel(hero);
         if (ignoredTarget == attacker) {
@@ -308,6 +310,7 @@ public final class BlastAutoPlay {
 
         for (Mob mob : Dungeon.level.mobs) {
             if (!mob.isAlive() || mob.alignment == Char.Alignment.ALLY
+                    || isProtectedNpc(mob)
                     || mob.invisible > 0 || !isAwake(mob) || ignored(mob)
                     || hero.isCharmedBy(mob)) continue;
 
@@ -373,6 +376,7 @@ public final class BlastAutoPlay {
             }
             for (Mob mob : Dungeon.level.mobs) {
                 if (mob.isAlive() && mob.alignment != Char.Alignment.ALLY
+                        && !isProtectedNpc(mob)
                         && mob.invisible == 0 && hero.fieldOfView[mob.pos]
                         && isAwake(mob) && !ignored(mob)
                         && !mob.isInvulnerable(Hero.class) && !hero.isCharmedBy(mob)
@@ -387,6 +391,7 @@ public final class BlastAutoPlay {
 
         if (attackerTurns > 0 && lastAttacker != null
                 && lastAttacker.isAlive() && lastAttacker.isInvulnerable(Hero.class)
+                && !(lastAttacker instanceof NPC)
                 && (!(lastAttacker instanceof Mob) || isAwake((Mob) lastAttacker))) {
             int step = retreatStep(hero, lastAttacker.pos, safe, distances);
             if (step >= 0) hero.curAction = new HeroAction.Move(step);
@@ -431,6 +436,7 @@ public final class BlastAutoPlay {
             attackerTurns--;
             if (lastAttacker != null && lastAttacker.isAlive()
                     && lastAttacker.alignment != Char.Alignment.ALLY
+                    && !(lastAttacker instanceof NPC)
                     && (!(lastAttacker instanceof Mob)
                         || (isAwake((Mob) lastAttacker)
                             && !avoidEvasiveNeutral(hero, (Mob) lastAttacker)))) {
@@ -475,6 +481,7 @@ public final class BlastAutoPlay {
     }
 
     private static boolean useWand(Hero hero, Mob target) {
+        if (isProtectedNpc(target)) return false;
         // Ranged opponents are always approached for melee, except for bomb attacks.
         if (BlastAutoSacrifice.isRangedEnemy(target.getClass())) return false;
         // High-evasion enemies retain their existing wand fallback.
@@ -541,6 +548,11 @@ public final class BlastAutoPlay {
                 || (steps == otherSteps && distance < otherDistance)));
     }
 
+    /** Quest and service NPCs are never auto-combat targets, regardless of alignment. */
+    static boolean isProtectedNpc(Mob mob) {
+        return mob instanceof NPC;
+    }
+
     /** Sleeping enemies are deliberately left alone by automatic combat. */
     static boolean isAwake(Mob mob) {
         return mob.state != mob.SLEEPING;
@@ -605,6 +617,7 @@ public final class BlastAutoPlay {
         }
         if (combatTarget == null) return false;
         if (!combatTarget.isAlive() || combatTarget.alignment == Char.Alignment.ALLY
+                || isProtectedNpc(combatTarget)
                 || combatTarget.invisible > 0 || !isAwake(combatTarget)
                 || hero.isCharmedBy(combatTarget)
                 || combatTarget.isInvulnerable(Hero.class)
