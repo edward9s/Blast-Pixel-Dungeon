@@ -15,6 +15,7 @@ public final class BlastAutoPlayTag extends Tag {
 
     public BlastAutoPlayTag() {
         super(0x7B8073);
+        setColor(0x7B8073);
         for (int i = 0; i < play.length; i++) {
             play[i] = new ColorBlock(2, 11 - i * 2, 0xFFFFFFFF);
             add(play[i]);
