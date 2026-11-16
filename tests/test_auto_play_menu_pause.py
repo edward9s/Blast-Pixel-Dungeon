@@ -61,7 +61,7 @@ class AutoPlayPauseTagTests(unittest.TestCase):
         code = injected_java(HERO_PATCH, "Hero.act automatic actions")
         self.assertLess(code.index("BlastAutoPlay.pauseForManualInput(this)"),
                         code.index("BlastAutoPlay.pauseForUser(this)"))
-        self.assertIn("BlastAutoPlay.pauseForUser(this)) {\\n\\t\\t\\tready();", code)
+        self.assertIn("BlastAutoPlay.pauseForUser(this)) {\n\t\t\tready();", code)
         self.assertLess(code.index("BlastAutoPlay.pauseForUser(this)"),
                         code.index("BlastAutoPlay.performBombInput(this)"))
         pause = AUTO_PLAY.read_text(encoding="utf-8").split(
@@ -72,7 +72,7 @@ class AutoPlayPauseTagTests(unittest.TestCase):
 
     def test_manual_actions_and_resume(self):
         source = AUTO_PLAY.read_text(encoding="utf-8")
-        self.assertIn("if (!isPaused() || manualActionActive(hero) || !pendingBombInputs.isEmpty()) return false;", source)
+        self.assertIn("return isPaused() && !manualActionActive(hero) && pendingBombInputs.isEmpty();", source)
         self.assertIn("public static boolean pauseForUser(Hero hero)", source)
         self.assertIn("if (resume && Dungeon.hero.ready && !GameScene.manualInputPending())", source)
         self.assertIn("BlastSettings.testAutoPlay() && !isPaused() && hero != null && hero.ready", source)
