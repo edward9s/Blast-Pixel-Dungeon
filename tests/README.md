@@ -230,3 +230,16 @@ javac --release 11 -encoding UTF-8 -cp "$BLAST_TEST_CLASSPATH" \
   -d /tmp/blast-tests tests/BlastAutoSacrificeTest.java
 java -cp "/tmp/blast-tests:$BLAST_TEST_CLASSPATH" com.spd.blast.BlastAutoSacrificeTest
 ```
+
+
+`BlastAutoRoamingTest.java` verifies that auto-play prefers the nearest reachable
+unexplored frontier, preserves its selected destination, excludes failed
+corners, and idles when there is nothing left to explore. Previously rejected
+frontiers become eligible again after solid obstacles change or roaming resets.
+The navigator only considers known traversable cells.
+
+```sh
+javac --release 11 -encoding UTF-8 -cp "$BLAST_TEST_CLASSPATH" \
+  -d /tmp/blast-tests tests/BlastAutoRoamingTest.java
+java -cp "/tmp/blast-tests:$BLAST_TEST_CLASSPATH" com.spd.blast.BlastAutoRoamingTest
+```
