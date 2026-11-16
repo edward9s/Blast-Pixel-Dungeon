@@ -60,7 +60,7 @@ class AutoPlayPauseSaveTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "Dungeon.java"
             path.write_text(DUNGEON_FIXTURE.replace(
-                "\t\t\thero = (Hero)bundle.get( HERO );",
+                "\t\thero = (Hero)bundle.get( HERO );",
                 "\t\t\thero = (Hero)bundle.get( OTHER_HERO );",
             ), encoding="utf-8")
             with self.assertRaises(SystemExit):
