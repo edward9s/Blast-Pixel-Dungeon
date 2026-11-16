@@ -201,6 +201,16 @@ def patch(path: Path) -> None:
         "\t\t\t}",
         "actor-thread manual cell input")
 
+    # The AI bypasses Hero.ready() on new floors, so the native default
+    # listener must be installed even before the first manual-ready turn.
+    source = replace(source,
+        "\t\tadd( cellSelector = new CellSelector( tiles ) );",
+        "\t\tadd( cellSelector = new CellSelector( tiles ) );\n"
+        "\t\tif (com.spd.blast.BlastSettings.testAutoPlay()) {\n"
+        "\t\t\tcellSelector.listener = defaultCellListener;\n"
+        "\t\t}",
+        "initial auto-play map listener")
+
     source = replace(source,
         "\t\tcellSelector.enable(Dungeon.hero.ready);",
         "\t\tcellSelector.enable(Dungeon.hero.ready || com.spd.blast.BlastSettings.testAutoPlay());",
