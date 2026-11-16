@@ -57,6 +57,10 @@ class ManualPriorityTests(unittest.TestCase):
         self.assertIn("BlastAutoPlay.requestManualCell(cell)", code)
         self.assertIn("else if (Dungeon.hero.handle( cell ))", code)
 
+    def test_map_listener_exists_on_auto_play_start(self):
+        code = injection(SCENE, "initial auto-play map listener")
+        self.assertIn("cellSelector.listener = defaultCellListener", code)
+
     def test_input_precedes_ai_and_bombs(self):
         code = injection(HERO, "Hero.act automatic actions")
         manual = code.index("BlastAutoPlay.performManualCell(this)")
@@ -68,6 +72,12 @@ class ManualPriorityTests(unittest.TestCase):
         self.assertLess(bomb, ai)
         self.assertIn("&& !com.spd.blast.BlastAutoPlay.manualActionActive(this)\n"
                       "\t\t\t\t&& com.spd.blast.BlastAutoPlay.performBombInput(this)", code)
+
+    def test_manual_completion_returns_to_actor_loop(self):
+        code = injection(HERO, "Hero.act wait for door unlock animation")
+        self.assertIn("boolean blastManualFinished", code)
+        self.assertIn("return (blastManualFinished || actResult)", code)
+        self.assertNotIn("finishManualAction(this)) next()", code)
 
     def test_latest_click_consumed_atomically(self):
         source = AUTO.read_text(encoding="utf-8")
