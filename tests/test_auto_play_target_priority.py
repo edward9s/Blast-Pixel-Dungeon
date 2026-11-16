@@ -62,7 +62,7 @@ class AutoTargetPriorityTests(unittest.TestCase):
             "blastReachesTarget(bomb.blastWarningCells(landing), mob.pos)",
             source,
         )
-        self.assertIn("containsRareMob(blast)", source)
+        self.assertIn("containsProtectedMob(blast)", source)
         self.assertIn("BlastRemoteBomb.isTimedMode()", source)
 
 
