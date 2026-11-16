@@ -135,9 +135,9 @@ def patch(path: Path) -> None:
     s = replace_once(
         s,
         "\t\treturn actResult;\n\t}",
-        "\t\tif (com.spd.blast.BlastSettings.testAutoPlay()\n"
-        "\t\t\t\t&& com.spd.blast.BlastAutoPlay.finishManualAction(this)) next();\n"
-        "\t\treturn actResult && blastActionAfterUnlock == null;\n\t}",
+        "\t\tboolean blastManualFinished = com.spd.blast.BlastSettings.testAutoPlay()\n"
+        "\t\t\t\t&& com.spd.blast.BlastAutoPlay.finishManualAction(this);\n"
+        "\t\treturn (blastManualFinished || actResult) && blastActionAfterUnlock == null;\n\t}",
         "Hero.act wait for door unlock animation"
     )
     s = replace_once(
@@ -186,6 +186,17 @@ def patch(path: Path) -> None:
         "Hero.handle mining versus phasing"
     )
 
+    # A chasm prompt suspends the manual move until the user decides.
+    s = replace_once(
+        s,
+        "\t\t\t\tif (!Chasm.jumpConfirmed){\n"
+        "\t\t\t\t\tChasm.heroJump(this);",
+        "\t\t\t\tif (!Chasm.jumpConfirmed){\n"
+        "\t\t\t\t\tcom.spd.blast.BlastAutoPlay.beginManualConfirmation(this);\n"
+        "\t\t\t\t\tChasm.heroJump(this);",
+        "Hero.getCloser chasm confirmation"
+    )
+
     # Map taps and directional input retain the native multi-turn HeroAction.
     s = replace_once(
         s,
@@ -202,6 +213,9 @@ def patch(path: Path) -> None:
     s = replace_once(
         s,
         "\t\tboolean actResult;\n\t\tif (curAction == null) {",
+        "\t\tif (com.spd.blast.BlastSettings.testAutoPlay()) {\n"
+        "\t\t\tcom.spd.blast.BlastAutoPlay.performManualCell(this);\n"
+        "\t\t}\n"
         "\t\tif (com.spd.blast.BlastSettings.testAutoPlay()\n"
         "\t\t\t\t&& com.spd.blast.BlastAutoPlay.pauseForManualInput(this)) {\n"
         "\t\t\treturn false;\n"
@@ -212,6 +226,7 @@ def patch(path: Path) -> None:
         "\t\t\treturn false;\n"
         "\t\t}\n"
         "\t\tif (com.spd.blast.BlastSettings.testAutoPlay()\n"
+        "\t\t\t\t&& !com.spd.blast.BlastAutoPlay.manualActionActive(this)\n"
         "\t\t\t\t&& com.spd.blast.BlastAutoPlay.performBombInput(this)) {\n"
         "\t\t\treturn false;\n"
         "\t\t}\n"

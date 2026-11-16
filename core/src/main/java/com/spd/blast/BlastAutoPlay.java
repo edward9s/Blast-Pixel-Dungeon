@@ -26,6 +26,7 @@ import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
 import com.watabou.utils.PathFinder;
 
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicReference;
 
 /** Autonomous testing, one ordinary HeroAction per actor turn. */
 public final class BlastAutoPlay {
@@ -50,9 +51,23 @@ public final class BlastAutoPlay {
     private static int ignoredTargetCell = -1;
     private static int lastRetryCell = -1;
     private static volatile boolean manualAction;
+    private static volatile Hero manualConfirmationHero;
+    private static final AtomicReference<ManualCell> pendingManualCell = new AtomicReference<>();
     private static volatile boolean waitingForInput;
     private static volatile Hero pausedHero;
     private static final ConcurrentLinkedQueue<BombInput> pendingBombInputs = new ConcurrentLinkedQueue<>();
+
+    private static final class ManualCell {
+        final Hero hero;
+        final Level level;
+        final int destination;
+
+        ManualCell(Hero hero, Level level, int destination) {
+            this.hero = hero;
+            this.level = level;
+            this.destination = destination;
+        }
+    }
 
     private enum BombAction { PLACE, THROW, DETONATE, TOGGLE }
 
@@ -81,6 +96,8 @@ public final class BlastAutoPlay {
         ignoredTargetCell = -1;
         lastRetryCell = -1;
         manualAction = false;
+        manualConfirmationHero = null;
+        pendingManualCell.set(null);
         waitingForInput = false;
         if (!BlastSettings.testAutoPlay()) pausedHero = null;
         pendingBombInputs.clear();
@@ -119,6 +136,7 @@ public final class BlastAutoPlay {
         if (!BlastSettings.testAutoPlay()) return;
         resetForLevel(hero);
         manualAction = true;
+        manualConfirmationHero = null;
         resetPursuitMemory();
         roaming.reset();
         lastRetryCell = -1;
@@ -129,9 +147,59 @@ public final class BlastAutoPlay {
     }
 
     public static boolean finishManualAction(Hero hero) {
-        if (!manualActionActive(hero) || hero.curAction != null) return false;
+        if (!manualActionActive(hero) || hero.curAction != null
+                || manualConfirmationHero == hero) return false;
         manualAction = false;
         return true;
+    }
+
+    /** Retain an interrupted manual action until a confirmation window finishes. */
+    public static void beginManualConfirmation(Hero hero) {
+        if (manualActionActive(hero)) manualConfirmationHero = hero;
+    }
+
+    /** Accepting a confirmation lets the native callback resume the saved action. */
+    public static void acceptManualConfirmation(Hero hero) {
+        if (manualConfirmationHero == hero) manualConfirmationHero = null;
+    }
+
+    /** Cancelling the prompt discards the saved action and wakes the hero. */
+    public static void cancelManualConfirmation(Hero hero) {
+        if (manualConfirmationHero != hero) return;
+        manualConfirmationHero = null;
+        manualAction = false;
+        hero.lastAction = null;
+        if (hero == Dungeon.hero && BlastSettings.testAutoPlay()) hero.next();
+    }
+
+    /**
+     * Map clicks arrive on the render thread. The latest click wins and is
+     * interpreted on the actor thread before another automated action.
+     */
+    public static void requestManualCell(int cell) {
+        Hero hero = Dungeon.hero;
+        Level level = Dungeon.level;
+        if (!BlastSettings.testAutoPlay() || hero == null || level == null) {
+            throw new IllegalStateException("Cannot request manual movement without auto-play");
+        }
+        if (!level.insideMap(cell)) {
+            throw new IllegalArgumentException("Invalid manual destination: " + cell);
+        }
+        pendingManualCell.set(new ManualCell(hero, level, cell));
+        if (hero.ready) hero.next();
+    }
+
+    /** This is called by Hero.act, not the render callback. */
+    public static void performManualCell(Hero hero) {
+        if (!BlastSettings.testAutoPlay()) return;
+        ManualCell input = pendingManualCell.getAndSet(null);
+        resetForLevel(hero);
+        if (input == null || input.hero != hero || input.level != Dungeon.level) return;
+        hero.lastAction = null;
+        hero.resting = false;
+        if (!hero.handle(input.destination)) {
+            throw new IllegalStateException("Queued manual destination was rejected: " + input.destination);
+        }
     }
 
     /** An explicit item action supersedes the last AI movement order. */
@@ -139,6 +207,8 @@ public final class BlastAutoPlay {
         if (!BlastSettings.testAutoPlay()) return;
         resetForLevel(hero);
         manualAction = false;
+        manualConfirmationHero = null;
+        pendingManualCell.set(null);
         hero.curAction = null;
         hero.lastAction = null;
         hero.resting = false;
@@ -231,6 +301,7 @@ public final class BlastAutoPlay {
         BombInput input = pendingBombInputs.poll();
         if (input == null) return false;
         manualAction = false;
+        manualConfirmationHero = null;
         hero.curAction = null;
         hero.lastAction = null;
         hero.resting = false;
@@ -541,6 +612,8 @@ public final class BlastAutoPlay {
         ignoredTargetCell = -1;
         lastRetryCell = -1;
         manualAction = false;
+        manualConfirmationHero = null;
+        pendingManualCell.set(null);
         waitingForInput = false;
         pendingBombInputs.clear();
         BlastAutoPickup.reset();
