@@ -39,6 +39,13 @@ public final class BlastAutoRoamingTest {
     }
 
     public static void main(String[] args) {
+        Map stalledMap = new Map();
+        BlastAutoRoaming stalled = new BlastAutoRoaming();
+        equal(16, stalledMap.select(stalled, 24), "initial goal for stall test");
+        equal(16, stalledMap.select(stalled, 24), "first stationary attempt");
+        equal(16, stalledMap.select(stalled, 24), "second stationary attempt");
+        equal(32, stalledMap.select(stalled, 24), "third stalled attempt skips goal");
+
         Map map = new Map();
         BlastAutoRoaming roaming = new BlastAutoRoaming();
         equal(16, map.select(roaming, 24), "nearest frontier");

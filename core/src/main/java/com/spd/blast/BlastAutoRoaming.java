@@ -5,14 +5,26 @@ import java.util.Arrays;
 
 /** Explore reachable unknown boundaries without revisiting unproductive corners. */
 final class BlastAutoRoaming {
+    private static final int MAX_STALLED_ROAMS = 3;
+
     private int destination = -1;
     private boolean[] failedFrontiers;
     private boolean[] solidSnapshot;
+    private int progressGoal = -1;
+    private int bestGoalDistance = Integer.MAX_VALUE;
+    private int stalledRoams;
 
     void reset() {
         destination = -1;
         failedFrontiers = null;
         solidSnapshot = null;
+        resetProgress();
+    }
+
+    private void resetProgress() {
+        progressGoal = -1;
+        bestGoalDistance = Integer.MAX_VALUE;
+        stalledRoams = 0;
     }
 
     int chooseDestination(int position, int width, boolean[] safe, int[] distances,
@@ -33,6 +45,7 @@ final class BlastAutoRoaming {
         } else if (!Arrays.equals(solidSnapshot, solid)) {
             Arrays.fill(failedFrontiers, false);
             System.arraycopy(solid, 0, solidSnapshot, 0, length);
+            resetProgress();
         }
 
         if (destination == position) {
@@ -41,14 +54,26 @@ final class BlastAutoRoaming {
                 failedFrontiers[destination] = true;
             }
             destination = -1;
+            resetProgress();
         }
 
-        // Preserve the current goal until reached or no longer reachable.
+        // Detect repeated visits to the same region without getting closer.
+        // This also bounds loops caused by another automatic action interrupting roaming.
         if (destination >= 0 && safe[destination]
                 && distances[destination] != Integer.MAX_VALUE) {
-            return destination;
+            int remaining = distances[destination];
+            if (progressGoal != destination || remaining < bestGoalDistance) {
+                progressGoal = destination;
+                bestGoalDistance = remaining;
+                stalledRoams = 0;
+            } else if (++stalledRoams >= MAX_STALLED_ROAMS) {
+                failedFrontiers[destination] = true;
+                destination = -1;
+            }
+            if (destination >= 0) return destination;
         }
         destination = -1;
+        resetProgress();
 
         int shortest = Integer.MAX_VALUE;
         int ties = 0;
@@ -66,6 +91,10 @@ final class BlastAutoRoaming {
             } else if (Random.Int(++ties) == 0) {
                 destination = cell;
             }
+        }
+        if (destination >= 0) {
+            progressGoal = destination;
+            bestGoalDistance = shortest;
         }
         // No viable frontier: let normal idle turns handle new activity.
         return destination;

@@ -27,6 +27,7 @@ public final class BlastAutoFarming {
     private static boolean planted;
     private static boolean harvested;
     private static int farmingSite = -1;
+    private static final BlastAutoHarvest harvesting = new BlastAutoHarvest();
     private static int farmingBlastCell = -1;
     private static boolean siteUsesRemoteThrow;
     private static float nextSearchAt = Float.NEGATIVE_INFINITY;
@@ -39,6 +40,7 @@ public final class BlastAutoFarming {
         planted = false;
         harvested = false;
         farmingSite = farmingBlastCell = -1;
+        harvesting.reset();
         nextSearchAt = Float.NEGATIVE_INFINITY;
     }
 
@@ -182,22 +184,12 @@ public final class BlastAutoFarming {
         return -1;
     }
 
-    /** Use the existing route map and avoid harmful plants and traps. */
+    /** Keep a remembered crop through brief line-of-sight loss around corners. */
     private static int nearestCrop(Hero hero, boolean[] safe, int[] distances) {
         Level level = Dungeon.level;
-        int target = -1;
-        int shortest = Integer.MAX_VALUE;
-        for (int cell = 0; cell < level.length(); cell++) {
-            if (!hero.fieldOfView[cell] || !safe[cell]
-                    || distances[cell] == Integer.MAX_VALUE
-                    || !harvestable(level.map[cell], level.plants.get(cell))) continue;
-            if (cell == hero.pos && !hero.canSelfTrample()) continue;
-            if (distances[cell] < shortest) {
-                target = cell;
-                shortest = distances[cell];
-            }
-        }
-        return target;
+        return harvesting.chooseDestination(hero.pos, safe, distances, hero.fieldOfView,
+                hero.canSelfTrample(), cell -> harvestable(
+                        level.map[cell], level.plants.get(cell)));
     }
 
     /** Cheap 7x7 local screen: O(1) area per candidate, independent of blast radius. */

@@ -243,3 +243,17 @@ javac --release 11 -encoding UTF-8 -cp "$BLAST_TEST_CLASSPATH" \
   -d /tmp/blast-tests tests/BlastAutoRoamingTest.java
 java -cp "/tmp/blast-tests:$BLAST_TEST_CLASSPATH" com.spd.blast.BlastAutoRoamingTest
 ```
+
+`BlastAutoHarvestTest.java` verifies that auto-farming retains a selected crop
+when movement around a wall temporarily hides it, then revalidates the crop
+after it becomes visible again. This prevents harvest-versus-roam oscillation.
+`BlastAutoRoamingTest.java` additionally checks that a roaming goal is rejected
+after repeated attempts make no progress, even if another automatic action
+temporarily interrupts movement.
+
+```sh
+javac --release 11 -encoding UTF-8 -cp "$BLAST_TEST_CLASSPATH" \
+  -d /tmp/blast-tests tests/BlastAutoHarvestTest.java tests/BlastAutoRoamingTest.java
+java -cp "/tmp/blast-tests:$BLAST_TEST_CLASSPATH" com.spd.blast.BlastAutoHarvestTest
+java -cp "/tmp/blast-tests:$BLAST_TEST_CLASSPATH" com.spd.blast.BlastAutoRoamingTest
+```
