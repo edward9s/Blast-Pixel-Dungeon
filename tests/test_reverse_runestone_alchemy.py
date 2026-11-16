@@ -47,6 +47,7 @@ class ReverseRunestoneAlchemyTests(unittest.TestCase):
         self.assertIn("ingredients.size() != 2", scroll)
         self.assertIn("new Scroll.StoneToScroll()", recipe)
         self.assertIn("scroll.identify();", scroll)
+        self.assertIn("return 6;", scroll)
         self.assertIn("stone.quantity(stone.quantity() - 1);", scroll)
         self.assertIn("return scroll.isKnown() ? scroll : new Scroll.PlaceHolder();", scroll)
         self.assertIn("BlastSettings.enchantmentStoneReverseAlchemy()", scroll)

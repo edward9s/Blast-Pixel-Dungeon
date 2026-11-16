@@ -66,6 +66,7 @@ class ReverseAlchemyGuideTests(unittest.TestCase):
         self.assertIn("BlastSettings.enchantmentStoneReverseAlchemy()", journal)
         self.assertIn("case 9:", recipe)
         self.assertIn("new Scroll.StoneToScroll()", recipe)
+        self.assertIn("new QuickRecipe(r,", recipe)
         self.assertIn("r.testIngredients(recipeInputs)", recipe)
         self.assertIn("Item output = r.sampleOutput(recipeInputs);", recipe)
         self.assertIn("new ArrayList<>(Arrays.asList(stone.quantity(2)))", recipe)
@@ -95,6 +96,9 @@ class ReverseAlchemyGuideTests(unittest.TestCase):
             found = {line.split("=", 1)[0] for line in locale.read_text(
                 encoding="utf-8").splitlines() if "=" in line}
             self.assertTrue(keys.issubset(found), locale.name)
+            reverse_body = next(line for line in locale.read_text(encoding="utf-8").splitlines()
+                                if line.startswith("blast.alchemy.reverse_stones.body="))
+            self.assertIn("6", reverse_body, locale.name)
 
 
 if __name__ == "__main__":
