@@ -7,7 +7,7 @@ import com.shatteredpixel.shatteredpixeldungeon.plants.Sorrowmoss;
 import com.shatteredpixel.shatteredpixeldungeon.plants.Starflower;
 import com.shatteredpixel.shatteredpixeldungeon.plants.Sungrass;
 
-/** Regression checks for Blast-only farming decisions. */
+/** Regression checks for Regrowth farming and ordinary auto-play harvest targets. */
 public final class BlastAutoFarmingTest {
     private static void plantAgain(boolean expected, boolean planted,
                                    boolean harvested, boolean cloudActive) {
@@ -18,13 +18,13 @@ public final class BlastAutoFarmingTest {
 
     private static void crop(boolean expected, int terrain,
                              com.shatteredpixel.shatteredpixeldungeon.plants.Plant plant) {
-        if (BlastAutoFarming.harvestable(terrain, plant) != expected) {
+        if (BlastAutoHarvest.harvestable(terrain, plant) != expected) {
             throw new AssertionError("Unexpected farming harvest eligibility");
         }
     }
 
     public static void main(String[] args) {
-        // Bomb readiness affects new planting only; harvest runs without bombs.
+        // Bomb readiness affects planting only; basic auto-play harvest is independent.
         if (BlastAutoFarming.regrowthReady(0, 0)
                 || BlastAutoFarming.regrowthReady(1, -1)
                 || !BlastAutoFarming.regrowthReady(1, 0)) {
