@@ -79,24 +79,48 @@ public final class BlastAutoRoamingTest {
         map.solid[17] = true;
         equal(16, map.select(roaming, 32), "retest after topology change");
 
-        roaming.reset();
-        Arrays.fill(map.visited, true);
-        equal(-1, map.select(roaming, 24), "complete floor stays idle");
+        Map complete = new Map();
+        Arrays.fill(complete.visited, true);
+        BlastAutoRoaming ordinary = new BlastAutoRoaming();
+        equal(32, complete.select(ordinary, 24),
+                "completed exploration still roams to a distant cell");
+        ordinary.clearDestination();
+        complete.distances[16] = 3;
+        complete.distances[32] = 2;
+        equal(16, complete.select(ordinary, 24),
+                "longer roaming trip preferred to short trip");
+        ordinary.clearDestination();
+        complete.distances[16] = 1;
+        equal(32, complete.select(ordinary, 24),
+                "two-step wandering preferred over one-step bounce");
+        ordinary.clearDestination();
+        complete.distances[32] = Integer.MAX_VALUE;
+        equal(-1, complete.select(ordinary, 24),
+                "avoid adjacent-only oscillation");
 
-        map.visited[15] = false;
-        map.mapped[15] = true;
-        equal(-1, map.select(roaming, 24), "mapped cells are known");
-        map.mapped[15] = false;
-        map.visible[15] = true;
-        equal(-1, map.select(roaming, 24), "visible cells are known");
+        Map mapped = new Map();
+        mapped.mapped[15] = true;
+        mapped.visited[33] = true;
+        equal(32, mapped.select(new BlastAutoRoaming(), 24),
+                "mapped cells do not count as frontiers");
+        mapped.mapped[15] = false;
+        mapped.visible[15] = true;
+        equal(32, mapped.select(new BlastAutoRoaming(), 24),
+                "visible cells do not count as frontiers");
 
-        roaming.reset();
-        map.visible[15] = false;
-        map.safe[16] = false;
-        equal(-1, map.select(roaming, 24), "unsafe frontier excluded");
-        map.safe[16] = true;
-        map.distances[16] = Integer.MAX_VALUE;
-        equal(-1, map.select(roaming, 24), "unreachable frontier excluded");
+        Map unreachable = new Map();
+        unreachable.safe[16] = false;
+        unreachable.distances[32] = Integer.MAX_VALUE;
+        equal(-1, unreachable.select(new BlastAutoRoaming(), 24),
+                "unreachable frontier or fallback excluded");
+
+        Map handoff = new Map();
+        BlastAutoRoaming interrupted = new BlastAutoRoaming();
+        equal(16, handoff.select(interrupted, 24), "initial roam goal");
+        interrupted.clearDestination();
+        handoff.distances[32] = 1;
+        equal(32, handoff.select(interrupted, 24),
+                "farming cancels stale roaming destination");
 
         System.out.println("BlastAutoRoamingTest passed");
     }

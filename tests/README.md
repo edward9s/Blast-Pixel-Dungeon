@@ -257,3 +257,8 @@ javac --release 11 -encoding UTF-8 -cp "$BLAST_TEST_CLASSPATH" \
 java -cp "/tmp/blast-tests:$BLAST_TEST_CLASSPATH" com.spd.blast.BlastAutoHarvestTest
 java -cp "/tmp/blast-tests:$BLAST_TEST_CLASSPATH" com.spd.blast.BlastAutoRoamingTest
 ```
+
+Once no useful exploration frontier remains, auto-play keeps roaming to
+random reachable known cells, preferring paths at least three steps long.
+Auto-farming movement clears its previous roaming goal so a completed harvest
+does not immediately send the hero back to an obsolete destination.

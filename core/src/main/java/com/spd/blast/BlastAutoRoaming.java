@@ -3,21 +3,28 @@ package com.spd.blast;
 import com.watabou.utils.Random;
 import java.util.Arrays;
 
-/** Explore reachable unknown boundaries without revisiting unproductive corners. */
+/** Explore unknown boundaries first, then roam across known reachable terrain. */
 final class BlastAutoRoaming {
     private static final int MAX_STALLED_ROAMS = 3;
+    private static final int MIN_DISTANT_STEPS = 3;
 
     private int destination = -1;
-    private boolean[] failedFrontiers;
+    private boolean frontierDestination;
+    private boolean[] failedDestinations;
     private boolean[] solidSnapshot;
     private int progressGoal = -1;
     private int bestGoalDistance = Integer.MAX_VALUE;
     private int stalledRoams;
 
     void reset() {
-        destination = -1;
-        failedFrontiers = null;
+        clearDestination();
+        failedDestinations = null;
         solidSnapshot = null;
+    }
+
+    void clearDestination() {
+        destination = -1;
+        frontierDestination = false;
         resetProgress();
     }
 
@@ -39,22 +46,21 @@ final class BlastAutoRoaming {
         }
 
         // Re-evaluate failed corners after solid obstacles change.
-        if (failedFrontiers == null) {
-            failedFrontiers = new boolean[length];
+        if (failedDestinations == null) {
+            failedDestinations = new boolean[length];
             solidSnapshot = solid.clone();
         } else if (!Arrays.equals(solidSnapshot, solid)) {
-            Arrays.fill(failedFrontiers, false);
+            Arrays.fill(failedDestinations, false);
             System.arraycopy(solid, 0, solidSnapshot, 0, length);
             resetProgress();
         }
 
         if (destination == position) {
-            // Unrevealed neighbours after arrival mean this corner is unproductive.
-            if (hasUnknownNeighbor(destination, width, visited, mapped, visible)) {
-                failedFrontiers[destination] = true;
+            if (frontierDestination
+                    && hasUnknownNeighbor(destination, width, visited, mapped, visible)) {
+                failedDestinations[destination] = true;
             }
-            destination = -1;
-            resetProgress();
+            clearDestination();
         }
 
         // Detect repeated visits to the same region without getting closer.
@@ -67,19 +73,18 @@ final class BlastAutoRoaming {
                 bestGoalDistance = remaining;
                 stalledRoams = 0;
             } else if (++stalledRoams >= MAX_STALLED_ROAMS) {
-                failedFrontiers[destination] = true;
-                destination = -1;
+                failedDestinations[destination] = true;
+                clearDestination();
             }
             if (destination >= 0) return destination;
         }
-        destination = -1;
-        resetProgress();
+        clearDestination();
 
         int shortest = Integer.MAX_VALUE;
         int ties = 0;
         for (int cell = 0; cell < length; cell++) {
             int steps = distances[cell];
-            if (cell == position || !safe[cell] || failedFrontiers[cell]
+            if (cell == position || !safe[cell] || failedDestinations[cell]
                     || steps <= 0 || steps == Integer.MAX_VALUE || steps > shortest
                     || !hasUnknownNeighbor(cell, width, visited, mapped, visible)) {
                 continue;
@@ -93,10 +98,33 @@ final class BlastAutoRoaming {
             }
         }
         if (destination >= 0) {
+            frontierDestination = true;
             progressGoal = destination;
             bestGoalDistance = shortest;
+            return destination;
         }
-        // No viable frontier: let normal idle turns handle new activity.
+
+        // When exploration is complete, pick a distant known safe destination.
+        // Avoid one-cell shuttling where there is no meaningful route.
+        int distant = -1;
+        int distantCount = 0;
+        int other = -1;
+        int otherCount = 0;
+        for (int cell = 0; cell < length; cell++) {
+            int steps = distances[cell];
+            if (cell == position || !safe[cell] || failedDestinations[cell]
+                    || steps <= 1 || steps == Integer.MAX_VALUE) continue;
+            if (steps >= MIN_DISTANT_STEPS) {
+                if (Random.Int(++distantCount) == 0) distant = cell;
+            } else if (Random.Int(++otherCount) == 0) {
+                other = cell;
+            }
+        }
+        destination = distant >= 0 ? distant : other;
+        if (destination >= 0) {
+            progressGoal = destination;
+            bestGoalDistance = distances[destination];
+        }
         return destination;
     }
 
