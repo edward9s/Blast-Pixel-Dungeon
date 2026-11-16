@@ -242,6 +242,7 @@ def patch(path: Path) -> None:
         "\tprivate void ready() {\n",
         "\tprivate void ready() {\n"
         "\t\tboolean blastRetry = com.spd.blast.BlastSettings.testAutoPlay()\n"
+        "\t\t\t\t&& !com.spd.blast.BlastAutoPlay.isPaused()\n"
         "\t\t\t\t&& !com.spd.blast.BlastAutoPlay.manualActionActive(this)\n"
         "\t\t\t\t&& curAction != null\n"
         "\t\t\t\t&& com.spd.blast.BlastAutoPlay.retryBlockedAction(this);\n",
