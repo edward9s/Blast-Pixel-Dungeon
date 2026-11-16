@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Register Blast's native, configurable keyboard actions for its two Tag buttons."""
+"""Register Blast's native, configurable keyboard actions for its Tag buttons."""
 from pathlib import Path
 import sys
 
@@ -12,27 +12,29 @@ def replace_exact(source: str, before: str, after: str, label: str) -> str:
 
 
 def patch_actions(source: str) -> str:
-    if "TAG_BLAST_MANIAC" in source or "TAG_BLAST_REMOTE" in source:
+    if any(name in source for name in ("TAG_BLAST_MANIAC", "TAG_BLAST_REMOTE", "TAG_BLAST_AUTO_PLAY")):
         raise SystemExit("Blast key actions are already registered")
     old = '\tpublic static final GameAction TAG_RESUME   = new SPDAction("tag_resume");'
     source = replace_exact(
         source, old,
         old + '\n\tpublic static final GameAction TAG_BLAST_MANIAC = new SPDAction("tag_blast_maniac");'
-            + '\n\tpublic static final GameAction TAG_BLAST_REMOTE = new SPDAction("tag_blast_remote");',
+            + '\n\tpublic static final GameAction TAG_BLAST_REMOTE = new SPDAction("tag_blast_remote");'
+            + '\n\tpublic static final GameAction TAG_BLAST_AUTO_PLAY = new SPDAction("tag_blast_auto_play");',
         "Blast key actions",
     )
     old = '\t\tdefaultBindings.put( Input.Keys.R,              SPDAction.TAG_RESUME );'
     source = replace_exact(
         source, old,
         old + '\n\t\tdefaultBindings.put( Input.Keys.B,              SPDAction.TAG_BLAST_MANIAC );'
-            + '\n\t\tdefaultBindings.put( Input.Keys.V,              SPDAction.TAG_BLAST_REMOTE );',
+            + '\n\t\tdefaultBindings.put( Input.Keys.V,              SPDAction.TAG_BLAST_REMOTE );'
+            + '\n\t\tdefaultBindings.put( Input.Keys.P,              SPDAction.TAG_BLAST_AUTO_PLAY );',
         "Blast keyboard defaults",
     )
     return source
 
 
 def patch_binding_window(source: str) -> str:
-    if "SPDAction.TAG_BLAST_MANIAC" in source or "SPDAction.TAG_BLAST_REMOTE" in source:
+    if any(name in source for name in ("SPDAction.TAG_BLAST_MANIAC", "SPDAction.TAG_BLAST_REMOTE", "SPDAction.TAG_BLAST_AUTO_PLAY")):
         raise SystemExit("Blast key labels are already registered")
     old = '\t\t\tactionName = PixelScene.renderTextBlock(Messages.get(WndKeyBindings.class, action.name()), 6 );'
     new = """\t\t\tString label;
@@ -40,6 +42,8 @@ def patch_binding_window(source: str) -> str:
 \t\t\t\tlabel = com.spd.blast.BlastMessages.get("bomb_maniac.buff_name");
 \t\t\t} else if (action == SPDAction.TAG_BLAST_REMOTE) {
 \t\t\t\tlabel = com.spd.blast.BlastMessages.get("remote_bomb.buff_name");
+\t\t\t} else if (action == SPDAction.TAG_BLAST_AUTO_PLAY) {
+\t\t\t\tlabel = com.spd.blast.BlastMessages.get("settings.auto_play");
 \t\t\t} else {
 \t\t\t\tlabel = Messages.get(WndKeyBindings.class, action.name());
 \t\t\t}
