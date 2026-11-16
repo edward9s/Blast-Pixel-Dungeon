@@ -23,7 +23,6 @@ import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.Trap;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
 import com.watabou.utils.PathFinder;
-import com.watabou.utils.Random;
 
 import java.util.concurrent.ConcurrentLinkedQueue;
 
@@ -35,7 +34,7 @@ public final class BlastAutoPlay {
 
     private static Hero currentHero;
     private static Level currentLevel;
-    private static int roamCell = -1;
+    private static final BlastAutoRoaming roaming = new BlastAutoRoaming();
     private static Char lastAttacker;
     private static int attackerCell = -1;
     private static int attackerTurns;
@@ -69,7 +68,7 @@ public final class BlastAutoPlay {
     public static void onSettingChanged() {
         currentHero = null;
         currentLevel = null;
-        roamCell = -1;
+        roaming.reset();
         lastAttacker = null;
         attackerCell = -1;
         attackerTurns = 0;
@@ -115,7 +114,7 @@ public final class BlastAutoPlay {
         resetForLevel(hero);
         manualAction = true;
         resetPursuitMemory();
-        roamCell = -1;
+        roaming.reset();
         lastRetryCell = -1;
     }
 
@@ -138,7 +137,7 @@ public final class BlastAutoPlay {
         hero.lastAction = null;
         hero.resting = false;
         resetPursuitMemory();
-        roamCell = -1;
+        roaming.reset();
     }
 
     /** Target selection and the game/settings menus pause auto-play; informational windows do not. */
@@ -479,7 +478,7 @@ public final class BlastAutoPlay {
         if (currentHero == hero && currentLevel == Dungeon.level) return;
         currentHero = hero;
         currentLevel = Dungeon.level;
-        roamCell = -1;
+        roaming.reset();
         lastAttacker = null;
         attackerCell = -1;
         attackerTurns = 0;
@@ -720,38 +719,9 @@ public final class BlastAutoPlay {
     }
 
     private static int roamStep(Hero hero, boolean[] safe, int[] distances) {
-        if (roamCell >= 0 && roamCell != hero.pos && safe[roamCell]
-                && distances[roamCell] != Integer.MAX_VALUE) {
-            return firstStep(roamCell, safe, distances);
-        }
-
-        // Random reachable destinations, favouring the edge of explored terrain.
-        int frontier = -1;
-        int frontierCount = 0;
-        int distant = -1;
-        int distantCount = 0;
-        int nearby = -1;
-        int nearbyCount = 0;
         Level level = Dungeon.level;
-        for (int cell = 0; cell < level.length(); cell++) {
-            if (!safe[cell] || cell == hero.pos
-                    || distances[cell] == Integer.MAX_VALUE) continue;
-
-            if (Random.Int(++nearbyCount) == 0) nearby = cell;
-            if (distances[cell] < 3) continue;
-            if (Random.Int(++distantCount) == 0) distant = cell;
-
-            for (int offset : PathFinder.NEIGHBOURS8) {
-                int adjacent = cell + offset;
-                if (level.insideMap(adjacent) && !level.visited[adjacent]
-                        && !level.mapped[adjacent] && !hero.fieldOfView[adjacent]) {
-                    if (Random.Int(++frontierCount) == 0) frontier = cell;
-                    break;
-                }
-            }
-        }
-
-        roamCell = frontier >= 0 ? frontier : distant >= 0 ? distant : nearby;
-        return roamCell < 0 ? -1 : firstStep(roamCell, safe, distances);
+        int goal = roaming.chooseDestination(hero.pos, level.width(), safe, distances,
+                level.visited, level.mapped, hero.fieldOfView, level.solid);
+        return goal < 0 ? -1 : firstStep(goal, safe, distances);
     }
 }
