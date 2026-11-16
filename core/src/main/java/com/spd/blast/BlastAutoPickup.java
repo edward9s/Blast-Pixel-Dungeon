@@ -6,10 +6,12 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroAction;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Talent;
 import com.shatteredpixel.shatteredpixeldungeon.items.Dewdrop;
+import com.shatteredpixel.shatteredpixeldungeon.items.EnergyCrystal;
 import com.shatteredpixel.shatteredpixeldungeon.items.Gold;
 import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.Waterskin;
+import com.shatteredpixel.shatteredpixeldungeon.items.artifacts.DriedRose;
 import com.shatteredpixel.shatteredpixeldungeon.items.bags.Bag;
 import com.shatteredpixel.shatteredpixeldungeon.items.keys.Key;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
@@ -19,6 +21,8 @@ import java.util.function.Predicate;
 /** Portable SPD floor-loot policy; Blast-specific bombs live elsewhere. */
 public final class BlastAutoPickup {
     private static final int RETRY_TURNS = 20;
+    // DriedRose's native petal upgrade cap.
+    private static final int MAX_ROSE_LEVEL = 10;
     private static Hero currentHero;
     private static Level currentLevel;
     private static Item attemptedItem;
@@ -91,12 +95,21 @@ public final class BlastAutoPickup {
         return item.stackable || instantPickup.test(item);
     }
 
-    /** Keys go to the journal, and gold and instant pickups use no backpack slots. */
+    /** These items are consumed on pickup without entering the backpack. */
     static boolean bypassesBackpack(Item item, Predicate<Item> instantPickup) {
-        return item instanceof Key || item instanceof Gold || instantPickup.test(item);
+        return item instanceof Key || item instanceof Gold
+                || item instanceof EnergyCrystal || item instanceof DriedRose.Petal
+                || instantPickup.test(item);
+    }
+
+    static boolean canUpgradeRose(DriedRose rose) {
+        return rose != null && rose.level() < MAX_ROSE_LEVEL;
     }
 
     private static boolean canCollect(Hero hero, Item item, Predicate<Item> instantPickup) {
+        if (item instanceof DriedRose.Petal) {
+            return canUpgradeRose(hero.belongings.getItem(DriedRose.class));
+        }
         if (bypassesBackpack(item, instantPickup)) return true;
         if (item instanceof Dewdrop) {
             Waterskin waterskin = hero.belongings.getItem(Waterskin.class);
