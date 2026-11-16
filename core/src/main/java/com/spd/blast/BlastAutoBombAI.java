@@ -34,10 +34,10 @@ public final class BlastAutoBombAI {
         Mob target = findTarget(hero, bomb, blastAtHero, remoteThrow, regrowth);
         if (target == null) return false;
 
-        // Do not affect rare variants, even as collateral or outside hero vision.
+        // Avoid rare variants and NPCs, including collateral outside hero vision.
         int center = remoteThrow ? BlastBombTrajectory.throwPos(hero.pos, target.pos) : hero.pos;
         boolean[] blast = remoteThrow ? bomb.blastWarningCells(center) : blastAtHero;
-        if (containsRareMob(blast)) return false;
+        if (containsProtectedMob(blast)) return false;
 
         if (remoteThrow) return maniac.blastAutoThrowAndDetonate(target.pos);
 
@@ -74,7 +74,8 @@ public final class BlastAutoBombAI {
             if (!mob.isAlive() || mob.alignment != Char.Alignment.ENEMY
                     || !hero.fieldOfView[mob.pos] || mob.invisible > 0
                     || hero.isCharmedBy(mob) || mob.isInvulnerable(Hero.class)
-                    || !BlastAutoPlay.isAwake(mob) || isRare(mob)) continue;
+                    || !BlastAutoPlay.isAwake(mob) || isRare(mob)
+                    || BlastAutoPlay.isProtectedNpc(mob)) continue;
             if (regrowth && !regrowthReady(mob.rooted, regrowthAt(mob.pos))) continue;
 
             if (remoteThrow) {
@@ -101,9 +102,10 @@ public final class BlastAutoBombAI {
         return chosen;
     }
 
-    private static boolean containsRareMob(boolean[] blast) {
+    private static boolean containsProtectedMob(boolean[] blast) {
         for (Mob mob : Dungeon.level.mobs) {
-            if (mob.isAlive() && isRare(mob) && blast[mob.pos]) return true;
+            if (mob.isAlive() && blast[mob.pos]
+                    && (isRare(mob) || BlastAutoPlay.isProtectedNpc(mob))) return true;
         }
         return false;
     }
