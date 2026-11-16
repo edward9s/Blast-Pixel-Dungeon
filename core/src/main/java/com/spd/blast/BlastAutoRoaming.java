@@ -80,7 +80,7 @@ final class BlastAutoRoaming {
         for (int cell = 0; cell < length; cell++) {
             int steps = distances[cell];
             if (cell == position || !safe[cell] || failedFrontiers[cell]
-                    || steps <= 0 || steps > shortest
+                    || steps <= 0 || steps == Integer.MAX_VALUE || steps > shortest
                     || !hasUnknownNeighbor(cell, width, visited, mapped, visible)) {
                 continue;
             }
