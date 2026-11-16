@@ -43,7 +43,7 @@ class AutoPlayIdleWaitTests(unittest.TestCase):
         _, after = hero_action_patch()
         self.assertLess(after.index("BlastAutoPlay.pauseForManualInput(this)"),
                         after.index("BlastAutoPlay.chooseAction(this)"))
-        self.assertEqual(after.count("!com.spd.blast.BlastAutoPlay.manualActionActive(this)"), 2)
+        self.assertEqual(after.count("!com.spd.blast.BlastAutoPlay.manualActionActive(this)"), 3)
         self.assertIn("BlastSettings.testAutoPlay()\n"
                       "\t\t\t\t&& !com.spd.blast.BlastAutoPlay.isPaused()\n"
                       "\t\t\t\t&& !com.spd.blast.BlastAutoPlay.manualActionActive(this)\n"
