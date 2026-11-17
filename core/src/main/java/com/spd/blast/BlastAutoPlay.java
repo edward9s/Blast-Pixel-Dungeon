@@ -25,6 +25,7 @@ import com.shatteredpixel.shatteredpixeldungeon.levels.traps.Trap;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
 import com.watabou.utils.PathFinder;
 
+import java.util.ArrayDeque;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -55,7 +56,11 @@ public final class BlastAutoPlay {
     private static final AtomicReference<ManualCell> pendingManualCell = new AtomicReference<>();
     private static volatile boolean waitingForInput;
     private static volatile Hero pausedHero;
+    // Timed throws stay on the Hero's turn; free commands can preempt mob turns.
     private static final ConcurrentLinkedQueue<BombInput> pendingBombInputs = new ConcurrentLinkedQueue<>();
+    private static final Object freeBombLock = new Object();
+    private static final ArrayDeque<BombInput> pendingFreeBombInputs = new ArrayDeque<>();
+    private static FreeBombActor freeBombActor;
 
     private static final class ManualCell {
         final Hero hero;
@@ -81,6 +86,72 @@ public final class BlastAutoPlay {
         }
     }
 
+    /** A single high-priority actor preserves the click order of free bomb commands. */
+    private static final class FreeBombActor extends Actor {
+        private final Hero hero;
+        private final Level level;
+
+        private FreeBombActor(Hero hero, Level level) {
+            this.hero = hero;
+            this.level = level;
+            actPriority = VFX_PRIO;
+        }
+
+        @Override
+        protected boolean act() {
+            BombInput input;
+            synchronized (freeBombLock) {
+                if (freeBombActor != this) {
+                    Actor.remove(this);
+                    return true;
+                }
+                if (!BlastSettings.testAutoPlay()
+                        || hero != Dungeon.hero || level != Dungeon.level) {
+                    clearFreeBombInputs();
+                    return true;
+                }
+                input = pendingFreeBombInputs.pollFirst();
+                if (input == null) {
+                    clearFreeBombInputs();
+                    return true;
+                }
+            }
+
+            switch (input.action) {
+                case PLACE:
+                    BlastBombManiac maniac = BlastBombManiac.current();
+                    if (maniac != null) maniac.place();
+                    break;
+                case DETONATE:
+                    BlastRemoteBomb.detonateNext();
+                    break;
+                case TOGGLE:
+                    BlastRemoteBomb.toggleMode();
+                    break;
+                default:
+                    throw new IllegalStateException("Unexpected free bomb action: " + input.action);
+            }
+
+            synchronized (freeBombLock) {
+                if (freeBombActor == this && pendingFreeBombInputs.isEmpty()) {
+                    Actor.remove(this);
+                    freeBombActor = null;
+                }
+            }
+            return true;
+        }
+    }
+
+    private static void clearFreeBombInputs() {
+        synchronized (freeBombLock) {
+            pendingFreeBombInputs.clear();
+            if (freeBombActor != null) {
+                Actor.remove(freeBombActor);
+                freeBombActor = null;
+            }
+        }
+    }
+
     private BlastAutoPlay() {}
 
     public static void onSettingChanged() {
@@ -101,6 +172,7 @@ public final class BlastAutoPlay {
         waitingForInput = false;
         if (!BlastSettings.testAutoPlay()) pausedHero = null;
         pendingBombInputs.clear();
+        clearFreeBombInputs();
         BlastAutoPickup.reset();
         BlastAutoSacrifice.reset();
 
@@ -265,12 +337,24 @@ public final class BlastAutoPlay {
         if (BlastSettings.testAutoPlay() && !isPaused() && hero != null && hero.ready) hero.next();
     }
 
-    /** Tag commands are applied on the actor thread, never in a render callback. */
+    /** Queue tag commands on the actor thread; free actions need not wait for Hero.act. */
     private static void requestBombInput(BombAction action, int destination) {
         Hero hero = Dungeon.hero;
-        if (hero == null || !BlastSettings.testAutoPlay()) return;
+        Level level = Dungeon.level;
+        if (hero == null || level == null || !BlastSettings.testAutoPlay()) return;
         resetForLevel(hero);
-        pendingBombInputs.add(new BombInput(action, destination));
+
+        if (action == BombAction.THROW) {
+            pendingBombInputs.add(new BombInput(action, destination));
+        } else {
+            synchronized (freeBombLock) {
+                pendingFreeBombInputs.addLast(new BombInput(action, destination));
+                if (freeBombActor == null) {
+                    freeBombActor = new FreeBombActor(hero, level);
+                    Actor.add(freeBombActor);
+                }
+            }
+        }
         if (hero.ready && !GameScene.manualInputPending()) hero.next();
     }
 
@@ -304,23 +388,11 @@ public final class BlastAutoPlay {
         hero.curAction = null;
         hero.lastAction = null;
         hero.resting = false;
-        switch (input.action) {
-            case PLACE:
-                BlastBombManiac maniac = BlastBombManiac.current();
-                if (maniac != null) maniac.place();
-                return false;
-            case THROW:
-                BlastBombManiac thrower = BlastBombManiac.current();
-                return thrower != null && thrower.blastAutoThrow(input.destination);
-            case DETONATE:
-                BlastRemoteBomb.detonateNext();
-                return false;
-            case TOGGLE:
-                BlastRemoteBomb.toggleMode();
-                return false;
-            default:
-                throw new IllegalStateException("Unknown bomb input: " + input.action);
+        if (input.action != BombAction.THROW) {
+            throw new IllegalStateException("Unexpected Hero bomb action: " + input.action);
         }
+        BlastBombManiac thrower = BlastBombManiac.current();
+        return thrower != null && thrower.blastAutoThrow(input.destination);
     }
 
     /** Retry a blocked action once at the same location, then stop idle looping. */
@@ -615,6 +687,7 @@ public final class BlastAutoPlay {
         pendingManualCell.set(null);
         waitingForInput = false;
         pendingBombInputs.clear();
+        clearFreeBombInputs();
         BlastAutoPickup.reset();
         BlastAutoSacrifice.reset();
     }
