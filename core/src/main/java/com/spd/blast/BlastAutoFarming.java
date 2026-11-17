@@ -1,6 +1,7 @@
 package com.spd.blast;
 
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.Statistics;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.Blob;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
@@ -45,7 +46,7 @@ public final class BlastAutoFarming {
         }
 
         // Allow another blast only after its cooldown and all Regrowth clouds end.
-        if (!plantingReady(Actor.now(), nextBombAt, regrowthActive(level))) return Action.NONE;
+        if (!plantingReady(gameTime(), nextBombAt, regrowthActive(level))) return Action.NONE;
 
         // Only planting new grass requires remote mode and an available Regrowth bomb.
         if (BlastRemoteBomb.isTimedMode() || hero.buff(BlastRemoteBomb.class) == null) {
@@ -76,9 +77,18 @@ public final class BlastAutoFarming {
             maniac.select(previous);
         }
         if (!launched) return Action.NONE;
-        nextBombAt = Actor.now() + BOMB_INTERVAL;
+        nextBombAt = gameTime() + BOMB_INTERVAL;
         if (!remoteThrow) hero.spendAndNext(1f);
         return Action.BOMB;
+    }
+
+    /** Actor.fixTime() rebases Actor.now(); Statistics.duration records the offset. */
+    private static float gameTime() {
+        return gameTime(Statistics.duration, Actor.now());
+    }
+
+    static float gameTime(float duration, float actorTime) {
+        return duration + actorTime;
     }
 
     static boolean regrowthReady(int remainingBombs, int regrowthIndex) {
