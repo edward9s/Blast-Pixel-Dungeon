@@ -15,8 +15,18 @@ import com.shatteredpixel.shatteredpixeldungeon.items.bombs.RegrowthBomb;
 public final class BlastAutoBombAI {
     private BlastAutoBombAI() {}
 
+    /** Hit ranged enemies immediately, including enemies outside the hero's vision. */
+    public static boolean actAgainstRanged(Hero hero) {
+        return act(hero, true);
+    }
+
+    /** Preserve ordinary bomb attacks for visible non-ranged enemies. */
+    public static boolean actAgainstOtherEnemies(Hero hero) {
+        return act(hero, false);
+    }
+
     /** Returns true only when an automated bomb has started or spent a turn. */
-    public static boolean act(Hero hero) {
+    private static boolean act(Hero hero, boolean rangedTargets) {
         if (!BlastSettings.testAutoPlay()
                 || BlastRemoteBomb.isTimedMode()
                 || hero.buff(BlastRemoteBomb.class) == null
@@ -31,7 +41,7 @@ public final class BlastAutoBombAI {
         boolean regrowth = bomb instanceof RegrowthBomb;
         boolean remoteThrow = BlastSettings.testRemoteThrow();
         boolean[] blastAtHero = remoteThrow ? null : bomb.blastWarningCells(hero.pos);
-        Mob target = findTarget(hero, bomb, blastAtHero, remoteThrow, regrowth);
+        Mob target = findTarget(hero, bomb, blastAtHero, remoteThrow, regrowth, rangedTargets);
         if (target == null) return false;
 
         // Avoid rare variants and NPCs, including collateral outside hero vision.
@@ -67,12 +77,14 @@ public final class BlastAutoBombAI {
     }
 
     private static Mob findTarget(Hero hero, Bomb bomb, boolean[] blastAtHero,
-                                  boolean remoteThrow, boolean regrowth) {
+                                  boolean remoteThrow, boolean regrowth, boolean rangedTargets) {
         Mob chosen = null;
         int closest = Integer.MAX_VALUE;
         for (Mob mob : Dungeon.level.mobs) {
+            boolean ranged = BlastAutoSacrifice.isRangedEnemy(mob.getClass());
+            if (ranged != rangedTargets || (!ranged && !hero.fieldOfView[mob.pos])) continue;
             if (!mob.isAlive() || mob.alignment != Char.Alignment.ENEMY
-                    || !hero.fieldOfView[mob.pos] || mob.invisible > 0
+                    || mob.invisible > 0
                     || hero.isCharmedBy(mob) || mob.isInvulnerable(Hero.class)
                     || !BlastAutoPlay.isAwake(mob) || isRare(mob)
                     || BlastAutoPlay.isProtectedNpc(mob)) continue;
