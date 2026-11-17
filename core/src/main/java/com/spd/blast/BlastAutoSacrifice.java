@@ -114,6 +114,16 @@ public final class BlastAutoSacrifice {
             return Action.NONE;
         }
 
+        // Once a marked enemy reaches the flame, prefer a safe bomb blast.
+        // WAIT means the bomb action has already advanced the hero's turn.
+        if (BlastAutoBombAI.actAgainstSacrifice(hero, fire.cur)) {
+            trackedEnemy = null;
+            waitingSince = Float.NaN;
+            patrollingOutside = false;
+            outsideRoaming.clearDestination();
+            return Action.WAIT;
+        }
+
         // Attack only when the enemy has been marked within the flame aura.
         Mob attackable = null;
         int attackDistance = Integer.MAX_VALUE;
