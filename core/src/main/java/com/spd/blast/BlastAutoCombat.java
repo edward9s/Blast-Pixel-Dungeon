@@ -75,10 +75,15 @@ final class BlastAutoCombat {
         }
         if (melee > 0f) return attack(hero, target);
 
-        // No attack can connect yet: close the distance without hiding or retreating.
+        // No attack can connect yet: first approach a position where the
+        // selected bomb can reach this ranged target, without closing to melee.
         if (!hero.rooted) {
-            int destination = BlastAutoPlay.nearCell(
-                    hero.pos, target.pos, safe, distances);
+            int destination = BlastAutoBombAI.rangedBlastCell(
+                    hero, target, safe, distances);
+            if (destination < 0) {
+                destination = BlastAutoPlay.nearCell(
+                        hero.pos, target.pos, safe, distances);
+            }
             if (destination >= 0 && distances[destination] > 0
                     && distances[destination] < Integer.MAX_VALUE) {
                 BlastAutoPlay.rememberCombatTarget(target);
