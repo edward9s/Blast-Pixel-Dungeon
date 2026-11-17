@@ -4,7 +4,7 @@ import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.bombs.Bomb;
 
-/** Keep armed Bomb Maniac bombs on top of closed containers without hiding their loot. */
+/** Store armed Bomb Maniac bombs in container cells without changing loot order. */
 public final class BlastBombHeap {
     private BlastBombHeap() {}
 
@@ -30,6 +30,14 @@ public final class BlastBombHeap {
         }
         heap.items.addLast(item);
         if (heap.sprite != null) heap.sprite.view(heap).place(heap.pos);
+    }
+
+    /** Freezing still extinguishes exposed fuses even while the chest is closed. */
+    public static void freezeExposed(Heap heap) {
+        if (!isContainer(heap)) return;
+        for (Item item : heap.items) {
+            if (isExposedBomb(item)) ((Bomb) item).fuse.freeze();
+        }
     }
 
     /** Container contents remain protected; exposed armed bombs still chain-react. */
