@@ -38,20 +38,21 @@ public final class BlastAutoFarmingTest {
         plantingReady(false, 30f, 20f, true);
         plantingReady(true, 30f, 20f, false);
 
-        // A bounded search must progress to the next sites, wrapping the map.
-        int site = 8;
-        for (int i = 0; i < 8; i++) site = BlastAutoFarming.nextSiteIndex(site, 12);
-        if (site != 4 || BlastAutoFarming.nextSiteIndex(11, 12) != 0) {
-            throw new AssertionError("Farming search must advance past eight sites");
+        // Local geometric filter matches the blast footprint and radius upgrades.
+        if (!BlastAutoFarming.withinBlastRadius(3, 0, 3)
+                || BlastAutoFarming.withinBlastRadius(3, 3, 3)
+                || BlastAutoFarming.withinBlastRadius(4, 0, 3)
+                || !BlastAutoFarming.withinBlastRadius(4, 0, 5)) {
+            throw new AssertionError("Incorrect Regrowth blast radius filter");
         }
         try {
-            BlastAutoFarming.nextSiteIndex(12, 12);
-            throw new AssertionError("Invalid farming scan index was accepted");
+            BlastAutoFarming.withinBlastRadius(0, 0, -1);
+            throw new AssertionError("Invalid Regrowth radius was accepted");
         } catch (IllegalArgumentException expected) {
-            // Fail fast on invalid scan state.
+            // Invalid parameters must fail immediately.
         }
 
-        // Require at least ten reachable, growable cells under the actual blast.
+        // Require at least ten plantable cells under the actual blast.
         if (BlastAutoFarming.sufficientArea(0)
                 || BlastAutoFarming.sufficientArea(9)
                 || !BlastAutoFarming.sufficientArea(10)
@@ -61,14 +62,14 @@ public final class BlastAutoFarmingTest {
         for (int ground : new int[]{Terrain.EMPTY, Terrain.EMPTY_DECO,
                 Terrain.EMBERS, Terrain.GRASS, Terrain.FURROWED_GRASS, Terrain.HIGH_GRASS}) {
             if (!BlastAutoFarming.canHostRegrowth(ground)) {
-                throw new AssertionError("Expected growable terrain: " + ground);
+                throw new AssertionError("Expected plantable terrain: " + ground);
             }
         }
         for (int ground : new int[]{Terrain.WALL, Terrain.CHASM, Terrain.WATER,
                 Terrain.EXIT, Terrain.ENTRANCE,
                 Terrain.LOCKED_DOOR, Terrain.TRAP, Terrain.EMPTY_WELL}) {
             if (BlastAutoFarming.canHostRegrowth(ground)) {
-                throw new AssertionError("Non-growable terrain: " + ground);
+                throw new AssertionError("Non-plantable terrain: " + ground);
             }
         }
 
