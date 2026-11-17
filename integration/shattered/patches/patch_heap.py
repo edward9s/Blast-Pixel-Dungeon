@@ -47,6 +47,21 @@ def patch(path: Path) -> None:
         "\t\t\t\t}\n\n\t\t\t\t"
         + explode, 1)
 
+    # Bombs sharing a closed chest remain exposed to fire and chain explosions.
+    for method in ("burn", "explode"):
+        entry = f"\tpublic void {method}() {{\n\t\thidden = false;"
+        if source.count(entry) != 1:
+            raise SystemExit(f"Heap.{method}: expected one entry")
+        source = source.replace(
+            entry, entry + "\n\t\tcom.spd.blast.BlastBombHeap.detonateExposed(this);", 1)
+
+    freeze_entry = "\tpublic void freeze() {\n"
+    if source.count(freeze_entry) != 1:
+        raise SystemExit("Heap.freeze: expected one entry")
+    source = source.replace(
+        freeze_entry,
+        freeze_entry + "\t\tcom.spd.blast.BlastBombHeap.freezeExposed(this);\n", 1)
+
     for signature in (
         "public Item pickUp()",
         "public void drop( Item item )",

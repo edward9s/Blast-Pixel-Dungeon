@@ -94,8 +94,7 @@ public final class BlastAutoFarming {
         }
 
         int destination = farmingBlastCell;
-        if ((!remoteThrow && (level.pit[hero.pos]
-                || BlastBombCollision.hasLitBomb(level, hero.pos)))
+        if ((!remoteThrow && level.pit[hero.pos])
                 || (remoteThrow && BlastBombTrajectory.throwPos(hero.pos, destination) != destination)
                 || !sufficientArea(countGrowable(
                         bomb.blastWarningCells(destination), level, safe, distances,
@@ -251,8 +250,7 @@ public final class BlastAutoFarming {
         for (int i = 0; i < found; i++) {
             int site = candidates[i];
             int center = centers[i];
-            if (BlastBombCollision.hasLitBomb(level, site)
-                    || (remoteThrow && BlastBombTrajectory.throwPos(site, center) != center)) {
+            if (remoteThrow && BlastBombTrajectory.throwPos(site, center) != center) {
                 continue;
             }
             if (!sufficientArea(countGrowable(

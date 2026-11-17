@@ -74,8 +74,12 @@ public final class BlastOutOfSightItems extends Group {
     }
 
     private static Marker markerAt(Heap heap) {
-        if (heap == null || heap.type != Heap.Type.HEAP) return null;
+        if (heap == null) return null;
         for (Item item : heap.items) {
+            // Closed containers keep their loot hidden, but exposed lit bombs
+            // still need their normal out-of-sight marker.
+            if (heap.type != Heap.Type.HEAP
+                    && (!(item instanceof Bomb) || ((Bomb) item).fuse == null)) continue;
             Marker marker = marker(item);
             if (marker != null) return marker;
         }
