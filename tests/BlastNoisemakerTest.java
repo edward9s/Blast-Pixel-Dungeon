@@ -24,6 +24,7 @@ import com.shatteredpixel.shatteredpixeldungeon.items.bombs.Noisemaker;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Buff;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
 import com.spd.blast.BlastRemoteBomb;
+import com.spd.blast.BlastBombManiac;
 import com.watabou.noosa.Group;
 import com.watabou.noosa.Game;
 import com.watabou.utils.Bundle;
@@ -224,6 +225,44 @@ public final class BlastNoisemakerTest {
         }
     }
 
+
+    private static void stackedChestBombs() throws Exception {
+        for (Heap.Type type : new Heap.Type[]{Heap.Type.LOCKED_CHEST, Heap.Type.CRYSTAL_CHEST}) {
+            TestLevel level = setup();
+            Buff.affect(Dungeon.hero, BlastRemoteBomb.class);
+            BlastBombManiac maniac = Buff.affect(Dungeon.hero, BlastBombManiac.class);
+            Heap chest = heap(level, cell(4, 4));
+            chest.type = type;
+            Bomb loot = new Bomb();
+            chest.items.add(loot);
+
+            Bomb first = new Bomb();
+            Bomb second = new Bomb();
+            for (Bomb bomb : new Bomb[]{first, second}) {
+                bomb.blastSetManiacCharge(true);
+                bomb.blastThrowLit(chest.pos);
+            }
+            check(level.heaps.get(chest.pos) == chest, "chest heap must stay on its cell");
+            check(chest.type == type && chest.peek() == loot,
+                    "stacked bombs must not replace or conceal chest loot");
+            check(chest.items.contains(first) && chest.items.contains(second),
+                    "both armed bombs must stay on the chest cell");
+
+            Field active = BlastBombManiac.class.getDeclaredField("activeBombs");
+            active.setAccessible(true);
+            active.setInt(maniac, 2);
+            Method detonate = BlastBombManiac.class.getDeclaredMethod("detonateAutoBomb", Bomb.class);
+            detonate.setAccessible(true);
+            detonate.invoke(null, first);
+
+            check(first.fuse == null && second.fuse == null,
+                    "detonating the selected chest bomb must chain to the second bomb");
+            check(chest.type == type && chest.items.size() == 1 && chest.peek() == loot,
+                    "locked chest and its loot must survive normal bomb chains");
+            check(maniac.deployed() == 0, "both bomb slots must be returned exactly once");
+        }
+    }
+
     private static void ordinaryBomb() throws Exception {
         TestLevel level = setup();
         Buff.affect(Dungeon.hero, BlastRemoteBomb.class);
@@ -241,6 +280,7 @@ public final class BlastNoisemakerTest {
         remoteAlarm();
         freezeAndKick();
         ordinaryBomb();
+        stackedChestBombs();
         System.out.println("Passed " + checks + " remote noisemaker checks");
     }
 }
