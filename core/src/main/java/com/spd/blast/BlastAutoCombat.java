@@ -63,10 +63,18 @@ final class BlastAutoCombat {
 
         Mob target = findEnemy(hero);
         if (target == null) {
-            if (coverTarget != null && coverCell == hero.pos && coverTarget.isAlive()
-                    && coverTurns++ < COVER_WAIT_TURNS) {
-                hero.spendAndNext(Actor.TICK);
-                return Action.STARTED;
+            if (coverTarget != null && coverTarget.isAlive()
+                    && coverCell >= 0 && safe[coverCell]) {
+                if (coverCell != hero.pos && distances[coverCell] > 0
+                        && distances[coverCell] < Integer.MAX_VALUE) {
+                    hero.curAction = new HeroAction.Move(
+                            BlastAutoPlay.firstStep(coverCell, safe, distances));
+                    return Action.QUEUED;
+                }
+                if (coverCell == hero.pos && coverTurns++ < COVER_WAIT_TURNS) {
+                    hero.spendAndNext(Actor.TICK);
+                    return Action.STARTED;
+                }
             }
             if (coverTarget != null) markCoverExhausted(coverTarget);
             clearCover();
