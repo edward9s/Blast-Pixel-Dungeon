@@ -90,14 +90,7 @@ public final class BlastAutoBombAI {
         boolean remoteThrow = BlastSettings.testRemoteThrow();
         boolean[] blastAtHero = remoteThrow ? null : bomb.blastWarningCells(hero.pos);
         Mob target = findTarget(hero, bomb, blastAtHero, remoteThrow, regrowth, rangedTargets);
-        if (target == null) return false;
-
-        // Avoid rare variants and NPCs, including collateral outside hero vision.
-        int center = remoteThrow ? BlastBombTrajectory.throwPos(hero.pos, target.pos) : hero.pos;
-        boolean[] blast = remoteThrow ? bomb.blastWarningCells(center) : blastAtHero;
-        if (containsProtectedMob(blast)) return false;
-
-        return detonate(hero, maniac, remoteThrow, target);
+        return target != null && detonate(hero, maniac, remoteThrow, target);
     }
 
     private static boolean autoBombAvailable(Hero hero) {
@@ -151,17 +144,12 @@ public final class BlastAutoBombAI {
                     || BlastAutoPlay.isProtectedNpc(mob)) continue;
             if (regrowth && !regrowthReady(mob.rooted, regrowthAt(mob.pos))) continue;
 
-            if (remoteThrow) {
-                int landing = BlastBombTrajectory.throwPos(hero.pos, mob.pos);
-                if (!Dungeon.level.insideMap(landing)) continue;
-                // An obstructed throw still counts if the actual blast reaches the enemy.
-                if (landing != mob.pos
-                        && !blastReachesTarget(bomb.blastWarningCells(landing), mob.pos)) {
-                    continue;
-                }
-            } else if (!blastReachesTarget(blastAtHero, mob.pos)) {
-                continue;
-            }
+            int center = remoteThrow
+                    ? BlastBombTrajectory.throwPos(hero.pos, mob.pos) : hero.pos;
+            if (!Dungeon.level.insideMap(center)) continue;
+            boolean[] blast = remoteThrow ? bomb.blastWarningCells(center) : blastAtHero;
+            // A blocked first choice must not hide a second, safe ranged target.
+            if (!blastReachesTarget(blast, mob.pos) || containsProtectedMob(blast)) continue;
 
             int distance = Dungeon.level.distance(hero.pos, mob.pos);
             if (chosen == null
@@ -173,6 +161,48 @@ public final class BlastAutoBombAI {
             }
         }
         return chosen;
+    }
+
+    /**
+     * Find the nearest reachable cell where placing the selected bomb would
+     * hit the target. Both melee and ranged enemies use this approach rule.
+     */
+    static int bombApproachCell(Hero hero, Mob target, boolean[] safe, int[] distances) {
+        if (!autoBombAvailable(hero) || BlastSettings.testRemoteThrow()
+                || !target.isAlive() || target.alignment != Char.Alignment.ENEMY
+                || target.invisible > 0 || !hero.fieldOfView[target.pos]
+                || hero.isCharmedBy(target) || !BlastAutoPlay.isAwake(target)
+                || target.isInvulnerable(Hero.class) || isRare(target)
+                || BlastAutoPlay.isProtectedNpc(target)) return -1;
+
+        int length = Dungeon.level.length();
+        if (safe.length != length || distances.length != length) {
+            throw new IllegalArgumentException("Invalid bomb approach map");
+        }
+
+        BlastBombManiac maniac = BlastBombManiac.current();
+        if (maniac == null || maniac.remaining() == 0) return -1;
+
+        Bomb bomb = maniac.selectedBomb();
+        if (bomb instanceof RegrowthBomb
+                && !regrowthReady(target.rooted, regrowthAt(target.pos))) return -1;
+
+        // One projection filters candidate cells before checking their exact
+        // blast coverage and collateral safety.
+        boolean[] reachable = bomb.blastWarningCells(target.pos);
+        int best = -1;
+        int shortest = Integer.MAX_VALUE;
+        for (int cell = 0; cell < length; cell++) {
+            int steps = distances[cell];
+            if (!reachable[cell] || !safe[cell] || steps <= 0 || steps >= shortest) continue;
+
+            boolean[] blast = bomb.blastWarningCells(cell);
+            if (!blastReachesTarget(blast, target.pos)
+                    || containsProtectedMob(blast)) continue;
+            best = cell;
+            shortest = steps;
+        }
+        return best;
     }
 
     private static boolean containsUnreadySacrificeMob(boolean[] blast, int[] flames) {
