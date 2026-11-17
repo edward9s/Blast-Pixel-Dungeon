@@ -164,14 +164,16 @@ public final class BlastAutoBombAI {
     }
 
     /**
-     * When a ranged enemy cannot yet be hit, stop at the nearest reachable
-     * remote-placement cell whose explosion can actually hit it. Callers still
-     * try an immediate attack first, so this only guides an otherwise idle chase.
+     * Find the nearest reachable cell where placing the selected bomb would
+     * hit the target. Both melee and ranged enemies use this approach rule.
      */
-    static int rangedBlastCell(Hero hero, Mob target, boolean[] safe, int[] distances) {
+    static int bombApproachCell(Hero hero, Mob target, boolean[] safe, int[] distances) {
         if (!autoBombAvailable(hero) || BlastSettings.testRemoteThrow()
-                || !BlastAutoSacrifice.isRangedEnemy(target.getClass())
-                || target.isInvulnerable(Hero.class) || isRare(target)) return -1;
+                || !target.isAlive() || target.alignment != Char.Alignment.ENEMY
+                || target.invisible > 0 || !hero.fieldOfView[target.pos]
+                || hero.isCharmedBy(target) || !BlastAutoPlay.isAwake(target)
+                || target.isInvulnerable(Hero.class) || isRare(target)
+                || BlastAutoPlay.isProtectedNpc(target)) return -1;
 
         int length = Dungeon.level.length();
         if (safe.length != length || distances.length != length) {
