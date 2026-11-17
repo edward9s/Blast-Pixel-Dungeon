@@ -240,7 +240,7 @@ def patch(path: Path) -> None:
         "\t\t\treturn true;\n"
         "\t\t}",
         "\t\tpublic boolean freeze(){\n"
-        "\t\t\tif (com.spd.blast.BlastSettings.BOMB_FUSES_IGNORE_FREEZING) return false;\n"
+        "\t\t\tif (!com.spd.blast.BlastSettings.ENABLE_BOMB_FUSE_EXTINGUISHING) return false;\n"
         "\t\t\tbomb.fuse = null;\n"
         "\t\t\tsnuff();\n"
         "\t\t\treturn true;\n"
