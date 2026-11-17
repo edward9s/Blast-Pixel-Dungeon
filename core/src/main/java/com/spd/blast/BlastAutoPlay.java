@@ -472,6 +472,11 @@ public final class BlastAutoPlay {
         // Blast-specific tactics are isolated from the portable AI policy.
         if (BlastAutoBombAI.actAgainstOtherEnemies(hero)) return true;
 
+        BlastAutoCombat.Action combat = BlastAutoCombat.chooseAction(hero, safe, distances);
+        if (combat != BlastAutoCombat.Action.NONE) {
+            return combat == BlastAutoCombat.Action.STARTED;
+        }
+
         Mob invulnerable = null;
         Mob hiddenNecromancer = null;
         int hiddenNecromancerGoal = -1;
@@ -753,7 +758,14 @@ public final class BlastAutoPlay {
         return false;
     }
 
-    private static void rememberCombatTarget(Mob mob) {
+    static void rememberCombatTarget(Mob mob) {
+        rememberCombatTarget(mob, mob.pos);
+    }
+
+    static void rememberCombatTarget(Mob mob, int observedCell) {
+        if (observedCell < 0 || !Dungeon.level.insideMap(observedCell)) {
+            throw new IllegalArgumentException("Invalid last-seen combat cell: " + observedCell);
+        }
         // Keep one hidden target in reserve when combat is interrupted.
         if (combatTarget != null && combatTarget != mob && suspendedTarget == null
                 && combatTarget.isAlive() && Dungeon.hero != null
@@ -763,7 +775,7 @@ public final class BlastAutoPlay {
             suspendedTargetTurns = lostTargetTurns;
         }
         combatTarget = mob;
-        combatTargetCell = mob.pos;
+        combatTargetCell = observedCell;
         lostTargetTurns = 0;
     }
 
@@ -871,7 +883,7 @@ public final class BlastAutoPlay {
     }
 
     /** Find a shortest reachable destination at or beside an occupied target. */
-    private static int nearCell(int origin, int target, boolean[] safe, int[] distances) {
+    static int nearCell(int origin, int target, boolean[] safe, int[] distances) {
         int goal = -1;
         int shortest = Integer.MAX_VALUE;
         if (target != origin && safe[target] && distances[target] < shortest) {
@@ -914,7 +926,7 @@ public final class BlastAutoPlay {
     }
 
     /** Retreat without entering traps, chasms or non-grass plants. */
-    private static int retreatStep(Hero hero, int threat, boolean[] safe, int[] distances) {
+    static int retreatStep(Hero hero, int threat, boolean[] safe, int[] distances) {
         int distance = Dungeon.level.distance(hero.pos, threat);
         int step = -1;
         for (int offset : PathFinder.NEIGHBOURS8) {
