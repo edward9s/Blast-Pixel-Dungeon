@@ -63,7 +63,8 @@ final class BlastAutoCombat {
                 }
                 if (wand != null && wand.damage > melee) return zap(hero, target, wand);
             }
-            return melee > 0f ? attack(hero, target) : Action.NONE;
+            if (melee > 0f) return attack(hero, target);
+            return approachBombRange(hero, target, safe, distances);
         }
 
         // Against ranged enemies, attack immediately with the highest expected
@@ -75,15 +76,13 @@ final class BlastAutoCombat {
         }
         if (melee > 0f) return attack(hero, target);
 
-        // No attack can connect yet: first approach a position where the
-        // selected bomb can reach this ranged target, without closing to melee.
+        // No attack can connect yet: enter bomb range before chasing to melee.
+        Action approach = approachBombRange(hero, target, safe, distances);
+        if (approach != Action.NONE) return approach;
+
         if (!hero.rooted) {
-            int destination = BlastAutoBombAI.rangedBlastCell(
-                    hero, target, safe, distances);
-            if (destination < 0) {
-                destination = BlastAutoPlay.nearCell(
-                        hero.pos, target.pos, safe, distances);
-            }
+            int destination = BlastAutoPlay.nearCell(
+                    hero.pos, target.pos, safe, distances);
             if (destination >= 0 && distances[destination] > 0
                     && distances[destination] < Integer.MAX_VALUE) {
                 BlastAutoPlay.rememberCombatTarget(target);
@@ -93,6 +92,19 @@ final class BlastAutoCombat {
             }
         }
         return Action.NONE;
+    }
+
+    private static Action approachBombRange(Hero hero, Mob target,
+                                            boolean[] safe, int[] distances) {
+        if (hero.rooted) return Action.NONE;
+        int destination = BlastAutoBombAI.bombApproachCell(
+                hero, target, safe, distances);
+        if (destination < 0) return Action.NONE;
+
+        BlastAutoPlay.rememberCombatTarget(target);
+        hero.curAction = new HeroAction.Move(
+                BlastAutoPlay.firstStep(destination, safe, distances));
+        return Action.QUEUED;
     }
 
     private static Mob findEnemy(Hero hero) {
