@@ -7,7 +7,6 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Buff;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
-import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.bombs.Bomb;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.CellSelector;
@@ -289,7 +288,7 @@ public final class BlastBombManiac extends Buff {
                     }
                 }
                 bomb.blastThrowLit(cell);
-                if (autoDetonate) detonateAutoBomb(bomb, cell);
+                if (autoDetonate) detonateAutoBomb(bomb);
                 // Automated attacks must advance time even when remote throws are free.
                 hero.spendAndNext(autoDetonate ? 1f : timed ? 1f : 0f);
             }
@@ -304,19 +303,17 @@ public final class BlastBombManiac extends Buff {
     }
 
     /** Detonate only the newly deployed bomb, preserving older remote fuses. */
-    private static void detonateAutoBomb(Bomb bomb, int cell) {
+    private static void detonateAutoBomb(Bomb bomb) {
         if (!(bomb.fuse instanceof BlastRemoteBomb.RemoteFuse)) {
             throw new IllegalStateException("Automatic bomb has no remote fuse");
-        }
-        Heap heap = Dungeon.level.heaps.get(cell);
-        if (heap == null || !heap.items.contains(bomb)) {
-            throw new IllegalStateException("Automatic bomb was not deployed at " + cell);
         }
         BlastRemoteBomb.RemoteFuse fuse = (BlastRemoteBomb.RemoteFuse) bomb.fuse;
         if (!fuse.isArmed(bomb)) {
             throw new IllegalStateException("Automatic bomb remote fuse is not armed");
         }
-        fuse.detonateIfPresent(Dungeon.level);
+        if (!fuse.detonateIfPresent(Dungeon.level)) {
+            throw new IllegalStateException("Automatic bomb was not deployed");
+        }
     }
 
     /** Place and immediately detonate one bomb during the AI's actor turn. */
@@ -327,7 +324,7 @@ public final class BlastBombManiac extends Buff {
         }
         Bomb bomb = placeBomb(true);
         if (bomb == null) return false;
-        detonateAutoBomb(bomb, Dungeon.hero.pos);
+        detonateAutoBomb(bomb);
         return true;
     }
 
@@ -346,7 +343,7 @@ public final class BlastBombManiac extends Buff {
             return null;
         }
         int cell = hero.pos;
-        if (Dungeon.level.pit[cell] || BlastBombCollision.hasLitBomb(Dungeon.level, cell)) {
+        if (Dungeon.level.pit[cell]) {
             GLog.w(BlastMessages.get("bomb_maniac.blocked"));
             return null;
         }
