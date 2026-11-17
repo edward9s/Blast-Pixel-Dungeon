@@ -38,6 +38,15 @@ public final class BlastAutoFarmingTest {
         plantingReady(false, 30f, 20f, true);
         plantingReady(true, 30f, 20f, false);
 
+        // Rebased Actor time must not extend the twenty-turn farming cooldown.
+        float beforeSave = BlastAutoFarming.gameTime(40f, 100f);
+        float afterSave = BlastAutoFarming.gameTime(130f, 10f);
+        if (beforeSave != afterSave
+                || BlastAutoFarming.plantingReady(afterSave + 19f, beforeSave + 20f, false)
+                || !BlastAutoFarming.plantingReady(afterSave + 20f, beforeSave + 20f, false)) {
+            throw new AssertionError("Farming cooldown changed after Actor.fixTime");
+        }
+
         // Local geometric filter matches the blast footprint and radius upgrades.
         if (!BlastAutoFarming.withinBlastRadius(3, 0, 3)
                 || BlastAutoFarming.withinBlastRadius(3, 3, 3)
