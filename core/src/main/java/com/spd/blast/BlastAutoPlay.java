@@ -759,6 +759,13 @@ public final class BlastAutoPlay {
     }
 
     static void rememberCombatTarget(Mob mob) {
+        rememberCombatTarget(mob, mob.pos);
+    }
+
+    static void rememberCombatTarget(Mob mob, int observedCell) {
+        if (observedCell < 0 || !Dungeon.level.insideMap(observedCell)) {
+            throw new IllegalArgumentException("Invalid last-seen combat cell: " + observedCell);
+        }
         // Keep one hidden target in reserve when combat is interrupted.
         if (combatTarget != null && combatTarget != mob && suspendedTarget == null
                 && combatTarget.isAlive() && Dungeon.hero != null
@@ -768,7 +775,7 @@ public final class BlastAutoPlay {
             suspendedTargetTurns = lostTargetTurns;
         }
         combatTarget = mob;
-        combatTargetCell = mob.pos;
+        combatTargetCell = observedCell;
         lostTargetTurns = 0;
     }
 
