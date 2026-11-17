@@ -18,7 +18,7 @@ class BombTagDispatchTests(unittest.TestCase):
         source = self.source
         request = source.split("private static void requestBombInput(", 1)[1]
         request = request.split("public static void requestBombPlacement()", 1)[0]
-        self.assertIn("if (action == BombAction.THROW)", request)
+        self.assertIn("action == BombAction.THROW || GameScene.manualInputPending()", request)
         self.assertIn("pendingBombInputs.add(new BombInput(action, destination))", request)
         self.assertIn("pendingFreeBombInputs.addLast(new BombInput(action, destination))", request)
         self.assertIn("Actor.add(freeBombActor)", request)
@@ -43,15 +43,17 @@ class BombTagDispatchTests(unittest.TestCase):
         self.assertIn("freeBombActor = null", actor)
         self.assertIn("hero != Dungeon.hero || level != Dungeon.level", actor)
 
-    def test_hero_turn_still_owns_animated_throws(self):
+    def test_hero_turn_retains_throws_and_modal_fallback(self):
         source = self.source
         method = source.split("public static boolean performBombInput(Hero hero) {", 1)[1]
         method = method.split("/** Retry a blocked action", 1)[0]
         self.assertIn("pendingBombInputs.poll()", method)
-        self.assertIn("input.action != BombAction.THROW", method)
         self.assertIn("blastAutoThrow(input.destination)", method)
-        self.assertNotIn("BlastRemoteBomb.detonateNext()", method)
-        self.assertNotIn("maniac.place()", method)
+        self.assertIn("BlastRemoteBomb.detonateNext()", method)
+        self.assertIn("maniac.place()", method)
+        resume = source.split("public static void resumeIfInputFinished() {", 1)[1]
+        resume = resume.split("/** Queue tag commands", 1)[0]
+        self.assertIn("!isPaused() || !pendingBombInputs.isEmpty()", resume)
 
     def test_settings_and_level_changes_cancel_pending_commands(self):
         source = self.source
