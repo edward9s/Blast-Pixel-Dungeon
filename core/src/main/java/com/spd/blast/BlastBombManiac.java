@@ -212,8 +212,13 @@ public final class BlastBombManiac extends Buff {
                 targeting = null;
                 autoTarget = null;
                 if (cell != null && BlastBombManiac.current() == BlastBombManiac.this) {
-                    if (BlastSettings.testAutoPlay()) BlastAutoPlay.requestBombThrow(cell);
-                    else throwAt(cell);
+                    if (BlastSettings.testAutoPlay()) {
+                        // Clear targeting before queuing the throw so paused auto-play can wake.
+                        GameScene.ready();
+                        BlastAutoPlay.requestBombThrow(cell);
+                    } else {
+                        throwAt(cell);
+                    }
                 }
             }
 
