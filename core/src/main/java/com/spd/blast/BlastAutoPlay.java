@@ -102,7 +102,6 @@ public final class BlastAutoPlay {
         if (!BlastSettings.testAutoPlay()) pausedHero = null;
         pendingBombInputs.clear();
         BlastAutoPickup.reset();
-        BlastAutoFarming.reset();
         BlastAutoSacrifice.reset();
 
         Hero hero = Dungeon.hero;
@@ -617,7 +616,6 @@ public final class BlastAutoPlay {
         waitingForInput = false;
         pendingBombInputs.clear();
         BlastAutoPickup.reset();
-        BlastAutoFarming.reset();
         BlastAutoSacrifice.reset();
     }
 
