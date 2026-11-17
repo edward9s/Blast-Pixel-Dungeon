@@ -1,7 +1,6 @@
 package com.spd.blast;
 
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
-import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.ArtifactRecharge;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Berserk;
@@ -31,87 +30,29 @@ import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfFrost;
 import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfMagicMissile;
 import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfPrismaticLight;
 import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfTransfusion;
-import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
 import com.shatteredpixel.shatteredpixeldungeon.mechanics.Ballistica;
-import com.watabou.utils.PathFinder;
 
 /** Non-bomb combat: estimate damage without rolling an actual attack or consuming charges. */
 final class BlastAutoCombat {
     enum Action { NONE, QUEUED, STARTED }
 
-    private static final int COVER_SEARCH_STEPS = 3;
-    private static final int COVER_WAIT_TURNS = 4;
-    private static final float LOW_HEALTH_RATIO = 0.50f;
-
-    private static Hero currentHero;
-    private static Level currentLevel;
-    private static Mob coverTarget;
-    private static int coverCell = -1;
-    private static int coverLastSeenCell = -1;
-    private static int coverTurns;
-    private static Mob exhaustedCoverTarget;
-    private static int exhaustedCoverPosition = -1;
-
     private BlastAutoCombat() {}
 
     static Action chooseAction(Hero hero, boolean[] safe, int[] distances) {
-        if (currentHero != hero || currentLevel != Dungeon.level) {
-            currentHero = hero;
-            currentLevel = Dungeon.level;
-            clearCover();
-        }
-
         Mob target = findEnemy(hero);
-        if (target == null) {
-            if (coverTarget != null && coverTarget.isAlive()
-                    && coverCell >= 0 && safe[coverCell]) {
-                if (coverCell != hero.pos && distances[coverCell] > 0
-                        && distances[coverCell] < Integer.MAX_VALUE) {
-                    hero.curAction = new HeroAction.Move(
-                            BlastAutoPlay.firstStep(coverCell, safe, distances));
-                    return Action.QUEUED;
-                }
-                if (coverCell == hero.pos && coverTurns++ < COVER_WAIT_TURNS) {
-                    hero.spendAndNext(Actor.TICK);
-                    return Action.STARTED;
-                }
-            }
-            if (coverTarget != null) {
-                markCoverExhausted(coverTarget);
-                if (!hero.rooted && hero.HP <= hero.HT * LOW_HEALTH_RATIO) {
-                    int step = BlastAutoPlay.retreatStep(
-                            hero, coverLastSeenCell, safe, distances);
-                    if (step >= 0) {
-                        clearCover();
-                        hero.curAction = new HeroAction.Move(step);
-                        return Action.QUEUED;
-                    }
-                } else {
-                    // The ordinary auto-play memory pursues only the last seen cell.
-                    BlastAutoPlay.rememberCombatTarget(coverTarget, coverLastSeenCell);
-                }
-            }
-            clearCover();
-            return Action.NONE;
-        }
-        if (exhaustedCoverTarget != target || exhaustedCoverPosition != target.pos) {
-            exhaustedCoverTarget = null;
-            exhaustedCoverPosition = -1;
-        }
+        if (target == null) return Action.NONE;
 
         boolean ranged = BlastAutoSacrifice.isRangedEnemy(target.getClass());
         boolean adjacent = Dungeon.level.adjacent(hero.pos, target.pos);
-        // Use the same native attack-skill threshold as the auto-play fallback.
         boolean highEvasion = BlastAutoPlay.highEvasion(hero, target);
         Choice missile = bestMissile(hero, target);
         Choice wand = bestWand(hero, target);
         float melee = hero.canAttack(target) ? meleeDamage(hero, target) : 0f;
 
-        // Magic bypasses the high physical evasion of wraiths and similar enemies.
+        // Prefer accurate magic against evasive enemies before damage ranking.
         if (highEvasion && wand != null) return zap(hero, target, wand);
 
         if (!ranged) {
-            clearCover();
             if (!adjacent) {
                 if (missile != null) return throwMissile(hero, target, missile);
                 if (wand != null) return zap(hero, target, wand);
@@ -126,75 +67,26 @@ final class BlastAutoCombat {
             return melee > 0f ? attack(hero, target) : Action.NONE;
         }
 
-        // Ranged enemies are handled in melee once they reach the hero.
-        if (adjacent) {
-            clearCover();
-            if (wand != null && wand.damage > melee) return zap(hero, target, wand);
-            return melee > 0f ? attack(hero, target) : Action.NONE;
-        }
-
-        // A few reachable steps behind opaque terrain encourages a ranged pursuer
-        // to advance; do not chase it into an open firing lane unnecessarily.
-        if (!hero.rooted && coverTarget == target && coverCell != hero.pos
-                && coverCell >= 0 && safe[coverCell]
-                && distances[coverCell] > 0 && distances[coverCell] < Integer.MAX_VALUE) {
-            hero.curAction = new HeroAction.Move(
-                    BlastAutoPlay.firstStep(coverCell, safe, distances));
-            return Action.QUEUED;
-        }
-        if (coverTarget == target && coverCell == hero.pos) {
-            if (coverTurns++ < COVER_WAIT_TURNS) {
-                hero.spendAndNext(Actor.TICK);
-                return Action.STARTED;
-            }
-            markCoverExhausted(target);
-        } else if (!hero.rooted && exhaustedCoverTarget != target) {
-            int destination = nearbyCover(hero, target, safe, distances);
-            if (destination >= 0) {
-                coverTarget = target;
-                coverCell = destination;
-                coverLastSeenCell = target.pos;
-                coverTurns = 0;
-                hero.curAction = new HeroAction.Move(
-                        BlastAutoPlay.firstStep(destination, safe, distances));
-                return Action.QUEUED;
-            }
-        }
-
-        // When there is no useful cover, compare a four-attack damage budget
-        // against current HP. Prefer the highest expected ranged damage per hit.
+        // Against ranged enemies, attack immediately with the highest expected
+        // damage available. Melee includes weapons with extended attack reach.
         Choice remote = better(wand, missile);
-        if (remote != null && remote.damage * 4f >= target.HP) {
-            clearCover();
+        if (remote != null && remote.damage >= melee) {
             return remote.missile != null
                     ? throwMissile(hero, target, remote) : zap(hero, target, remote);
         }
+        if (melee > 0f) return attack(hero, target);
 
-        clearCover();
-        if (hero.HP > hero.HT * LOW_HEALTH_RATIO && !hero.rooted) {
-            int destination = BlastAutoPlay.nearCell(hero.pos, target.pos, safe, distances);
-            if (destination >= 0 && distances[destination] > 0) {
+        // No attack can connect yet: close the distance without hiding or retreating.
+        if (!hero.rooted) {
+            int destination = BlastAutoPlay.nearCell(
+                    hero.pos, target.pos, safe, distances);
+            if (destination >= 0 && distances[destination] > 0
+                    && distances[destination] < Integer.MAX_VALUE) {
+                BlastAutoPlay.rememberCombatTarget(target);
                 hero.curAction = new HeroAction.Move(
                         BlastAutoPlay.firstStep(destination, safe, distances));
                 return Action.QUEUED;
             }
-        } else if (!hero.rooted) {
-            int step = BlastAutoPlay.retreatStep(hero, target.pos, safe, distances);
-            if (step >= 0) {
-                hero.curAction = new HeroAction.Move(step);
-                return Action.QUEUED;
-            }
-        }
-
-        // A blocked approach or escape can still inflict damage instead of idling.
-        if (remote != null) {
-            return remote.missile != null
-                    ? throwMissile(hero, target, remote) : zap(hero, target, remote);
-        }
-        if (hero.rooted || hero.HP <= hero.HT * LOW_HEALTH_RATIO) {
-            // Do not fall back to the old ranged-enemy chase while wounded.
-            hero.spendAndNext(Actor.TICK);
-            return Action.STARTED;
         }
         return Action.NONE;
     }
@@ -433,32 +325,5 @@ final class BlastAutoCombat {
         return Action.STARTED;
     }
 
-    private static int nearbyCover(Hero hero, Mob enemy, boolean[] safe, int[] distances) {
-        int cover = -1;
-        int best = Integer.MAX_VALUE;
-        for (int cell = 0; cell < safe.length; cell++) {
-            int steps = distances[cell];
-            if (!safe[cell] || steps < 1 || steps > COVER_SEARCH_STEPS) continue;
-            if (new Ballistica(cell, enemy.pos,
-                    Ballistica.STOP_SOLID | Ballistica.STOP_TARGET).collisionPos == enemy.pos) continue;
-            int score = steps * 10 + Dungeon.level.distance(cell, enemy.pos);
-            if (score < best) {
-                cover = cell;
-                best = score;
-            }
-        }
-        return cover;
-    }
 
-    private static void markCoverExhausted(Mob target) {
-        exhaustedCoverTarget = target;
-        exhaustedCoverPosition = target.pos;
-    }
-
-    private static void clearCover() {
-        coverTarget = null;
-        coverCell = -1;
-        coverLastSeenCell = -1;
-        coverTurns = 0;
-    }
 }
