@@ -187,18 +187,19 @@ public final class BlastRemoteBomb extends Buff {
             return bomb == item && item.fuse == this;
         }
 
-        public void detonateIfPresent(Level level) {
+        public boolean detonateIfPresent(Level level) {
             if (bomb == null || bomb.fuse != this) {
-                return;
+                return false;
             }
             for (Heap heap : level.heaps.valueList()) {
                 if (heap.items.contains(bomb)) {
                     // Fuse.trigger removes the bomb before exploding it and
                     // snuffs this actor. Subsequent entries will be invalid.
                     trigger(heap);
-                    return;
+                    return true;
                 }
             }
+            return false;
         }
 
         @Override
