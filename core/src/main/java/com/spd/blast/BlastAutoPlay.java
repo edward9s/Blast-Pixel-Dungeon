@@ -460,13 +460,17 @@ public final class BlastAutoPlay {
             }
         }
 
-        // Lure pursuing enemies into Sacrificial Fire before using direct attacks.
+        // Bombard ranged enemies before sacrificial-fire luring or melee pursuit.
+        // The trajectory and blast radius determine whether unseen targets can be hit.
+        if (BlastAutoBombAI.actAgainstRanged(hero)) return true;
+
+        // Keep sacrificial-fire luring ahead of bomb attacks on other enemies.
         BlastAutoSacrifice.Action sacrifice = BlastAutoSacrifice.chooseAction(hero, safe, distances);
         if (sacrifice == BlastAutoSacrifice.Action.WAIT) return true;
         if (sacrifice == BlastAutoSacrifice.Action.QUEUED) return false;
 
         // Blast-specific tactics are isolated from the portable AI policy.
-        if (BlastAutoBombAI.act(hero)) return true;
+        if (BlastAutoBombAI.actAgainstOtherEnemies(hero)) return true;
 
         Mob invulnerable = null;
         Mob hiddenNecromancer = null;
