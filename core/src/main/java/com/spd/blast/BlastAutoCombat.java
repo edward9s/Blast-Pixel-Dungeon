@@ -18,7 +18,6 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroClass;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Talent;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Thief;
-import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Wraith;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.KindOfWeapon;
 import com.shatteredpixel.shatteredpixeldungeon.items.rings.RingOfAccuracy;
@@ -102,8 +101,8 @@ final class BlastAutoCombat {
 
         boolean ranged = BlastAutoSacrifice.isRangedEnemy(target.getClass());
         boolean adjacent = Dungeon.level.adjacent(hero.pos, target.pos);
-        boolean highEvasion = target instanceof Wraith
-                || target.defenseSkill(hero) >= 2f * basicAccuracy(hero, target);
+        // Use the same native attack-skill threshold as the auto-play fallback.
+        boolean highEvasion = BlastAutoPlay.highEvasion(hero, target);
         Choice missile = bestMissile(hero, target);
         Choice wand = bestWand(hero, target);
         float melee = hero.canAttack(target) ? meleeDamage(hero, target) : 0f;

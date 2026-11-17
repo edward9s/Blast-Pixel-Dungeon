@@ -650,7 +650,7 @@ public final class BlastAutoPlay {
         return wraith || defenseSkill >= 2L * attackSkill;
     }
 
-    private static boolean highEvasion(Hero hero, Mob mob) {
+    static boolean highEvasion(Hero hero, Mob mob) {
         return highEvasion(mob instanceof Wraith, mob.defenseSkill(hero),
                 hero.attackSkill(mob));
     }
