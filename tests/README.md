@@ -25,7 +25,11 @@ java -cp "/tmp/blast-tests:$BLAST_TEST_CLASSPATH" BlastDemolitionTest
 real lit throws, the two-unit remote alarm startup and six-unit repeat interval,
 native monster waking/targeting, a bomb under the Hero, saved alarm timing and
 remote ordering, immediate remote detonation, freezing, kicked native fuses,
-and ordinary remote bombs remaining silent. Compile and run it with the same
+and ordinary remote bombs remaining silent. It also checks stacked armed bombs
+on locked and crystal chests: the original loot remains first, automatic
+identity-based detonation triggers the linked bomb exactly once, occupied bomb
+slots are returned, and freezing snuffs exposed bombs without unlocking the
+chest. Compile and run it with the same
 classpath:
 
 ```sh
