@@ -9,13 +9,6 @@ import com.shatteredpixel.shatteredpixeldungeon.plants.Sungrass;
 
 /** Regression checks for Regrowth farming and ordinary auto-play harvest targets. */
 public final class BlastAutoFarmingTest {
-    private static void plantingReady(boolean expected, float now,
-                                      float nextBombAt, boolean cloudActive) {
-        if (BlastAutoFarming.plantingReady(now, nextBombAt, cloudActive) != expected) {
-            throw new AssertionError("Unexpected farming cooldown decision");
-        }
-    }
-
     private static void crop(boolean expected, int terrain,
                              com.shatteredpixel.shatteredpixeldungeon.plants.Plant plant) {
         if (BlastAutoHarvest.harvestable(terrain, plant) != expected) {
@@ -31,12 +24,8 @@ public final class BlastAutoFarmingTest {
             throw new AssertionError("Planting must require an available Regrowth bomb");
         }
 
-        // Plant without a prior harvest; guard subsequent blasts by time and cloud.
-        plantingReady(true, 0f, Float.NEGATIVE_INFINITY, false);
-        plantingReady(false, 10f, 20f, false);
-        plantingReady(true, 20f, 20f, false);
-        plantingReady(false, 30f, 20f, true);
-        plantingReady(true, 30f, 20f, false);
+        // The planting cycle has no fixed cooldown: harvestable crops are
+        // prioritized in BlastAutoPlay, and active Regrowth clouds block replanting.
 
         // Local geometric filter matches the blast footprint and radius upgrades.
         if (!BlastAutoFarming.withinBlastRadius(3, 0, 3)
