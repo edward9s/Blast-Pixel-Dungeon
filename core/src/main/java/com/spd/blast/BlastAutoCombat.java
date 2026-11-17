@@ -89,7 +89,7 @@ final class BlastAutoCombat {
                     }
                 } else {
                     // The ordinary auto-play memory pursues only the last seen cell.
-                    BlastAutoPlay.rememberCombatTarget(coverTarget);
+                    BlastAutoPlay.rememberCombatTarget(coverTarget, coverLastSeenCell);
                 }
             }
             clearCover();
