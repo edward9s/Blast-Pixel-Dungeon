@@ -1,7 +1,6 @@
 package com.spd.blast;
 
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
-import com.shatteredpixel.shatteredpixeldungeon.Statistics;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.Blob;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
@@ -16,27 +15,10 @@ public final class BlastAutoFarming {
     enum Action { NONE, MOVE, BOMB }
 
     static final int MIN_GROWABLE_CELLS = 10;
-    private static final float BOMB_INTERVAL = 20f;
-
-    private static Hero currentHero;
-    private static Level currentLevel;
-    private static float nextBombAt = Float.NEGATIVE_INFINITY;
-
     private BlastAutoFarming() {}
-
-    public static void reset() {
-        currentHero = null;
-        currentLevel = null;
-        nextBombAt = Float.NEGATIVE_INFINITY;
-    }
 
     /** Select one farming action; idle/roaming remains the caller's responsibility. */
     static Action chooseAction(Hero hero, boolean[] safe, int[] distances) {
-        if (currentHero != hero || currentLevel != Dungeon.level) {
-            reset();
-            currentHero = hero;
-            currentLevel = Dungeon.level;
-        }
         if (!BlastSettings.testAutoPlay() || !BlastSettings.autoFarming()
                 || hero.flying || BlastAutoPlay.hasVisibleEnemy(hero)) return Action.NONE;
 
@@ -45,8 +27,9 @@ public final class BlastAutoFarming {
             throw new IllegalArgumentException("Invalid farming distance map");
         }
 
-        // Allow another blast only after its cooldown and all Regrowth clouds end.
-        if (!plantingReady(gameTime(), nextBombAt, regrowthActive(level))) return Action.NONE;
+        // Auto-play harvests visible reachable crops before calling farming.
+        // Do not repeat a blast while the previous Regrowth cloud is active.
+        if (regrowthActive(level)) return Action.NONE;
 
         // Only planting new grass requires remote mode and an available Regrowth bomb.
         if (BlastRemoteBomb.isTimedMode() || hero.buff(BlastRemoteBomb.class) == null) {
@@ -77,26 +60,12 @@ public final class BlastAutoFarming {
             maniac.select(previous);
         }
         if (!launched) return Action.NONE;
-        nextBombAt = gameTime() + BOMB_INTERVAL;
         if (!remoteThrow) hero.spendAndNext(1f);
         return Action.BOMB;
     }
 
-    /** Actor.fixTime() rebases Actor.now(); Statistics.duration records the offset. */
-    private static float gameTime() {
-        return gameTime(Statistics.duration, Actor.now());
-    }
-
-    static float gameTime(float duration, float actorTime) {
-        return duration + actorTime;
-    }
-
     static boolean regrowthReady(int remainingBombs, int regrowthIndex) {
         return remainingBombs > 0 && regrowthIndex >= 0;
-    }
-
-    static boolean plantingReady(float now, float nextBombAt, boolean cloudActive) {
-        return !cloudActive && now >= nextBombAt;
     }
 
     static boolean sufficientArea(int count) {
