@@ -46,6 +46,18 @@ def patch_toolbar(path: Path) -> None:
     source = source.replace(
         ready, "(Dungeon.hero.ready || com.spd.blast.BlastSettings.testAutoPlay())"
     )
+    source = replace_once(
+        source,
+        "\t\t\t\t\t\tinformer.onSelect(null);\n"
+        "\t\t\t\t\t\tDungeon.hero.search(true);",
+        "\t\t\t\t\t\tif (com.spd.blast.BlastSettings.testAutoPlay()) {\n"
+        "\t\t\t\t\t\t\tGameScene.cancelCellSelector();\n"
+        "\t\t\t\t\t\t} else {\n"
+        "\t\t\t\t\t\t\tinformer.onSelect(null);\n"
+        "\t\t\t\t\t\t}\n"
+        "\t\t\t\t\t\tDungeon.hero.search(true);",
+        "examine selection cleanup"
+    )
     path.write_text(source, encoding="utf-8")
 
 
