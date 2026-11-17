@@ -232,6 +232,18 @@ def patch(path: Path) -> None:
         "\t\tif (demolition != null) demolition.finish();\n\t}\n",
         "finish demolition for every bomb type")
 
+    # Frozen terrain, ice clouds, and other cold effects never disarm a bomb.
+    source = replace(source,
+        "\t\tpublic boolean freeze(){\n"
+        "\t\t\tbomb.fuse = null;\n"
+        "\t\t\tsnuff();\n"
+        "\t\t\treturn true;\n"
+        "\t\t}",
+        "\t\tpublic boolean freeze(){\n"
+        "\t\t\treturn false;\n"
+        "\t\t}",
+        "bomb fuse ignores freezing")
+
     path.write_text(source, encoding="utf-8")
     print(f"patched {path}: remote fuse, generated bomb throw and identity")
 
