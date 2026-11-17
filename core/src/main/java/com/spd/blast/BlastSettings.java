@@ -10,6 +10,9 @@ public final class BlastSettings {
     /** Show the original Shattered title/victory support buttons and first Worn Key prompt. */
     public static final boolean SHOW_SHATTERED_SUPPORT = false;
 
+    /** Enable freezing to extinguish armed bomb fuses. */
+    public static final boolean ENABLE_BOMB_FUSE_EXTINGUISHING = false;
+
     public static final int MIN_SPAWN_MULTIPLIER = 1;
     public static final int MAX_SPAWN_MULTIPLIER = 10;
     public static final int DEFAULT_SPAWN_MULTIPLIER = 1;

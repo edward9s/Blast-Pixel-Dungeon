@@ -268,7 +268,11 @@ the native timed fuse calls the same helper without changing its behavior.
 The remote alarm countdown is saved with the fuse, alongside its sequence.
 An alarm does not consume the bomb or its deployment slot. Character contact
 does not explode a remote bomb; manual detonation and chain reactions still do.
-Freezing extinguishes the remote fuse. Kicks replace it with the native timed
+`BlastSettings.ENABLE_BOMB_FUSE_EXTINGUISHING` is a compile-time flag (default `false`).
+When enabled, freezing extinguishes armed bomb fuses, including remote, timed,
+and chest-deployed bombs, as in SPD. When disabled, freezing leaves all bomb
+fuses armed. Other freezing effects are unchanged.
+Changing the flag requires rebuilding. Kicks replace it with the native timed
 Noisemaker fuse, retaining the shared radius-based kick countdown and the
 original alarm/contact behavior.
 
@@ -329,7 +333,7 @@ until explosion or normal recovery. An ordinary timed throw still starts with
 SPD's native 2-unit fuse; kicking it restarts the fuse using the same formula.
 The Tag reflects these changes after the next refresh. Chain explosions can
 trigger earlier than the displayed countdown. Lit bombs remain impassable and cannot be
-picked up or manually disarmed; the native Loot Tag does not offer to pick up a heap topped by an armed bomb or death counterbomb; freeze-extinguished bombs can be recovered.
+picked up or manually disarmed; the native Loot Tag does not offer to pick up a heap topped by an armed bomb or death counterbomb; bombs extinguished by freezing (when enabled) can be recovered.
 
 ## Out-of-sight floor items
 
@@ -339,7 +343,7 @@ Unlit bombs follow the original visibility rules. A small render-only layer abov
 item icons without changing the Hero's field of view or the visibility of
 other items, enemies, and terrain. In-view sprites remain the native heap
 sprites. Heap mutations refresh the out-of-sight layer, including when freezing
-extinguishes a bomb or a bomb is ignited; loading a floor also reconstructs it. A heap with multiple relevant items displays the first one.
+extinguishes a bomb (if enabled) or a bomb is ignited; loading a floor also reconstructs it. A heap with multiple relevant items displays the first one.
 The layer is cleared when leaving the game scene.
 
 ## Mob drops and consumables
@@ -429,7 +433,7 @@ discovered bomb types; it still removes the BlastRadius upgrade.
 A Bomb Maniac-generated bomb falling into a chasm is consumed immediately:
 its deployment slot is returned, and it does not appear on the next floor.
 Ordinary bombs retain SPD's normal chasm behavior. Recovered charged bombs
-(such as ones extinguished by freezing) can be imbued to return one occupied
+(including ones extinguished by freezing when enabled) can be imbued to return one occupied
 deployment slot each, without increasing capacity. Ordinary unlit bombs still
 increase maximum capacity by one when imbued. After a successful imbue,
 `WndBlastBombs` immediately opens another inventory selector for the next bomb;

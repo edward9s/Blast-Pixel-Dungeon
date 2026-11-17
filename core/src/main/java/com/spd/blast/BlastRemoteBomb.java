@@ -162,7 +162,7 @@ public final class BlastRemoteBomb extends Buff {
         timedMode = bundle.getBoolean(TIMED_MODE);
     }
 
-    /** A fuse that never counts down, but still obeys vanilla snuff/freeze/explode. */
+    /** A fuse that never counts down; freezing follows the shared Bomb.Fuse setting. */
     public static final class RemoteFuse extends Bomb.Fuse {
         private static final String SEQUENCE = "blast_remote_bomb_sequence";
         private static final String ALARM_DELAY = "blast_remote_alarm_delay";

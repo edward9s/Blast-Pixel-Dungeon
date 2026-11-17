@@ -232,6 +232,21 @@ def patch(path: Path) -> None:
         "\t\tif (demolition != null) demolition.finish();\n\t}\n",
         "finish demolition for every bomb type")
 
+    # Centralize the rule in the fuse so ground and container bombs agree.
+    source = replace(source,
+        "\t\tpublic boolean freeze(){\n"
+        "\t\t\tbomb.fuse = null;\n"
+        "\t\t\tsnuff();\n"
+        "\t\t\treturn true;\n"
+        "\t\t}",
+        "\t\tpublic boolean freeze(){\n"
+        "\t\t\tif (!com.spd.blast.BlastSettings.ENABLE_BOMB_FUSE_EXTINGUISHING) return false;\n"
+        "\t\t\tbomb.fuse = null;\n"
+        "\t\t\tsnuff();\n"
+        "\t\t\treturn true;\n"
+        "\t\t}",
+        "configurable freezing of bomb fuses")
+
     path.write_text(source, encoding="utf-8")
     print(f"patched {path}: remote fuse, generated bomb throw and identity")
 
