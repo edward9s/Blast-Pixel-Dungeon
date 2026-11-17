@@ -16,7 +16,9 @@ public final class BlastBombHeap {
     }
 
     public static boolean isContainer(Heap heap) {
-        return heap.type != Heap.Type.HEAP && heap.type != Heap.Type.FOR_SALE;
+        return heap.type == Heap.Type.CHEST
+                || heap.type == Heap.Type.LOCKED_CHEST
+                || heap.type == Heap.Type.CRYSTAL_CHEST;
     }
 
     /** Keep native heap drop behavior, but leave its original loot before the bomb. */
