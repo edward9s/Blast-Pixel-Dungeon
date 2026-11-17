@@ -75,6 +75,31 @@ def patch_quickslot(path: Path) -> None:
         " && !GameScene.cancel())",
         "quickslot selection"
     )
+    # The old all-true distance map contains exactly the 5x5 neighbourhood.
+    # Iterating it in map order preserves every targeting result without
+    # allocating two map-sized arrays or overwriting PathFinder.distance.
+    source = replace_once(
+        source,
+        "\t\t//Otherwise pick nearby tiles to try and 'angle' the shot, auto-aim basically.\n"
+        "\t\tPathFinder.buildDistanceMap( target.pos, BArray.not( new boolean[Dungeon.level.length()], null ), 2 );\n"
+        "\t\tfor (int i = 0; i < PathFinder.distance.length; i++) {\n"
+        "\t\t\tif (PathFinder.distance[i] < Integer.MAX_VALUE\n"
+        "\t\t\t\t\t&& item.targetingPos(Dungeon.hero, i) == target.pos)\n"
+        "\t\t\t\treturn i;\n"
+        "\t\t}",
+        "\t\t//Try the same nearby aim cells in the same map order, without pathfinding.\n"
+        "\t\tint width = Dungeon.level.width();\n"
+        "\t\tint height = Dungeon.level.height();\n"
+        "\t\tint x = target.pos % width;\n"
+        "\t\tint y = target.pos / width;\n"
+        "\t\tfor (int yy = Math.max(0, y - 2); yy <= Math.min(height - 1, y + 2); yy++) {\n"
+        "\t\t\tfor (int xx = Math.max(0, x - 2); xx <= Math.min(width - 1, x + 2); xx++) {\n"
+        "\t\t\t\tint cell = yy * width + xx;\n"
+        "\t\t\t\tif (item.targetingPos(Dungeon.hero, cell) == target.pos) return cell;\n"
+        "\t\t\t}\n"
+        "\t\t}",
+        "quickslot nearby auto-aim",
+    )
     path.write_text(source, encoding="utf-8")
 
 
