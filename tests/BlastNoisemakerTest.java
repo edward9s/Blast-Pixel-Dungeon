@@ -263,6 +263,24 @@ public final class BlastNoisemakerTest {
         }
     }
 
+    private static void frozenChestBomb() {
+        TestLevel level = setup();
+        Buff.affect(Dungeon.hero, BlastRemoteBomb.class);
+        Heap chest = heap(level, cell(4, 4));
+        chest.type = Heap.Type.LOCKED_CHEST;
+        Bomb loot = new Bomb();
+        chest.items.add(loot);
+        Bomb placed = new Bomb();
+        placed.blastSetManiacCharge(true);
+        placed.blastThrowLit(chest.pos);
+
+        chest.freeze();
+        check(placed.fuse == null && chest.items.contains(placed),
+                "freezing an exposed chest bomb must snuff the fuse without losing the bomb");
+        check(chest.type == Heap.Type.LOCKED_CHEST && chest.peek() == loot,
+                "freezing must preserve locked chest loot and type");
+    }
+
     private static void ordinaryBomb() throws Exception {
         TestLevel level = setup();
         Buff.affect(Dungeon.hero, BlastRemoteBomb.class);
@@ -281,6 +299,7 @@ public final class BlastNoisemakerTest {
         freezeAndKick();
         ordinaryBomb();
         stackedChestBombs();
+        frozenChestBomb();
         System.out.println("Passed " + checks + " remote noisemaker checks");
     }
 }
