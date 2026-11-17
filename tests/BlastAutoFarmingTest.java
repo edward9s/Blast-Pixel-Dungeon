@@ -9,10 +9,10 @@ import com.shatteredpixel.shatteredpixeldungeon.plants.Sungrass;
 
 /** Regression checks for Regrowth farming and ordinary auto-play harvest targets. */
 public final class BlastAutoFarmingTest {
-    private static void plantAgain(boolean expected, boolean planted,
-                                   boolean harvested, boolean cloudActive) {
-        if (BlastAutoFarming.canPlantAgain(planted, harvested, cloudActive) != expected) {
-            throw new AssertionError("Unexpected farming cycle decision");
+    private static void plantingReady(boolean expected, float now,
+                                      float nextBombAt, boolean cloudActive) {
+        if (BlastAutoFarming.plantingReady(now, nextBombAt, cloudActive) != expected) {
+            throw new AssertionError("Unexpected farming cooldown decision");
         }
     }
 
@@ -31,13 +31,25 @@ public final class BlastAutoFarmingTest {
             throw new AssertionError("Planting must require an available Regrowth bomb");
         }
 
-        // First blast is allowed, but the next waits for at least one harvest
-        // and the end of the previous Regrowth cloud.
-        plantAgain(true, false, false, false);
-        plantAgain(false, true, false, true);
-        plantAgain(false, true, false, false);
-        plantAgain(false, true, true, true);
-        plantAgain(true, true, true, false);
+        // Plant without a prior harvest; guard subsequent blasts by time and cloud.
+        plantingReady(true, 0f, Float.NEGATIVE_INFINITY, false);
+        plantingReady(false, 10f, 20f, false);
+        plantingReady(true, 20f, 20f, false);
+        plantingReady(false, 30f, 20f, true);
+        plantingReady(true, 30f, 20f, false);
+
+        // A bounded search must progress to the next sites, wrapping the map.
+        int site = 8;
+        for (int i = 0; i < 8; i++) site = BlastAutoFarming.nextSiteIndex(site, 12);
+        if (site != 4 || BlastAutoFarming.nextSiteIndex(11, 12) != 0) {
+            throw new AssertionError("Farming search must advance past eight sites");
+        }
+        try {
+            BlastAutoFarming.nextSiteIndex(12, 12);
+            throw new AssertionError("Invalid farming scan index was accepted");
+        } catch (IllegalArgumentException expected) {
+            // Fail fast on invalid scan state.
+        }
 
         // Require at least ten reachable, growable cells under the actual blast.
         if (BlastAutoFarming.sufficientArea(0)
@@ -47,15 +59,15 @@ public final class BlastAutoFarmingTest {
             throw new AssertionError("Incorrect minimum farming area threshold");
         }
         for (int ground : new int[]{Terrain.EMPTY, Terrain.EMPTY_DECO,
-                Terrain.EMBERS, Terrain.GRASS, Terrain.FURROWED_GRASS}) {
-            if (!BlastAutoFarming.canGrow(ground)) {
+                Terrain.EMBERS, Terrain.GRASS, Terrain.FURROWED_GRASS, Terrain.HIGH_GRASS}) {
+            if (!BlastAutoFarming.canHostRegrowth(ground)) {
                 throw new AssertionError("Expected growable terrain: " + ground);
             }
         }
         for (int ground : new int[]{Terrain.WALL, Terrain.CHASM, Terrain.WATER,
-                Terrain.EXIT, Terrain.ENTRANCE, Terrain.HIGH_GRASS,
+                Terrain.EXIT, Terrain.ENTRANCE,
                 Terrain.LOCKED_DOOR, Terrain.TRAP, Terrain.EMPTY_WELL}) {
-            if (BlastAutoFarming.canGrow(ground)) {
+            if (BlastAutoFarming.canHostRegrowth(ground)) {
                 throw new AssertionError("Non-growable terrain: " + ground);
             }
         }

@@ -865,7 +865,6 @@ public final class BlastAutoPlay {
 
         int next = crop == hero.pos ? hero.pos : firstStep(crop, safe, distances);
         hero.curAction = new HeroAction.Move(next);
-        BlastAutoFarming.recordHarvest(next);
         roaming.clearDestination();
         return true;
     }
