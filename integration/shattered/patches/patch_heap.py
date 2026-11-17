@@ -55,6 +55,13 @@ def patch(path: Path) -> None:
         source = source.replace(
             entry, entry + "\n\t\tcom.spd.blast.BlastBombHeap.detonateExposed(this);", 1)
 
+    freeze_entry = "\tpublic void freeze() {\n"
+    if source.count(freeze_entry) != 1:
+        raise SystemExit("Heap.freeze: expected one entry")
+    source = source.replace(
+        freeze_entry,
+        freeze_entry + "\t\tcom.spd.blast.BlastBombHeap.freezeExposed(this);\n", 1)
+
     for signature in (
         "public Item pickUp()",
         "public void drop( Item item )",
