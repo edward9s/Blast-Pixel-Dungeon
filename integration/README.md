@@ -268,7 +268,7 @@ the native timed fuse calls the same helper without changing its behavior.
 The remote alarm countdown is saved with the fuse, alongside its sequence.
 An alarm does not consume the bomb or its deployment slot. Character contact
 does not explode a remote bomb; manual detonation and chain reactions still do.
-Freezing extinguishes the remote fuse. Kicks replace it with the native timed
+Freezing no longer extinguishes remote or timed bomb fuses, including bombs on chests. Other freezing effects are unchanged. Kicks replace it with the native timed
 Noisemaker fuse, retaining the shared radius-based kick countdown and the
 original alarm/contact behavior.
 
