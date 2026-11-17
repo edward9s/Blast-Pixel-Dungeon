@@ -166,6 +166,12 @@ public final class BlastAutoFarming {
                 && sufficientArea(countPlantable(bomb.blastWarningCells(center), level, standCell));
     }
 
+    static boolean withinBlastRadius(int dx, int dy, int radius) {
+        if (radius < 0) throw new IllegalArgumentException("Invalid bomb radius");
+        long diameter = 2L * radius + 1;
+        return 4L * ((long) dx * dx + (long) dy * dy) <= diameter * diameter;
+    }
+
     /** Count terrain candidates in the bomb's actual radius, before ray obstruction. */
     static int localPlantable(Level level, int center, int standCell, int radius) {
         if (radius < 0 || center < 0 || center >= level.length()
@@ -176,8 +182,6 @@ public final class BlastAutoFarming {
         int height = level.height();
         int x = center % width;
         int y = center / width;
-        int diameter = radius * 2 + 1;
-        int squaredLimit = diameter * diameter;
         int count = 0;
         for (int dy = -radius; dy <= radius; dy++) {
             int yy = y + dy;
@@ -185,7 +189,7 @@ public final class BlastAutoFarming {
             for (int dx = -radius; dx <= radius; dx++) {
                 int xx = x + dx;
                 if (xx < 0 || xx >= width
-                        || 4 * (dx * dx + dy * dy) > squaredLimit) continue;
+                        || !withinBlastRadius(dx, dy, radius)) continue;
                 int cell = yy * width + xx;
                 if (cell != standCell && level.plants.get(cell) == null
                         && canHostRegrowth(level.map[cell])) {
