@@ -34,6 +34,14 @@ public final class BlastBombHeap {
         if (heap.sprite != null) heap.sprite.view(heap).place(heap.pos);
     }
 
+    /** Freezing still extinguishes exposed fuses even while the chest is closed. */
+    public static void freezeExposed(Heap heap) {
+        if (!isContainer(heap)) return;
+        for (Item item : heap.items) {
+            if (isExposedBomb(item)) ((Bomb) item).fuse.freeze();
+        }
+    }
+
     /** Container contents remain protected; exposed armed bombs still chain-react. */
     public static void detonateExposed(Heap heap) {
         if (!isContainer(heap)) return;
