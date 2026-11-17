@@ -3,11 +3,14 @@ package com.spd.blast;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.ArtifactRecharge;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Berserk;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Bless;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Daze;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Hex;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.MagicImmune;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.PhysicalEmpower;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Recharging;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.WandEmpower;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroAction;
@@ -25,7 +28,6 @@ import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.MagesStaff;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.missiles.MissileWeapon;
 import com.shatteredpixel.shatteredpixeldungeon.items.wands.DamageWand;
 import com.shatteredpixel.shatteredpixeldungeon.items.wands.Wand;
-import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfDisintegration;
 import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfFrost;
 import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfMagicMissile;
 import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfPrismaticLight;
@@ -47,6 +49,8 @@ final class BlastAutoCombat {
     private static Mob coverTarget;
     private static int coverCell = -1;
     private static int coverTurns;
+    private static Mob exhaustedCoverTarget;
+    private static int exhaustedCoverPosition = -1;
 
     private BlastAutoCombat() {}
 
@@ -64,8 +68,13 @@ final class BlastAutoCombat {
                 hero.spendAndNext(Actor.TICK);
                 return Action.STARTED;
             }
+            if (coverTarget != null) markCoverExhausted(coverTarget);
             clearCover();
             return Action.NONE;
+        }
+        if (exhaustedCoverTarget != target || exhaustedCoverPosition != target.pos) {
+            exhaustedCoverTarget = null;
+            exhaustedCoverPosition = -1;
         }
 
         boolean ranged = BlastAutoSacrifice.isRangedEnemy(target.getClass());
@@ -104,7 +113,20 @@ final class BlastAutoCombat {
 
         // A few reachable steps behind opaque terrain encourages a ranged pursuer
         // to advance; do not chase it into an open firing lane unnecessarily.
-        if (coverTarget != target || coverCell != hero.pos) {
+        if (coverTarget == target && coverCell != hero.pos
+                && coverCell >= 0 && safe[coverCell]
+                && distances[coverCell] > 0 && distances[coverCell] < Integer.MAX_VALUE) {
+            hero.curAction = new HeroAction.Move(
+                    BlastAutoPlay.firstStep(coverCell, safe, distances));
+            return Action.QUEUED;
+        }
+        if (coverTarget == target && coverCell == hero.pos) {
+            if (coverTurns++ < COVER_WAIT_TURNS) {
+                hero.spendAndNext(Actor.TICK);
+                return Action.STARTED;
+            }
+            markCoverExhausted(target);
+        } else if (exhaustedCoverTarget != target) {
             int destination = nearbyCover(hero, target, safe, distances);
             if (destination >= 0) {
                 coverTarget = target;
@@ -114,9 +136,6 @@ final class BlastAutoCombat {
                         BlastAutoPlay.firstStep(destination, safe, distances));
                 return Action.QUEUED;
             }
-        } else if (coverTurns++ < COVER_WAIT_TURNS) {
-            hero.spendAndNext(Actor.TICK);
-            return Action.STARTED;
         }
 
         // When there is no useful cover, compare a four-attack damage budget
@@ -249,7 +268,6 @@ final class BlastAutoCombat {
         return wand instanceof WandOfMagicMissile
                 || wand instanceof WandOfFrost
                 || wand instanceof WandOfPrismaticLight
-                || wand instanceof WandOfDisintegration
                 || (wand instanceof WandOfTransfusion
                     && target.properties().contains(Char.Property.UNDEAD));
     }
@@ -269,6 +287,10 @@ final class BlastAutoCombat {
                 if (force <= 0) tier = 1f;
                 damage = (Math.round(tier + force)
                         + Math.round(5f * (tier + 1f) + force * (tier + 1f))) / 2f;
+                RingOfForce.BrawlersStance stance = hero.buff(RingOfForce.BrawlersStance.class);
+                if (stance != null && stance.active) {
+                    damage += Math.round(3f + tier + force * (4f + 2f * tier) / 8f);
+                }
             }
         } else if (weapon != null) {
             damage = weaponDamage(hero, weapon);
@@ -278,14 +300,27 @@ final class BlastAutoCombat {
         }
         PhysicalEmpower empower = hero.buff(PhysicalEmpower.class);
         if (empower != null) damage += empower.dmgBoost;
-        return Math.max(0f, damage * hitChance(hero, target, weapon, false));
+        return Math.max(0f, boostedDamage(hero, damage)
+                * hitChance(hero, target, weapon, false));
     }
 
     private static float physicalDamage(Hero hero, Mob target, MissileWeapon weapon) {
         float damage = weaponDamage(hero, weapon);
         PhysicalEmpower empower = hero.buff(PhysicalEmpower.class);
         if (empower != null) damage += empower.dmgBoost;
-        return Math.max(0f, damage * hitChance(hero, target, weapon, true));
+        return Math.max(0f, boostedDamage(hero, damage)
+                * hitChance(hero, target, weapon, true));
+    }
+
+    private static float boostedDamage(Hero hero, float damage) {
+        if (hero.heroClass != HeroClass.DUELIST
+                && hero.hasTalent(Talent.WEAPON_RECHARGING)
+                && (hero.buff(Recharging.class) != null
+                    || hero.buff(ArtifactRecharge.class) != null)) {
+            damage *= 1.025f + 0.025f * hero.pointsInTalent(Talent.WEAPON_RECHARGING);
+        }
+        Berserk berserk = hero.buff(Berserk.class);
+        return berserk == null ? damage : berserk.damageFactor(damage);
     }
 
     private static float weaponDamage(Hero hero, KindOfWeapon weapon) {
@@ -325,7 +360,9 @@ final class BlastAutoCombat {
         if (weapon != null) accuracy *= weapon.accuracyFactor(hero, target);
         // The extra shooting talent is included in the native missile accuracy factor
         // for adjacent targets, and not applied to unrelated melee strikes.
-        if (thrown && hero.buff(com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Momentum.class) != null
+        com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Momentum momentum =
+                hero.buff(com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Momentum.class);
+        if (thrown && momentum != null && momentum.freerunning()
                 && hero.pointsInTalent(Talent.PROJECTILE_MOMENTUM) > 0) {
             accuracy *= 1f + hero.pointsInTalent(Talent.PROJECTILE_MOMENTUM) / 2f;
         }
@@ -360,6 +397,7 @@ final class BlastAutoCombat {
             return Action.NONE;
         }
         BlastAutoPlay.rememberCombatTarget(target);
+        weapon.parent = null;
         weapon.setCurrent(hero);
         weapon.cast(hero, target.pos);
         return Action.STARTED;
@@ -380,6 +418,11 @@ final class BlastAutoCombat {
             }
         }
         return cover;
+    }
+
+    private static void markCoverExhausted(Mob target) {
+        exhaustedCoverTarget = target;
+        exhaustedCoverPosition = target.pos;
     }
 
     private static void clearCover() {
