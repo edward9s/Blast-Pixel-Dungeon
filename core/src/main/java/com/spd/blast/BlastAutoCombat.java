@@ -36,7 +36,7 @@ import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
 import com.shatteredpixel.shatteredpixeldungeon.mechanics.Ballistica;
 import com.watabou.utils.PathFinder;
 
-/** Non-bomb combat: estimate attacks without consuming RNG, charges, or temporary buffs. */
+/** Non-bomb combat: estimate damage without rolling an actual attack or consuming charges. */
 final class BlastAutoCombat {
     enum Action { NONE, QUEUED, STARTED }
 
@@ -48,6 +48,7 @@ final class BlastAutoCombat {
     private static Level currentLevel;
     private static Mob coverTarget;
     private static int coverCell = -1;
+    private static int coverLastSeenCell = -1;
     private static int coverTurns;
     private static Mob exhaustedCoverTarget;
     private static int exhaustedCoverPosition = -1;
@@ -76,7 +77,21 @@ final class BlastAutoCombat {
                     return Action.STARTED;
                 }
             }
-            if (coverTarget != null) markCoverExhausted(coverTarget);
+            if (coverTarget != null) {
+                markCoverExhausted(coverTarget);
+                if (!hero.rooted && hero.HP <= hero.HT * LOW_HEALTH_RATIO) {
+                    int step = BlastAutoPlay.retreatStep(
+                            hero, coverLastSeenCell, safe, distances);
+                    if (step >= 0) {
+                        clearCover();
+                        hero.curAction = new HeroAction.Move(step);
+                        return Action.QUEUED;
+                    }
+                } else {
+                    // The ordinary auto-play memory pursues only the last seen cell.
+                    BlastAutoPlay.rememberCombatTarget(coverTarget);
+                }
+            }
             clearCover();
             return Action.NONE;
         }
@@ -139,6 +154,7 @@ final class BlastAutoCombat {
             if (destination >= 0) {
                 coverTarget = target;
                 coverCell = destination;
+                coverLastSeenCell = target.pos;
                 coverTurns = 0;
                 hero.curAction = new HeroAction.Move(
                         BlastAutoPlay.firstStep(destination, safe, distances));
@@ -231,8 +247,10 @@ final class BlastAutoCombat {
             MissileWeapon weapon = (MissileWeapon) item;
             // The standard manual throw warns before destroying a valuable last throw.
             // Auto-play must not bypass that warning.
-            if (item.quantity() == 1
-                    && (weapon.level() > 0 || weapon.hasGoodEnchant())
+            if (item.quantity() == 1 && !weapon.extraThrownLeft
+                    && ((weapon.levelKnown && weapon.level() > 0)
+                        || weapon.hasGoodEnchant() || weapon.masteryPotionBonus
+                        || weapon.enchantHardened)
                     && weapon.durabilityLeft() <= weapon.durabilityPerUse()) continue;
             float damage = physicalDamage(hero, target, weapon);
             if (damage > 0f && (best == null || damage > best.damage)) {
@@ -436,6 +454,7 @@ final class BlastAutoCombat {
     private static void clearCover() {
         coverTarget = null;
         coverCell = -1;
+        coverLastSeenCell = -1;
         coverTurns = 0;
     }
 }
