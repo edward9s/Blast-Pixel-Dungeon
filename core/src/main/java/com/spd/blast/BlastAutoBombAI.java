@@ -185,8 +185,8 @@ public final class BlastAutoBombAI {
         if (bomb instanceof RegrowthBomb
                 && !regrowthReady(target.rooted, regrowthAt(target.pos))) return -1;
 
-        // One projection narrows the search to the selected bomb's actual radius,
-        // keeping the work independent of dungeon size and enemy count.
+        // One projection filters candidate cells before checking their exact
+        // blast coverage and collateral safety.
         boolean[] reachable = bomb.blastWarningCells(target.pos);
         int best = -1;
         int shortest = Integer.MAX_VALUE;
