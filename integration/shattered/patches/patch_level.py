@@ -68,20 +68,20 @@ def change(path: Path) -> None:
     ])
     # A charged lit bomb shares the chest cell instead of being redirected.
     replacements.append((
-        "\\t\\t} else if (heap.type == Heap.Type.LOCKED_CHEST || heap.type == Heap.Type.CRYSTAL_CHEST) {",
-        "\\t\\t} else if ((heap.type == Heap.Type.LOCKED_CHEST || heap.type == Heap.Type.CRYSTAL_CHEST)\\n"
-        "\\t\\t\\t\\t&& !com.spd.blast.BlastBombHeap.isExposedBomb(item)) {",
+        "\t\t} else if (heap.type == Heap.Type.LOCKED_CHEST || heap.type == Heap.Type.CRYSTAL_CHEST) {",
+        "\t\t} else if ((heap.type == Heap.Type.LOCKED_CHEST || heap.type == Heap.Type.CRYSTAL_CHEST)\n"
+        "\t\t\t\t&& !com.spd.blast.BlastBombHeap.isExposedBomb(item)) {",
     ))
     replacements.append((
-        "\\t\\t} else {\\n\\t\\t\\theap.drop(item);\\n\\t\\t}",
-        "\\t\\t} else {\\n"
-        "\\t\\t\\tif (com.spd.blast.BlastBombHeap.isExposedBomb(item)\\n"
-        "\\t\\t\\t\\t\\t&& com.spd.blast.BlastBombHeap.isContainer(heap)) {\\n"
-        "\\t\\t\\t\\tcom.spd.blast.BlastBombHeap.dropOnContainer(heap, item);\\n"
-        "\\t\\t\\t} else {\\n"
-        "\\t\\t\\t\\theap.drop(item);\\n"
-        "\\t\\t\\t}\\n"
-        "\\t\\t}",
+        "\t\t} else {\n\t\t\theap.drop(item);\n\t\t}",
+        "\t\t} else {\n"
+        "\t\t\tif (com.spd.blast.BlastBombHeap.isExposedBomb(item)\n"
+        "\t\t\t\t\t&& com.spd.blast.BlastBombHeap.isContainer(heap)) {\n"
+        "\t\t\t\tcom.spd.blast.BlastBombHeap.dropOnContainer(heap, item);\n"
+        "\t\t\t} else {\n"
+        "\t\t\t\theap.drop(item);\n"
+        "\t\t\t}\n"
+        "\t\t}",
     ))
     for old, new in replacements:
         if source.count(old) != 1:
