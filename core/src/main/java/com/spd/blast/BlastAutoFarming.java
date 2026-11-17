@@ -15,19 +15,11 @@ public final class BlastAutoFarming {
     enum Action { NONE, MOVE, BOMB }
 
     static final int MIN_GROWABLE_CELLS = 10;
-    private static final int SAMPLE_RADIUS = 3;
-    private static final int MAX_SITE_CHECKS = 8;
-    private static final float SEARCH_INTERVAL = 8f;
     private static final float BOMB_INTERVAL = 20f;
 
     private static Hero currentHero;
     private static Level currentLevel;
     private static float nextBombAt = Float.NEGATIVE_INFINITY;
-    private static int nextCandidateCell = -1;
-    private static int farmingSite = -1;
-    private static int farmingBlastCell = -1;
-    private static boolean siteUsesRemoteThrow;
-    private static float nextSearchAt = Float.NEGATIVE_INFINITY;
 
     private BlastAutoFarming() {}
 
@@ -35,9 +27,6 @@ public final class BlastAutoFarming {
         currentHero = null;
         currentLevel = null;
         nextBombAt = Float.NEGATIVE_INFINITY;
-        nextCandidateCell = -1;
-        farmingSite = farmingBlastCell = -1;
-        nextSearchAt = Float.NEGATIVE_INFINITY;
     }
 
     /** Select one farming action; idle/roaming remains the caller's responsibility. */
@@ -69,32 +58,11 @@ public final class BlastAutoFarming {
 
         RegrowthBomb bomb = (RegrowthBomb) maniac.bombAt(index);
         boolean remoteThrow = BlastSettings.testRemoteThrow();
-
-        if (farmingSite >= 0
-                && (siteUsesRemoteThrow != remoteThrow
-                    || !safe[farmingSite] || distances[farmingSite] == Integer.MAX_VALUE)) {
-            farmingSite = farmingBlastCell = -1;
-        }
-        if (farmingSite < 0) {
-            if (Actor.now() < nextSearchAt) return Action.NONE;
-            nextSearchAt = Actor.now() + SEARCH_INTERVAL;
-            findFarmingSite(level, safe, distances, bomb, remoteThrow);
-            if (farmingSite < 0) return Action.NONE;
-        }
-        if (hero.pos != farmingSite) {
-            hero.curAction = new HeroAction.Move(
-                    BlastAutoPlay.firstStep(farmingSite, safe, distances));
+        Site site = findNearbySite(hero, level, safe, distances, bomb, remoteThrow);
+        if (site == null) return Action.NONE;
+        if (hero.pos != site.standCell) {
+            hero.curAction = new HeroAction.Move(site.standCell);
             return Action.MOVE;
-        }
-
-        int destination = farmingBlastCell;
-        if ((!remoteThrow && level.pit[hero.pos])
-                || (remoteThrow && BlastBombTrajectory.throwPos(hero.pos, destination) != destination)
-                || !sufficientArea(countGrowable(
-                        bomb.blastWarningCells(destination), level, safe, distances,
-                        hero.pos))) {
-            farmingSite = farmingBlastCell = -1;
-            return Action.NONE;
         }
 
         int previous = maniac.selectedIndex();
@@ -102,14 +70,13 @@ public final class BlastAutoFarming {
         maniac.select(index);
         try {
             launched = remoteThrow
-                    ? maniac.blastAutoThrowAndDetonate(destination)
+                    ? maniac.blastAutoThrowAndDetonate(site.blastCell)
                     : maniac.blastAutoPlaceAndDetonate();
         } finally {
             maniac.select(previous);
         }
         if (!launched) return Action.NONE;
         nextBombAt = Actor.now() + BOMB_INTERVAL;
-        farmingSite = farmingBlastCell = -1;
         if (!remoteThrow) hero.spendAndNext(1f);
         return Action.BOMB;
     }
@@ -145,112 +112,105 @@ public final class BlastAutoFarming {
         return -1;
     }
 
-    /** Cheap 7x7 local screen: O(1) area per candidate, independent of blast radius. */
-    static int localGrowable(Level level, int center, int standCell,
-                             boolean[] safe, int[] distances) {
+    /** One local decision, with no stale global scan cursor or retained target. */
+    private static final class Site {
+        final int standCell;
+        final int blastCell;
+
+        Site(int standCell, int blastCell) {
+            this.standCell = standCell;
+            this.blastCell = blastCell;
+        }
+    }
+
+    private static Site findNearbySite(Hero hero, Level level, boolean[] safe, int[] distances,
+                                       RegrowthBomb bomb, boolean remoteThrow) {
+        int radius = Math.min(20, bomb.blastExplosionRange());
+        if (radius < 0) throw new IllegalStateException("Invalid Regrowth bomb radius");
+
+        if (remoteThrow) {
+            // Throw from the current tile. Nearby landings are cheap to reconsider
+            // on every idle turn, even after walls, grass, or visibility change.
+            for (int offset : PathFinder.NEIGHBOURS8) {
+                int center = hero.pos + offset;
+                if (!level.insideMap(center) || !safe[center]) continue;
+                if (BlastBombTrajectory.throwPos(hero.pos, center) != center) continue;
+                if (suitableBlast(level, bomb, center, hero.pos, radius)) {
+                    return new Site(hero.pos, center);
+                }
+            }
+            return null;
+        }
+
+        // Plant under the hero first; step only one tile if a better location
+        // is required. Ordinary roaming explores areas outside this local range.
+        if (!level.pit[hero.pos] && suitableBlast(level, bomb, hero.pos, hero.pos, radius)) {
+            return new Site(hero.pos, hero.pos);
+        }
+        if (hero.rooted) return null;
+        for (int offset : PathFinder.NEIGHBOURS8) {
+            int stand = hero.pos + offset;
+            if (!level.insideMap(stand) || !safe[stand]
+                    || distances[stand] != 1 || level.pit[stand]) continue;
+            if (suitableBlast(level, bomb, stand, stand, radius)) {
+                return new Site(stand, stand);
+            }
+        }
+        return null;
+    }
+
+    private static boolean suitableBlast(Level level, RegrowthBomb bomb,
+                                         int center, int standCell, int radius) {
+        // Cheap geometric screen; only successful sites need full ray-traced blasts.
+        return sufficientArea(localPlantable(level, center, standCell, radius))
+                && sufficientArea(countPlantable(bomb.blastWarningCells(center), level, standCell));
+    }
+
+    /** Count terrain candidates in the bomb's actual radius, before ray obstruction. */
+    static int localPlantable(Level level, int center, int standCell, int radius) {
+        if (radius < 0 || center < 0 || center >= level.length()
+                || standCell < 0 || standCell >= level.length()) {
+            throw new IllegalArgumentException("Invalid Regrowth sample parameters");
+        }
         int width = level.width();
+        int height = level.height();
         int x = center % width;
         int y = center / width;
+        int diameter = radius * 2 + 1;
+        int squaredLimit = diameter * diameter;
         int count = 0;
-        int radius = SAMPLE_RADIUS;
-        int squaredLimit = (2 * radius + 1) * (2 * radius + 1);
         for (int dy = -radius; dy <= radius; dy++) {
             int yy = y + dy;
-            if (yy < 0 || yy >= level.height()) continue;
+            if (yy < 0 || yy >= height) continue;
             for (int dx = -radius; dx <= radius; dx++) {
                 int xx = x + dx;
                 if (xx < 0 || xx >= width
                         || 4 * (dx * dx + dy * dy) > squaredLimit) continue;
                 int cell = yy * width + xx;
-                if (cell != standCell && safe[cell] && distances[cell] != Integer.MAX_VALUE
-                        && level.plants.get(cell) == null && canHostRegrowth(level.map[cell])) count++;
+                if (cell != standCell && level.plants.get(cell) == null
+                        && canHostRegrowth(level.map[cell])) {
+                    if (++count >= MIN_GROWABLE_CELLS) return count;
+                }
             }
         }
         return count;
     }
 
-    /** Actual blast footprint accounts for walls, radius upgrades, and accessible crops. */
-    static int countGrowable(boolean[] blast, Level level, boolean[] safe, int[] distances,
-                             int standCell) {
-        if (blast.length != level.length()) {
-            throw new IllegalArgumentException("Invalid farming blast footprint");
+    /** Count cells where Regrowth can actually plant, including unseen or unwalked floor. */
+    static int countPlantable(boolean[] blast, Level level, int standCell) {
+        if (blast.length != level.length() || standCell < 0 || standCell >= blast.length) {
+            throw new IllegalArgumentException("Invalid Regrowth blast footprint");
         }
         int count = 0;
         for (int cell = 0; cell < blast.length; cell++) {
-            if (cell != standCell && blast[cell] && safe[cell]
-                    && distances[cell] != Integer.MAX_VALUE
-                    && level.plants.get(cell) == null && canHostRegrowth(level.map[cell])) count++;
+            if (cell != standCell && blast[cell]
+                    && level.plants.get(cell) == null
+                    && canHostRegrowth(level.map[cell])
+                    && Actor.findChar(cell) == null) {
+                if (++count >= MIN_GROWABLE_CELLS) return count;
+            }
         }
         return count;
     }
 
-    /** Advance the level scan between searches; never retry only the first eight sites. */
-    static int nextSiteIndex(int site, int length) {
-        if (length <= 0 || site < 0 || site >= length) {
-            throw new IllegalArgumentException("Invalid farming scan index");
-        }
-        return site + 1 == length ? 0 : site + 1;
-    }
-
-    /** Bound precise blast checks to eight per search, eight game ticks apart. */
-    private static void findFarmingSite(Level level, boolean[] safe, int[] distances,
-                                        RegrowthBomb bomb, boolean remoteThrow) {
-        int length = level.length();
-        if (nextCandidateCell < 0) nextCandidateCell = currentHero.pos;
-
-        int checked = 0;
-        int selectedSite = -1;
-        int selectedCenter = -1;
-        int selectedDistance = Integer.MAX_VALUE;
-        int selectedArea = -1;
-
-        for (int scanned = 0; scanned < length && checked < MAX_SITE_CHECKS; scanned++) {
-            int site = nextCandidateCell;
-            nextCandidateCell = nextSiteIndex(site, length);
-            if (!safe[site] || distances[site] == Integer.MAX_VALUE || level.pit[site]) {
-                continue;
-            }
-
-            int center = site;
-            int score = -1;
-            if (remoteThrow) {
-                for (int offset : PathFinder.NEIGHBOURS8) {
-                    int cell = site + offset;
-                    if (!level.insideMap(cell) || !safe[cell]) continue;
-                    int local = localGrowable(level, cell, site, safe, distances);
-                    if (local > score) {
-                        score = local;
-                        center = cell;
-                    }
-                }
-            } else {
-                score = localGrowable(level, site, site, safe, distances);
-            }
-            if (!sufficientArea(score)) continue;
-
-            checked++;
-            if (remoteThrow && BlastBombTrajectory.throwPos(site, center) != center) {
-                continue;
-            }
-            int area = countGrowable(
-                    bomb.blastWarningCells(center), level, safe, distances, site);
-            if (!sufficientArea(area)) continue;
-
-            int distance = distances[site];
-            if (selectedSite < 0 || distance < selectedDistance
-                    || (distance == selectedDistance && area > selectedArea)) {
-                selectedSite = site;
-                selectedCenter = center;
-                selectedDistance = distance;
-                selectedArea = area;
-            }
-        }
-
-        if (selectedSite >= 0) {
-            farmingSite = selectedSite;
-            farmingBlastCell = selectedCenter;
-            siteUsesRemoteThrow = remoteThrow;
-            nextCandidateCell = -1;
-        }
-    }
 }
