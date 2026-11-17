@@ -334,7 +334,8 @@ public final class BlastAutoPlay {
         if (!waitingForInput || GameScene.manualInputPending()) return;
         waitingForInput = false;
         Hero hero = Dungeon.hero;
-        if (BlastSettings.testAutoPlay() && !isPaused() && hero != null && hero.ready) hero.next();
+        if (BlastSettings.testAutoPlay() && hero != null && hero.ready
+                && (!isPaused() || !pendingBombInputs.isEmpty())) hero.next();
     }
 
     /** Queue tag commands on the actor thread; free actions need not wait for Hero.act. */
@@ -344,7 +345,8 @@ public final class BlastAutoPlay {
         if (hero == null || level == null || !BlastSettings.testAutoPlay()) return;
         resetForLevel(hero);
 
-        if (action == BombAction.THROW) {
+        // A targeting window must finish before its queued commands can run.
+        if (action == BombAction.THROW || GameScene.manualInputPending()) {
             pendingBombInputs.add(new BombInput(action, destination));
         } else {
             synchronized (freeBombLock) {
@@ -388,11 +390,23 @@ public final class BlastAutoPlay {
         hero.curAction = null;
         hero.lastAction = null;
         hero.resting = false;
-        if (input.action != BombAction.THROW) {
-            throw new IllegalStateException("Unexpected Hero bomb action: " + input.action);
+        switch (input.action) {
+            case PLACE:
+                BlastBombManiac maniac = BlastBombManiac.current();
+                if (maniac != null) maniac.place();
+                return false;
+            case THROW:
+                BlastBombManiac thrower = BlastBombManiac.current();
+                return thrower != null && thrower.blastAutoThrow(input.destination);
+            case DETONATE:
+                BlastRemoteBomb.detonateNext();
+                return false;
+            case TOGGLE:
+                BlastRemoteBomb.toggleMode();
+                return false;
+            default:
+                throw new IllegalStateException("Unknown bomb input: " + input.action);
         }
-        BlastBombManiac thrower = BlastBombManiac.current();
-        return thrower != null && thrower.blastAutoThrow(input.destination);
     }
 
     /** Retry a blocked action once at the same location, then stop idle looping. */
