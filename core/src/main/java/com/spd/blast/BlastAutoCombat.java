@@ -136,7 +136,7 @@ final class BlastAutoCombat {
 
         // A few reachable steps behind opaque terrain encourages a ranged pursuer
         // to advance; do not chase it into an open firing lane unnecessarily.
-        if (coverTarget == target && coverCell != hero.pos
+        if (!hero.rooted && coverTarget == target && coverCell != hero.pos
                 && coverCell >= 0 && safe[coverCell]
                 && distances[coverCell] > 0 && distances[coverCell] < Integer.MAX_VALUE) {
             hero.curAction = new HeroAction.Move(
@@ -149,7 +149,7 @@ final class BlastAutoCombat {
                 return Action.STARTED;
             }
             markCoverExhausted(target);
-        } else if (exhaustedCoverTarget != target) {
+        } else if (!hero.rooted && exhaustedCoverTarget != target) {
             int destination = nearbyCover(hero, target, safe, distances);
             if (destination >= 0) {
                 coverTarget = target;
@@ -191,6 +191,11 @@ final class BlastAutoCombat {
         if (remote != null) {
             return remote.missile != null
                     ? throwMissile(hero, target, remote) : zap(hero, target, remote);
+        }
+        if (hero.rooted || hero.HP <= hero.HT * LOW_HEALTH_RATIO) {
+            // Do not fall back to the old ranged-enemy chase while wounded.
+            hero.spendAndNext(Actor.TICK);
+            return Action.STARTED;
         }
         return Action.NONE;
     }
