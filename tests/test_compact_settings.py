@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
 """Regression checks for the compact Blast settings and enchantment-stone toggle."""
 from pathlib import Path
+import runpy
+import tempfile
 import unittest
 
 
 ROOT = Path(__file__).resolve().parents[1]
 SETTINGS = ROOT / "core/src/main/java/com/spd/blast/BlastSettings.java"
 TAB = ROOT / "core/src/main/java/com/spd/blast/BlastSettingsTab.java"
+OPTION_SLIDER_PATCH = ROOT / "integration/shattered/patches/patch_option_slider.py"
+APPLY_SCRIPT = ROOT / "integration/shattered/apply.sh"
 STONE_PATCH = ROOT / "integration/shattered/patches/patch_stone_to_scroll.py"
 GUIDE_PATCH = ROOT / "integration/shattered/patches/patch_reverse_alchemy_guide.py"
 
@@ -38,7 +42,7 @@ class CompactSettingsTests(unittest.TestCase):
     def test_test_switches_use_a_compact_two_column_layout(self):
         source = TAB.read_text(encoding="utf-8")
         self.assertIn("testOptions = new CheckBox[]{", source)
-        self.assertIn("demolition, autoPlay, enchantmentReverseAlchemy", source)
+        self.assertIn("demolition, autoPlay, autoFarming, enchantmentReverseAlchemy", source)
         self.assertNotIn("Messages.lang()", source)
         self.assertNotIn("Languages.CHI_TRAD", source)
         self.assertIn("option.multiline = true;", source)
@@ -49,6 +53,66 @@ class CompactSettingsTests(unittest.TestCase):
         self.assertIn("if (radiusLabel.visible)", source)
         self.assertIn("if (heightChanged != null) heightChanged.run()", source)
         self.assertIn("BlastSettings.setEnchantmentStoneReverseAlchemy(checked())", source)
+
+    def test_spawn_and_explosion_radius_use_full_width_sliders(self):
+        tab = TAB.read_text(encoding="utf-8")
+        settings = SETTINGS.read_text(encoding="utf-8")
+
+        self.assertIn("MIN_SPAWN_MULTIPLIER = 1", settings)
+        self.assertIn("MAX_SPAWN_MULTIPLIER = 10", settings)
+        self.assertIn("MAX_TEST_RADIUS_STACKS = 20", tab)
+        self.assertIn('new OptionSlider("", "1x", "10x",', tab)
+        self.assertIn('new OptionSlider("", "0", "20", 0, MAX_TEST_RADIUS_STACKS)', tab)
+
+        for name in ("spawn", "radius"):
+            self.assertNotIn(f"{name}Decrease", tab)
+            self.assertNotIn(f"{name}Increase", tab)
+            self.assertIn(f"{name}Slider.setSelectedValue(", tab)
+        self.assertIn("spawnSlider.setRect(0, spawnTop, width, SLIDER_HEIGHT)", tab)
+        self.assertIn("radiusSlider.setRect(0, controlsTop, width, SLIDER_HEIGHT)", tab)
+
+        self.assertIn("BlastSettings.setSpawnMultiplier(getSelectedValue())", tab)
+        self.assertIn("BlastRadius.setStacks(hero, getSelectedValue())", tab)
+        self.assertIn('spawnValue.text(multiplier + "x")', tab)
+        self.assertIn('radiusValue.text("+" + count)', tab)
+        self.assertIn("radiusSlider.visible = radiusVisible", tab)
+
+    def test_option_slider_drag_preview_only_commits_on_release(self):
+        tab = TAB.read_text(encoding="utf-8")
+        apply_script = APPLY_SCRIPT.read_text(encoding="utf-8")
+        self.assertIn('patch_option_slider.py" "$root/ui/OptionSlider.java"', apply_script)
+        self.assertEqual(tab.count("protected void onDragPreview(int value)"), 2)
+        self.assertIn('spawnValue.text(value + "x")', tab)
+        self.assertIn('radiusValue.text("+" + value)', tab)
+
+        # Small upstream-style fixture exercises every fail-fast patch anchor.
+        fixture = (
+            "\tprivate int selectedVal;\n"
+            "\tprotected abstract void onChange();\n"
+            "\t\tthis.selectedVal = val;\n"
+            "\t\t\t\tsliderNode.brightness(1.5f);\n"
+            "\t\t\t\t\tselectedVal = minVal + Math.round((sliderNode.x - x) / tickDist);\n"
+            "\t\t\tprotected void onDrag( PointerEvent event ) {\n"
+            "\t\t\t\tif (pressed) {\n"
+            "\t\t\t\t\tPointF p = camera().screenToCamera((int) event.current.x, (int) event.current.y);\n"
+            "\t\t\t\t\tsliderNode.x = GameMath.gate(sliderBG.x - 2, p.x - sliderNode.width()/2, sliderBG.x + sliderBG.width() - 2);\n"
+        )
+        patch = runpy.run_path(str(OPTION_SLIDER_PATCH))["patch"]
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "OptionSlider.java"
+            path.write_text(fixture, encoding="utf-8")
+            patch(path)
+            patched = path.read_text(encoding="utf-8")
+            with self.assertRaises(SystemExit):
+                patch(path)
+
+        self.assertEqual(patched.count("previewDragValue();"), 2)
+        self.assertIn("protected void onDragPreview(int value) {}", patched)
+        self.assertIn("if (value != previewVal)", patched)
+        self.assertIn("previewVal = val;", patched)
+        self.assertIn("previewVal = selectedVal;", patched)
+        self.assertIn("onDragPreview(value);", patched)
+        self.assertNotIn("onChange();\n\t\t\t\t\tpreviewDragValue();", patched)
 
     def test_settings_window_resizes_after_toggle(self):
         patch = (ROOT / "integration/shattered/patches/patch_wndsettings.py").read_text(encoding="utf-8")
@@ -72,11 +136,11 @@ class CompactSettingsTests(unittest.TestCase):
         traditional = (ROOT / "messages/misc_zh-hant.properties").read_text(
             encoding="utf-8"
         )
-        self.assertIn("blast.settings.enchantment_reverse=附魔逆合成", traditional)
+        self.assertIn("blast.settings.enchantment_reverse=升級合成", traditional)
         japanese = (ROOT / "messages/misc_ja.properties").read_text(encoding="utf-8")
         korean = (ROOT / "messages/misc_ko.properties").read_text(encoding="utf-8")
-        self.assertIn("blast.settings.enchantment_reverse=付呪逆錬金", japanese)
-        self.assertIn("blast.settings.enchantment_reverse=부여석 역연금", korean)
+        self.assertIn("blast.settings.enchantment_reverse=強化合成", japanese)
+        self.assertIn("blast.settings.enchantment_reverse=강화 합성", korean)
         self.assertNotIn("enchantment_reverse=Enchantment stone reversal", japanese)
         self.assertNotIn("enchantment_reverse=Enchantment stone reversal", korean)
 
