@@ -50,8 +50,9 @@ class AutoPlayRestTests(unittest.TestCase):
             self.assertEqual(result.count(f"else Dungeon.hero.rest({value});"), count)
 
     def test_native_cancel_can_interrupt_rest(self):
-        code = injection(SCENE, "autoplay ignores queued move during cancellation")
+        code = injection(SCENE, "autoplay running ignores queued move during cancellation")
         self.assertIn("Dungeon.hero == null || !Dungeon.hero.resting", code)
+        self.assertIn("!com.spd.blast.BlastAutoPlay.isPaused()", code)
 
 
 if __name__ == "__main__":

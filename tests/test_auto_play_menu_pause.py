@@ -74,8 +74,10 @@ class AutoPlayPauseTagTests(unittest.TestCase):
         source = AUTO_PLAY.read_text(encoding="utf-8")
         self.assertIn("return isPaused() && !manualActionActive(hero) && pendingBombInputs.isEmpty();", source)
         self.assertIn("public static boolean pauseForUser(Hero hero)", source)
-        self.assertIn("if (resume && Dungeon.hero.ready && !GameScene.manualInputPending())", source)
-        self.assertIn("BlastSettings.testAutoPlay() && !isPaused() && hero != null && hero.ready", source)
+        self.assertIn("if (resume && hero.ready && !GameScene.manualInputPending())", source)
+        self.assertIn("hero.lastAction = new HeroAction.Move(interruptedDestination);", source)
+        self.assertIn("interruptedDestination = ((HeroAction.Move) hero.lastAction).dst;", source)
+        self.assertIn("if (BlastSettings.testAutoPlay() && hero != null && hero.ready", source)
 
     def test_tag_binding(self):
         tag = AUTO_TAG.read_text(encoding="utf-8")

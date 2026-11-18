@@ -79,7 +79,10 @@ class AutoPlayPauseSaveTests(unittest.TestCase):
         self.assertIn("pausedHero = paused ? hero : null;", source)
         self.assertIn("pausedHero == Dungeon.hero", source)
         self.assertIn("if (!BlastSettings.testAutoPlay()) pausedHero = null;", source)
-        self.assertIn("pausedHero = resume ? null : Dungeon.hero;", source)
+        toggle = source.split("public static void togglePause() {", 1)[1]
+        toggle = toggle.split("public static boolean pauseForUser", 1)[0]
+        self.assertIn("pausedHero = null;", toggle)
+        self.assertIn("pausedHero = hero;", toggle)
         self.assertIn('patch_dungeon_auto_pause.py" "$root/Dungeon.java"',
                       APPLY.read_text(encoding="utf-8"))
 

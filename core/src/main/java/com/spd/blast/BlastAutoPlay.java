@@ -221,7 +221,10 @@ public final class BlastAutoPlay {
     public static void beginManualAction(Hero hero) {
         if (!BlastSettings.testAutoPlay()) return;
         resetForLevel(hero);
-        clearInterruptedTravel();
+        // Only a new movement order or explicit resume supersedes retained AI travel.
+        // Native Hero.handle() keeps lastAction for attacks and interactions.
+        if (hero.curAction instanceof HeroAction.Move
+                || hero.lastAction instanceof HeroAction.Move) clearInterruptedTravel();
         manualAction = true;
         manualConfirmationHero = null;
         resetPursuitMemory();
@@ -336,10 +339,9 @@ public final class BlastAutoPlay {
         resetForLevel(hero);
         if (input == null || input.hero != hero || input.level != Dungeon.level) return false;
         progress.reset();
-        hero.lastAction = null;
+        // Hero.handle() alone decides when a native lastAction is superseded.
         hero.resting = false;
         if (input instanceof ManualRest) {
-            clearInterruptedTravel();
             hero.curAction = null;
             manualAction = false;
             manualConfirmationHero = null;
@@ -363,10 +365,9 @@ public final class BlastAutoPlay {
         progress.reset();
         manualAction = false;
         manualConfirmationHero = null;
-        clearInterruptedTravel();
         pendingManualInput.set(null);
         hero.curAction = null;
-        hero.lastAction = null;
+        // Item use may interrupt a current action but must retain saved movement.
         hero.resting = false;
         resetPursuitMemory();
         roaming.reset();
@@ -395,9 +396,25 @@ public final class BlastAutoPlay {
             throw new IllegalStateException("Cannot toggle disabled auto play");
         }
         boolean resume = isPaused();
-        pausedHero = resume ? null : Dungeon.hero;
-        if (resume && Dungeon.hero.ready && !GameScene.manualInputPending()) {
-            Dungeon.hero.next();
+        Hero hero = Dungeon.hero;
+        if (resume) {
+            // Transfer the manual route before autonomous turns may start again.
+            if (hero.lastAction instanceof HeroAction.Move) {
+                interruptedDestination = ((HeroAction.Move) hero.lastAction).dst;
+                blockedTravelTurns = 0;
+                hero.lastAction = null;
+            }
+            pausedHero = null;
+        } else {
+            // Stop autonomous turns before exposing their destination to the UI.
+            pausedHero = hero;
+            if (interruptedDestination >= 0) {
+                hero.lastAction = new HeroAction.Move(interruptedDestination);
+                clearInterruptedTravel();
+            }
+        }
+        if (resume && hero.ready && !GameScene.manualInputPending()) {
+            hero.next();
         }
     }
 
@@ -474,7 +491,7 @@ public final class BlastAutoPlay {
         manualAction = false;
         manualConfirmationHero = null;
         hero.curAction = null;
-        hero.lastAction = null;
+        // Bomb actions do not supersede a native interrupted travel destination.
         hero.resting = false;
         switch (input.action) {
             case PLACE:
