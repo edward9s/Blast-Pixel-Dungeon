@@ -47,7 +47,7 @@ public final class BlastAutoPlay {
     private static int ignoredTargetCell = -1;
     private static int lastRetryCell = -1;
     private static volatile boolean manualAction;
-    private static int interruptedDestination = -1;
+    private static volatile int interruptedDestination = -1;
     private static int blockedTravelTurns;
     private static volatile Hero manualConfirmationHero;
     private static final AtomicReference<ManualInput> pendingManualInput = new AtomicReference<>();
