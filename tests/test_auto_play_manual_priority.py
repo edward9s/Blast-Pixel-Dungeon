@@ -63,7 +63,7 @@ class ManualPriorityTests(unittest.TestCase):
 
     def test_input_precedes_ai_and_bombs(self):
         code = injection(HERO, "Hero.act automatic actions")
-        manual = code.index("BlastAutoPlay.performManualCell(this)")
+        manual = code.index("BlastAutoPlay.performManualInput(this)")
         target = code.index("BlastAutoPlay.pauseForManualInput(this)")
         bomb = code.index("BlastAutoPlay.performBombInput(this)")
         ai = code.index("BlastAutoPlay.chooseAction(this)")
@@ -82,15 +82,15 @@ class ManualPriorityTests(unittest.TestCase):
     def test_latest_click_consumed_atomically(self):
         source = AUTO.read_text(encoding="utf-8")
         request = method(source, "public static void requestManualCell(int cell) {")
-        execute = method(source, "public static void performManualCell(Hero hero) {")
-        self.assertIn("pendingManualCell.set(new ManualCell(hero, level, cell))", request)
+        execute = method(source, "public static boolean performManualInput(Hero hero) {")
+        self.assertIn("pendingManualInput.set(new ManualCell(hero, level, cell))", request)
         self.assertIn("if (hero.ready) hero.next();", request)
-        self.assertIn("pendingManualCell.getAndSet(null)", execute)
+        self.assertIn("pendingManualInput.getAndSet(null)", execute)
         self.assertIn("input.hero != hero || input.level != Dungeon.level", execute)
         self.assertLess(execute.index("hero.lastAction = null"),
-                        execute.index("hero.handle(input.destination)"))
+                        execute.index("hero.handle(cell.destination)"))
         self.assertIn("new AtomicReference<>()", source)
-        self.assertGreaterEqual(source.count("pendingManualCell.set(null)"), 3)
+        self.assertGreaterEqual(source.count("pendingManualInput.set(null)"), 3)
 
     def test_prompt_blocks_manual_action_completion(self):
         code = injection(HERO, "Hero.getCloser chasm confirmation")

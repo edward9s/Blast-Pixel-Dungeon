@@ -46,6 +46,17 @@ def patch_toolbar(path: Path) -> None:
     source = source.replace(
         ready, "(Dungeon.hero.ready || com.spd.blast.BlastSettings.testAutoPlay())"
     )
+    # Rest consumes time, so queue it on the actor thread instead of the UI.
+    for full_rest, count in (("false", 2), ("true", 3)):
+        old = f"Dungeon.hero.rest({full_rest});"
+        if source.count(old) != count:
+            raise SystemExit(f"Toolbar rest: expected {count} {full_rest} calls")
+        source = source.replace(
+            old,
+            f"if (com.spd.blast.BlastSettings.testAutoPlay()) "
+            f"com.spd.blast.BlastAutoPlay.requestManualRest({full_rest}); "
+            f"else {old}"
+        )
     source = replace_once(
         source,
         "\t\t\t\t\t\tinformer.onSelect(null);\n"
