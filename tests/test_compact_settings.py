@@ -50,7 +50,7 @@ class CompactSettingsTests(unittest.TestCase):
         self.assertIn("if (heightChanged != null) heightChanged.run()", source)
         self.assertIn("BlastSettings.setEnchantmentStoneReverseAlchemy(checked())", source)
 
-    def test_spawn_and_explosion_radius_sliders_have_step_controls(self):
+    def test_spawn_and_explosion_radius_use_full_width_sliders(self):
         tab = TAB.read_text(encoding="utf-8")
         settings = SETTINGS.read_text(encoding="utf-8")
 
@@ -61,19 +61,16 @@ class CompactSettingsTests(unittest.TestCase):
         self.assertIn('new OptionSlider("", "0", "20", 0, MAX_TEST_RADIUS_STACKS)', tab)
 
         for name in ("spawn", "radius"):
-            self.assertIn(f"{name}Decrease = new RedButton", tab)
-            self.assertIn(f"{name}Increase = new RedButton", tab)
-            self.assertIn(f"{name}Slider.setRect(", tab)
+            self.assertNotIn(f"{name}Decrease", tab)
+            self.assertNotIn(f"{name}Increase", tab)
             self.assertIn(f"{name}Slider.setSelectedValue(", tab)
+        self.assertIn("spawnSlider.setRect(0, spawnTop, width, SLIDER_HEIGHT)", tab)
+        self.assertIn("radiusSlider.setRect(0, controlsTop, width, SLIDER_HEIGHT)", tab)
 
         self.assertIn("BlastSettings.setSpawnMultiplier(getSelectedValue())", tab)
         self.assertIn("BlastRadius.setStacks(hero, getSelectedValue())", tab)
         self.assertIn('spawnValue.text(multiplier + "x")', tab)
         self.assertIn('radiusValue.text("+" + count)', tab)
-        self.assertIn("spawnDecrease.active = multiplier > BlastSettings.MIN_SPAWN_MULTIPLIER", tab)
-        self.assertIn("spawnIncrease.active = multiplier < BlastSettings.MAX_SPAWN_MULTIPLIER", tab)
-        self.assertIn("radiusDecrease.active = active && count > 0", tab)
-        self.assertIn("radiusIncrease.active = active && count < MAX_TEST_RADIUS_STACKS", tab)
         self.assertIn("radiusSlider.visible = radiusVisible", tab)
 
     def test_settings_window_resizes_after_toggle(self):
