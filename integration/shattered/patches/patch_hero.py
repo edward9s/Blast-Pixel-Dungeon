@@ -212,10 +212,10 @@ def patch(path: Path) -> None:
     # destination to auto-play so tactical combat takes priority.
     s = replace_once(
         s,
-        "\\t\\tcheckVisibleMobs();\\n\\t\\tBuffIndicator.refreshHero();",
-        "\\t\\tcheckVisibleMobs();\\n"
-        "\\t\\tcom.spd.blast.BlastAutoPlay.interruptManualTravelForCombat(this);\\n"
-        "\\t\\tBuffIndicator.refreshHero();",
+        "\t\tcheckVisibleMobs();\n\t\tBuffIndicator.refreshHero();",
+        "\t\tcheckVisibleMobs();\n"
+        "\t\tcom.spd.blast.BlastAutoPlay.interruptManualTravelForCombat(this);\n"
+        "\t\tBuffIndicator.refreshHero();",
         "Hero.act interrupt manual route for combat"
     )
 
