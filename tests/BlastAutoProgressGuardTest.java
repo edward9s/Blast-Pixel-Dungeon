@@ -43,6 +43,14 @@ public final class BlastAutoProgressGuardTest {
         }
         check(false, triple.idleSafe(safe, 23)[24], "three-cell cycle excluded");
 
+        BlastAutoProgressGuard ordinaryRoam = new BlastAutoProgressGuard();
+        for (int i = 0; i < 3; i++) {
+            move(ordinaryRoam, 23, 24, BlastAutoProgressGuard.Intent.ROAM);
+            move(ordinaryRoam, 24, 23, BlastAutoProgressGuard.Intent.ROAM);
+        }
+        check(true, ordinaryRoam.idleSafe(safe, 23)[24],
+                "ordinary roaming backtrack remains handled by roaming's own progress policy");
+
         BlastAutoProgressGuard combat = new BlastAutoProgressGuard();
         for (int i = 0; i < 3; i++) {
             move(combat, 23, 24, BlastAutoProgressGuard.Intent.OTHER);
@@ -57,6 +65,19 @@ public final class BlastAutoProgressGuardTest {
             failure.observe(23);
         }
         check(false, failure.idleSafe(safe, 23)[24], "three blocked move attempts excluded");
+
+        BlastAutoProgressGuard interruptedFailure = new BlastAutoProgressGuard();
+        for (int i = 0; i < 2; i++) {
+            interruptedFailure.intent(BlastAutoProgressGuard.Intent.ROAM);
+            interruptedFailure.record(23, 24);
+            interruptedFailure.observe(23);
+        }
+        interruptedFailure.record(23, -1);
+        interruptedFailure.intent(BlastAutoProgressGuard.Intent.ROAM);
+        interruptedFailure.record(23, 24);
+        interruptedFailure.observe(23);
+        check(true, interruptedFailure.idleSafe(safe, 23)[24],
+                "a meaningful intervening action resets failed attempts");
 
         BlastAutoProgressGuard useful = new BlastAutoProgressGuard();
         move(useful, 23, 24, BlastAutoProgressGuard.Intent.ROAM);
