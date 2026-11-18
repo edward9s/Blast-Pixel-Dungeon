@@ -13,6 +13,8 @@ def replace_once(source: str, old: str, new: str, label: str) -> str:
 
 def patch(path: Path) -> None:
     source = path.read_text(encoding="utf-8")
+    if "protected void onDragPreview(int value)" in source:
+        raise SystemExit(f"{path}: slider preview already patched")
 
     source = replace_once(
         source,
