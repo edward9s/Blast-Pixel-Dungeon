@@ -90,7 +90,7 @@ public final class BlastAutoEnvironment {
                 throw new IllegalStateException("Invalid magical fire navigation state");
             }
             markEternalFire(eternalFire.cur, level.width(), dangerous);
-            MagicalFireRoom fireRoom = ((RegularLevel) level).room(MagicalFireRoom.class);
+            Room fireRoom = ((RegularLevel) level).room(MagicalFireRoom.class);
             if (fireRoom == null || fireRoom.entrance() == null) {
                 throw new IllegalStateException("Active magical fire without its room");
             }
