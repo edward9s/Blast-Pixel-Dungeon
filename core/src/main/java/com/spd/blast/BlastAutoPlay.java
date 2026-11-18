@@ -221,9 +221,10 @@ public final class BlastAutoPlay {
     public static void beginManualAction(Hero hero) {
         if (!BlastSettings.testAutoPlay()) return;
         resetForLevel(hero);
-        // Only a new movement destination supersedes the interrupted route.
-        // Native Hero.handle() leaves lastAction intact for attacks and interaction.
-        if (hero.curAction instanceof HeroAction.Move) clearInterruptedTravel();
+        // Only a new movement order or explicit resume supersedes retained AI travel.
+        // Native Hero.handle() keeps lastAction for attacks and interactions.
+        if (hero.curAction instanceof HeroAction.Move
+                || hero.lastAction instanceof HeroAction.Move) clearInterruptedTravel();
         manualAction = true;
         manualConfirmationHero = null;
         resetPursuitMemory();
