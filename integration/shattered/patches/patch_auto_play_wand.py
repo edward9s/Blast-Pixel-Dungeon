@@ -12,11 +12,15 @@ def patch(path: Path) -> None:
         raise SystemExit(f"{path}: expected one Wand.tryToZap anchor, found {count}")
 
     addition = (
-        "\t/** Fire a safe targeted wand during a normal automatic hero turn. */\n"
+        "\t/** Side-effect-free eligibility for automatic wand selection. */\n"
+        "\tpublic boolean blastAutoCanZap(Hero hero) {\n"
+        "\t\treturn curCharges >= chargesPerCast() && !cursed\n"
+        "\t\t\t\t&& hero.buff(MagicImmune.class) == null;\n"
+        "\t}\n\n"
+        "\t/** Fire an aim cell already validated by Blast's combat policy. */\n"
         "\tpublic boolean blastAutoZap(Hero hero, int target) {\n"
-        "\t\tif (curCharges < chargesPerCast() || cursed\n"
-        "\t\t\t\t|| hero.buff(MagicImmune.class) != null || target == hero.pos) return false;\n"
-        "\t\tif (new Ballistica(hero.pos, target, collisionProperties(target)).collisionPos != target) return false;\n"
+        "\t\tif (!blastAutoCanZap(hero) || target == hero.pos) return false;\n"
+        "\t\tif (new Ballistica(hero.pos, target, collisionProperties(target)).collisionPos == hero.pos) return false;\n"
         "\t\tcurUser = hero;\n"
         "\t\tcurItem = this;\n"
         "\t\tzapper.onSelect(target);\n"

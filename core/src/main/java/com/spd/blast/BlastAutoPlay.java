@@ -14,12 +14,6 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Wraith;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.NPC;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.Sheep;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
-import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.MagesStaff;
-import com.shatteredpixel.shatteredpixeldungeon.items.wands.Wand;
-import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfFrost;
-import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfMagicMissile;
-import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfPrismaticLight;
-import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfTransfusion;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.Trap;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
@@ -519,11 +513,12 @@ public final class BlastAutoPlay {
                 continue;
             }
 
+            // Visible hostile combat belongs exclusively to BlastAutoCombat.
+            // Ordinary neutral creatures retain their previous melee behavior.
+            if (mob.alignment == Char.Alignment.ENEMY) continue;
             boolean ranged = BlastAutoSacrifice.isRangedEnemy(mob.getClass());
             boolean adjacent = Dungeon.level.adjacent(hero.pos, mob.pos);
-            // Ranged enemies must be approached into melee range, even if
-            // the hero can attack from farther away with an extended weapon.
-            boolean canMelee = canMeleeTarget(ranged, adjacent, hero.canAttack(mob));
+            boolean canMelee = hero.canAttack(mob);
             int goal = canMelee ? -1 : nearCell(hero.pos, mob.pos, safe, distances);
             if (!canMelee && (goal < 0 || hero.rooted)) continue;
 
@@ -543,26 +538,13 @@ public final class BlastAutoPlay {
             }
         }
 
-        // Rooted heroes cannot chase a target, but may attack adjacent enemies
-        // or use the existing high-evasion wand fallback on non-ranged mobs.
+        // Rooted heroes cannot chase. Hostile ranged attacks were tried above.
         if (hero.rooted) {
             if (selected != null) {
                 rememberCombatTarget(selected);
-                if (useWand(hero, selected)) return true;
                 if (selectedCanMelee) {
                     hero.curAction = new HeroAction.Attack(selected);
                     return false;
-                }
-            }
-            for (Mob mob : Dungeon.level.mobs) {
-                if (mob.isAlive() && mob.alignment != Char.Alignment.ALLY
-                        && !isProtectedNpc(mob)
-                        && mob.invisible == 0 && hero.fieldOfView[mob.pos]
-                        && isAwake(mob) && !ignored(mob)
-                        && !mob.isInvulnerable(Hero.class) && !hero.isCharmedBy(mob)
-                        && !avoidEvasiveNeutral(hero, mob) && useWand(hero, mob)) {
-                    rememberCombatTarget(mob);
-                    return true;
                 }
             }
             hero.spendAndNext(Actor.TICK);
@@ -587,7 +569,6 @@ public final class BlastAutoPlay {
 
         if (selected != null) {
             rememberCombatTarget(selected);
-            if (useWand(hero, selected)) return true;
             if (selectedCanMelee) {
                 hero.curAction = new HeroAction.Attack(selected);
             } else {
@@ -652,7 +633,8 @@ public final class BlastAutoPlay {
 
     static boolean highEvasion(Hero hero, Mob mob) {
         return highEvasion(mob instanceof Wraith, mob.defenseSkill(hero),
-                hero.attackSkill(mob));
+                Math.max(1, Math.round(BlastAutoCombat.estimatedAccuracy(hero, mob,
+                        hero.belongings.attackingWeapon(), false))));
     }
 
     static boolean avoidEvasiveNeutral(Char.Alignment alignment, boolean evasive) {
@@ -661,35 +643,6 @@ public final class BlastAutoPlay {
 
     private static boolean avoidEvasiveNeutral(Hero hero, Mob mob) {
         return avoidEvasiveNeutral(mob.alignment, highEvasion(hero, mob));
-    }
-
-    private static boolean useWand(Hero hero, Mob target) {
-        if (isProtectedNpc(target)) return false;
-        // Ranged opponents are always approached for melee, except for bomb attacks.
-        if (BlastAutoSacrifice.isRangedEnemy(target.getClass())) return false;
-        // High-evasion enemies retain their existing wand fallback.
-        if (!highEvasion(hero, target)) return false;
-
-        // The mage's equipped staff can contain a charged wand.
-        if (hero.belongings.weapon() instanceof MagesStaff) {
-            MagesStaff staff = (MagesStaff) hero.belongings.weapon();
-            if (castWand(hero, target, staff.blastAutoPlayWand())) return true;
-        }
-        for (Item item : hero.belongings) {
-            if (item instanceof Wand && castWand(hero, target, (Wand) item)) return true;
-        }
-        return false;
-    }
-
-    private static boolean castWand(Hero hero, Mob target, Wand wand) {
-        if (wand == null || !(wand instanceof WandOfMagicMissile
-                || wand instanceof WandOfFrost
-                || wand instanceof WandOfPrismaticLight
-                || (wand instanceof WandOfTransfusion
-                    && target.properties().contains(Char.Property.UNDEAD)))) {
-            return false;
-        }
-        return wand.blastAutoZap(hero, target.pos);
     }
 
     private static void resetForLevel(Hero hero) {
@@ -713,11 +666,6 @@ public final class BlastAutoPlay {
         clearFreeBombInputs();
         BlastAutoPickup.reset();
         BlastAutoSacrifice.reset();
-    }
-
-    /** A ranged enemy must be adjacent before an ordinary melee attack is issued. */
-    static boolean canMeleeTarget(boolean rangedEnemy, boolean adjacent, boolean canAttack) {
-        return canAttack && (!rangedEnemy || adjacent);
     }
 
     /** Priority tiers are independent of distance; route length breaks ties. */
@@ -744,7 +692,7 @@ public final class BlastAutoPlay {
         return mob.state != mob.SLEEPING;
     }
 
-    private static boolean ignored(Mob mob) {
+    static boolean ignored(Mob mob) {
         if (mob != ignoredTarget) return false;
         // A stationary target becomes urgent again when it actively threatens
         // the hero at melee range, even if an earlier chase was abandoned.

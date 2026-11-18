@@ -1,39 +1,36 @@
 #!/usr/bin/env python3
-"""Guard combat target priority and melee-only pursuit of ranged enemies."""
+"""Guard unified hostile combat and bomb targeting."""
 from pathlib import Path
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 COMBAT = ROOT / "core/src/main/java/com/spd/blast/BlastAutoPlay.java"
 BOMBS = ROOT / "core/src/main/java/com/spd/blast/BlastAutoBombAI.java"
+TACTICS = ROOT / "core/src/main/java/com/spd/blast/BlastAutoCombat.java"
 
 
 class AutoTargetPriorityTests(unittest.TestCase):
     def test_priority_is_used_before_movement_and_pickup(self):
         source = COMBAT.read_text(encoding="utf-8")
-        action = source.split("public static boolean chooseAction(Hero hero)", 1)[1].split(
-            "private static boolean useWand(", 1
-        )[0]
-        self.assertLess(action.index("combatPriority(mob,"),
-                        action.index("betterTarget(priority,"))
-        self.assertLess(action.index("betterTarget(priority,"),
-                        action.index("if (selected != null) {", action.index("if (invulnerable !=")))
-        self.assertLess(action.index("if (selected != null) {", action.index("if (invulnerable !=")),
-                        action.index("pursueLastSeenTarget(hero"))
-        self.assertLess(action.index("pursueLastSeenTarget(hero"),
-                        action.index("BlastAutoPickup.chooseAction(hero"))
+        tactics = TACTICS.read_text(encoding="utf-8")
+        self.assertLess(source.index("BlastAutoCombat.chooseAction(hero"),
+                        source.index("pursueLastSeenTarget(hero"))
+        self.assertLess(source.index("pursueLastSeenTarget(hero"),
+                        source.index("BlastAutoPickup.chooseAction(hero"))
+        self.assertIn("targets.sort(Comparator.comparingInt", tactics)
+        self.assertIn("BlastAutoPlay.combatPriority(mob,", tactics)
+        self.assertLess(tactics.index("chooseAttack(hero, target, bow, arrow)"),
+                        tactics.index("approachBombRange(hero, target, safe, distances)"))
 
-    def test_ranged_enemies_require_close_combat(self):
+    def test_ranged_and_melee_enemies_share_attack_selection(self):
         source = COMBAT.read_text(encoding="utf-8")
-        self.assertIn("canMeleeTarget(ranged, adjacent, hero.canAttack(mob))", source)
-        self.assertIn("return canAttack && (!rangedEnemy || adjacent);", source)
-        wand = source.split("private static boolean useWand(Hero hero, Mob target)", 1)[1].split(
-            "private static boolean castWand(", 1
-        )[0]
-        self.assertIn(
-            "if (BlastAutoSacrifice.isRangedEnemy(target.getClass())) return false;",
-            wand,
-        )
+        tactics = TACTICS.read_text(encoding="utf-8")
+        self.assertNotIn("canMeleeTarget(", source)
+        self.assertNotIn("useWand(", source)
+        self.assertIn("if (mob.alignment == Char.Alignment.ENEMY) continue;", source)
+        self.assertIn("boolean canMelee = hero.canAttack(target);", tactics)
+        self.assertIn("preferRemote(remote.damage, melee)", tactics)
+        self.assertNotIn("pointBlankAccurate(", tactics)
 
     def test_quest_and_service_npcs_are_excluded_from_combat(self):
         combat = COMBAT.read_text(encoding="utf-8")
