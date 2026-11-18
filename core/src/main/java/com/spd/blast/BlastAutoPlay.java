@@ -27,6 +27,7 @@ public final class BlastAutoPlay {
 
     private static final int ATTACKER_MEMORY_TURNS = 8;
     private static final int LOST_TARGET_TURNS = 8;
+    private static final int BLOCKED_TRAVEL_TURNS = 8;
 
     private static Hero currentHero;
     private static Level currentLevel;
@@ -46,6 +47,8 @@ public final class BlastAutoPlay {
     private static int ignoredTargetCell = -1;
     private static int lastRetryCell = -1;
     private static volatile boolean manualAction;
+    private static volatile int interruptedDestination = -1;
+    private static int blockedTravelTurns;
     private static volatile Hero manualConfirmationHero;
     private static final AtomicReference<ManualInput> pendingManualInput = new AtomicReference<>();
     private static volatile boolean waitingForInput;
@@ -179,6 +182,7 @@ public final class BlastAutoPlay {
         lastRetryCell = -1;
         manualAction = false;
         manualConfirmationHero = null;
+        clearInterruptedTravel();
         pendingManualInput.set(null);
         waitingForInput = false;
         if (!BlastSettings.testAutoPlay()) pausedHero = null;
@@ -217,12 +221,54 @@ public final class BlastAutoPlay {
     public static void beginManualAction(Hero hero) {
         if (!BlastSettings.testAutoPlay()) return;
         resetForLevel(hero);
+        clearInterruptedTravel();
         manualAction = true;
         manualConfirmationHero = null;
         resetPursuitMemory();
         roaming.reset();
         progress.reset();
         lastRetryCell = -1;
+    }
+
+    /** A newly seen enemy interrupts a manual route; let combat AI run first. */
+    public static void interruptManualTravelForCombat(Hero hero) {
+        if (!BlastSettings.testAutoPlay() || isPaused() || !manualActionActive(hero)
+                || hero.curAction != null || !(hero.lastAction instanceof HeroAction.Move)
+                || hero.visibleEnemies() == 0) return;
+
+        int destination = ((HeroAction.Move) hero.lastAction).dst;
+        if (!Dungeon.level.insideMap(destination)) {
+            throw new IllegalStateException("Interrupted travel destination outside level: " + destination);
+        }
+        interruptedDestination = destination;
+        blockedTravelTurns = 0;
+        manualAction = false;
+        hero.lastAction = null;
+    }
+
+    private static void clearInterruptedTravel() {
+        interruptedDestination = -1;
+        blockedTravelTurns = 0;
+    }
+
+    /** Reuse the auto-play safe path map, never the now-stale native move route. */
+    private static boolean resumeInterruptedTravel(Hero hero, boolean[] safe, int[] distances) {
+        if (interruptedDestination < 0) return false;
+        if (!Dungeon.level.insideMap(interruptedDestination)) {
+            throw new IllegalStateException("Retained destination outside level: " + interruptedDestination);
+        }
+        if (hero.pos == interruptedDestination) {
+            clearInterruptedTravel();
+            return false;
+        }
+        if (safe[interruptedDestination] && distances[interruptedDestination] != Integer.MAX_VALUE) {
+            blockedTravelTurns = 0;
+            hero.curAction = new HeroAction.Move(firstStep(interruptedDestination, safe, distances));
+            return true;
+        }
+        // Allow transient enemies, doors or hazards to clear; never wait indefinitely.
+        if (++blockedTravelTurns >= BLOCKED_TRAVEL_TURNS) clearInterruptedTravel();
+        return false;
     }
 
     public static boolean manualActionActive(Hero hero) {
@@ -293,6 +339,7 @@ public final class BlastAutoPlay {
         hero.lastAction = null;
         hero.resting = false;
         if (input instanceof ManualRest) {
+            clearInterruptedTravel();
             hero.curAction = null;
             manualAction = false;
             manualConfirmationHero = null;
@@ -316,6 +363,7 @@ public final class BlastAutoPlay {
         progress.reset();
         manualAction = false;
         manualConfirmationHero = null;
+        clearInterruptedTravel();
         pendingManualInput.set(null);
         hero.curAction = null;
         hero.lastAction = null;
@@ -651,6 +699,12 @@ public final class BlastAutoPlay {
             idleDistances = PathFinder.distance.clone();
         }
 
+        // Resume interrupted player travel after tactical combat and before idle tasks.
+        if (resumeInterruptedTravel(hero, idleSafe, idleDistances)) {
+            progress.intent(BlastAutoProgressGuard.Intent.ROAM);
+            return false;
+        }
+
         // Collect reachable floor loot after visible enemies have been handled.
         if (BlastAutoPickup.chooseAction(hero, idleSafe, idleDistances,
                 BlastAutoPickupPolicy::isInstantPickup)) {
@@ -741,6 +795,7 @@ public final class BlastAutoPlay {
         lastRetryCell = -1;
         manualAction = false;
         manualConfirmationHero = null;
+        clearInterruptedTravel();
         pendingManualInput.set(null);
         waitingForInput = false;
         pendingBombInputs.clear();

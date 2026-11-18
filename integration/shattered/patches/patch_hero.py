@@ -208,6 +208,17 @@ def patch(path: Path) -> None:
         "Hero.handle manual command"
     )
 
+    # Enemy discovery interrupts native manual movement. Transfer the saved
+    # destination to auto-play so tactical combat takes priority.
+    s = replace_once(
+        s,
+        "\t\tcheckVisibleMobs();\n\t\tBuffIndicator.refreshHero();",
+        "\t\tcheckVisibleMobs();\n"
+        "\t\tcom.spd.blast.BlastAutoPlay.interruptManualTravelForCombat(this);\n"
+        "\t\tBuffIndicator.refreshHero();",
+        "Hero.act interrupt manual route for combat"
+    )
+
     # Use the normal action dispatch for automated turns.
     # If all safe moves are blocked, advance the game by one regular turn.
     s = replace_once(
