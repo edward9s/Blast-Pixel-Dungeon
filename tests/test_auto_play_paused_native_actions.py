@@ -61,11 +61,11 @@ class NativePausedManualActionsTests(unittest.TestCase):
         toggle = method("public static void togglePause() {",
                         "/** The Hero.act caller")
         self.assertIn("hero.lastAction = new HeroAction.Move(interruptedDestination);", toggle)
-        self.assertLess(toggle.index("hero.lastAction = new HeroAction.Move"),
-                        toggle.index("pausedHero = resume ? null : hero;"))
+        self.assertLess(toggle.index("pausedHero = hero;"),
+                        toggle.index("hero.lastAction = new HeroAction.Move"))
         self.assertIn("interruptedDestination = ((HeroAction.Move) hero.lastAction).dst", toggle)
         self.assertLess(toggle.index("interruptedDestination = ((HeroAction.Move) hero.lastAction).dst"),
-                        toggle.index("pausedHero = resume ? null : hero;"))
+                        toggle.index("pausedHero = null;"))
         self.assertIn("if (resume && hero.ready && !GameScene.manualInputPending())", toggle)
 
     def test_native_cancel_is_available_only_when_paused_or_disabled(self):
