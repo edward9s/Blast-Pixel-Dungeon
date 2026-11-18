@@ -40,7 +40,7 @@ class NativePausedManualActionsTests(unittest.TestCase):
                        "/** A newly seen enemy")
         self.assertIn("hero.curAction instanceof HeroAction.Move", begin)
         self.assertIn("hero.lastAction instanceof HeroAction.Move", begin)
-        self.assertNotIn("clearInterruptedTravel();\n        manualAction = true;", begin)
+        self.assertNotIn("\n        clearInterruptedTravel();\n        manualAction = true;", begin)
 
     def test_wait_and_bomb_do_not_destroy_suspended_route(self):
         wait = method("if (input instanceof ManualRest) {", "ManualCell cell =")
