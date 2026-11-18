@@ -38,7 +38,7 @@ class CompactSettingsTests(unittest.TestCase):
     def test_test_switches_use_a_compact_two_column_layout(self):
         source = TAB.read_text(encoding="utf-8")
         self.assertIn("testOptions = new CheckBox[]{", source)
-        self.assertIn("demolition, autoPlay, enchantmentReverseAlchemy", source)
+        self.assertIn("demolition, autoPlay, autoFarming, enchantmentReverseAlchemy", source)
         self.assertNotIn("Messages.lang()", source)
         self.assertNotIn("Languages.CHI_TRAD", source)
         self.assertIn("option.multiline = true;", source)
@@ -49,6 +49,32 @@ class CompactSettingsTests(unittest.TestCase):
         self.assertIn("if (radiusLabel.visible)", source)
         self.assertIn("if (heightChanged != null) heightChanged.run()", source)
         self.assertIn("BlastSettings.setEnchantmentStoneReverseAlchemy(checked())", source)
+
+    def test_spawn_and_explosion_radius_sliders_have_step_controls(self):
+        tab = TAB.read_text(encoding="utf-8")
+        settings = SETTINGS.read_text(encoding="utf-8")
+
+        self.assertIn("MIN_SPAWN_MULTIPLIER = 1", settings)
+        self.assertIn("MAX_SPAWN_MULTIPLIER = 10", settings)
+        self.assertIn("MAX_TEST_RADIUS_STACKS = 20", tab)
+        self.assertIn('new OptionSlider("", "1x", "10x",', tab)
+        self.assertIn('new OptionSlider("", "0", "20", 0, MAX_TEST_RADIUS_STACKS)', tab)
+
+        for name in ("spawn", "radius"):
+            self.assertIn(f"{name}Decrease = new RedButton", tab)
+            self.assertIn(f"{name}Increase = new RedButton", tab)
+            self.assertIn(f"{name}Slider.setRect(", tab)
+            self.assertIn(f"{name}Slider.setSelectedValue(", tab)
+
+        self.assertIn("BlastSettings.setSpawnMultiplier(getSelectedValue())", tab)
+        self.assertIn("BlastRadius.setStacks(hero, getSelectedValue())", tab)
+        self.assertIn('spawnValue.text(multiplier + "x")', tab)
+        self.assertIn('radiusValue.text("+" + count)', tab)
+        self.assertIn("spawnDecrease.active = multiplier > BlastSettings.MIN_SPAWN_MULTIPLIER", tab)
+        self.assertIn("spawnIncrease.active = multiplier < BlastSettings.MAX_SPAWN_MULTIPLIER", tab)
+        self.assertIn("radiusDecrease.active = active && count > 0", tab)
+        self.assertIn("radiusIncrease.active = active && count < MAX_TEST_RADIUS_STACKS", tab)
+        self.assertIn("radiusSlider.visible = radiusVisible", tab)
 
     def test_settings_window_resizes_after_toggle(self):
         patch = (ROOT / "integration/shattered/patches/patch_wndsettings.py").read_text(encoding="utf-8")
@@ -72,11 +98,11 @@ class CompactSettingsTests(unittest.TestCase):
         traditional = (ROOT / "messages/misc_zh-hant.properties").read_text(
             encoding="utf-8"
         )
-        self.assertIn("blast.settings.enchantment_reverse=附魔逆合成", traditional)
+        self.assertIn("blast.settings.enchantment_reverse=升級合成", traditional)
         japanese = (ROOT / "messages/misc_ja.properties").read_text(encoding="utf-8")
         korean = (ROOT / "messages/misc_ko.properties").read_text(encoding="utf-8")
-        self.assertIn("blast.settings.enchantment_reverse=付呪逆錬金", japanese)
-        self.assertIn("blast.settings.enchantment_reverse=부여석 역연금", korean)
+        self.assertIn("blast.settings.enchantment_reverse=強化合成", japanese)
+        self.assertIn("blast.settings.enchantment_reverse=강화 합성", korean)
         self.assertNotIn("enchantment_reverse=Enchantment stone reversal", japanese)
         self.assertNotIn("enchantment_reverse=Enchantment stone reversal", korean)
 
