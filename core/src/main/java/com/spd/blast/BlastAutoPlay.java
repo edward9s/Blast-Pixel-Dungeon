@@ -482,7 +482,7 @@ public final class BlastAutoPlay {
                 }
             }
             if (BlastAutoEnvironment.hazardousAt(hero.pos, hazards)
-                    || sentryFloors[hero.pos]) {
+                    || specialBarriers[hero.pos]) {
                 for (int offset : PathFinder.NEIGHBOURS8) {
                     int cell = hero.pos + offset;
                     if (Dungeon.level.insideMap(cell) && safe[cell] && distances[cell] == 1) {
