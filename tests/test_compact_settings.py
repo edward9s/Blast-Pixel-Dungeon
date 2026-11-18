@@ -60,9 +60,9 @@ class CompactSettingsTests(unittest.TestCase):
 
         self.assertIn("MIN_SPAWN_MULTIPLIER = 1", settings)
         self.assertIn("MAX_SPAWN_MULTIPLIER = 10", settings)
-        self.assertIn("MAX_TEST_RADIUS_STACKS = 20", tab)
-        self.assertIn('new OptionSlider("", "1x", "10x",', tab)
-        self.assertIn('new OptionSlider("", "0", "20", 0, MAX_TEST_RADIUS_STACKS)', tab)
+        self.assertIn("RADIUS_BOOST_VALUES = {0, 1, 2, 3, 5, 10, 20, 40, 70, 100}", tab)
+        self.assertIn('new OptionSlider("","1x","10x",', tab)
+        self.assertIn('new OptionSlider("", "0", "100", 0, RADIUS_BOOST_VALUES.length - 1)', tab)
 
         for name in ("spawn", "radius"):
             self.assertNotIn(f"{name}Decrease", tab)
@@ -72,9 +72,13 @@ class CompactSettingsTests(unittest.TestCase):
         self.assertIn("radiusSlider.setRect(0, controlsTop, width, SLIDER_HEIGHT)", tab)
 
         self.assertIn("BlastSettings.setSpawnMultiplier(getSelectedValue())", tab)
-        self.assertIn("BlastRadius.setStacks(hero, getSelectedValue())", tab)
+        self.assertIn("BlastRadius.setStacks(hero, RADIUS_BOOST_VALUES[getSelectedValue()])", tab)
         self.assertIn('spawnValue.text(multiplier + "x")', tab)
         self.assertIn('radiusValue.text("+" + count)', tab)
+        self.assertIn("radiusSlider.setSelectedValue(radiusBoostIndex(count))", tab)
+        self.assertIn("private static int radiusBoostIndex(int current)", tab)
+        self.assertIn("if (current < 0) throw new IllegalArgumentException", tab)
+        self.assertNotIn("BlastRadius.setStacks(hero, count)", tab)
         self.assertIn("radiusSlider.visible = radiusVisible", tab)
 
     def test_option_slider_drag_preview_only_commits_on_release(self):
@@ -83,7 +87,7 @@ class CompactSettingsTests(unittest.TestCase):
         self.assertIn('patch_option_slider.py" "$root/ui/OptionSlider.java"', apply_script)
         self.assertEqual(tab.count("protected void onDragPreview(int value)"), 2)
         self.assertIn('spawnValue.text(value + "x")', tab)
-        self.assertIn('radiusValue.text("+" + value)', tab)
+        self.assertIn('radiusValue.text("+" + RADIUS_BOOST_VALUES[value])', tab)
 
         # Small upstream-style fixture exercises every fail-fast patch anchor.
         fixture = (
@@ -113,6 +117,19 @@ class CompactSettingsTests(unittest.TestCase):
         self.assertIn("previewVal = selectedVal;", patched)
         self.assertIn("onDragPreview(value);", patched)
         self.assertNotIn("onChange();\n\t\t\t\t\tpreviewDragValue();", patched)
+
+    def test_explosion_boost_has_ten_non_linear_steps(self):
+        tab = TAB.read_text(encoding="utf-8")
+        self.assertIn("RADIUS_BOOST_VALUES.length - 1", tab)
+        self.assertIn("Math.abs((long) RADIUS_BOOST_VALUES[i] - current)", tab)
+        self.assertIn("Math.abs((long) RADIUS_BOOST_VALUES[closest] - current)", tab)
+        self.assertIn("return closest;", tab)
+        self.assertIn("radiusValue.text(\"+\" + count)", tab)
+        # Loading an existing save must not rewrite a non-step boost by opening settings.
+        self.assertEqual(
+            tab.count("BlastRadius.setStacks(hero,"),
+            1,
+        )
 
     def test_settings_window_resizes_after_toggle(self):
         patch = (ROOT / "integration/shattered/patches/patch_wndsettings.py").read_text(encoding="utf-8")
