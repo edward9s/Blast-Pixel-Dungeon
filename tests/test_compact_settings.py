@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
 """Regression checks for the compact Blast settings and enchantment-stone toggle."""
 from pathlib import Path
+import runpy
+import tempfile
 import unittest
 
 
 ROOT = Path(__file__).resolve().parents[1]
 SETTINGS = ROOT / "core/src/main/java/com/spd/blast/BlastSettings.java"
 TAB = ROOT / "core/src/main/java/com/spd/blast/BlastSettingsTab.java"
+OPTION_SLIDER_PATCH = ROOT / "integration/shattered/patches/patch_option_slider.py"
+APPLY_SCRIPT = ROOT / "integration/shattered/apply.sh"
 STONE_PATCH = ROOT / "integration/shattered/patches/patch_stone_to_scroll.py"
 GUIDE_PATCH = ROOT / "integration/shattered/patches/patch_reverse_alchemy_guide.py"
 
@@ -72,6 +76,43 @@ class CompactSettingsTests(unittest.TestCase):
         self.assertIn('spawnValue.text(multiplier + "x")', tab)
         self.assertIn('radiusValue.text("+" + count)', tab)
         self.assertIn("radiusSlider.visible = radiusVisible", tab)
+
+    def test_option_slider_drag_preview_only_commits_on_release(self):
+        tab = TAB.read_text(encoding="utf-8")
+        apply_script = APPLY_SCRIPT.read_text(encoding="utf-8")
+        self.assertIn('patch_option_slider.py" "$root/ui/OptionSlider.java"', apply_script)
+        self.assertEqual(tab.count("protected void onDragPreview(int value)"), 2)
+        self.assertIn('spawnValue.text(value + "x")', tab)
+        self.assertIn('radiusValue.text("+" + value)', tab)
+
+        # Small upstream-style fixture exercises every fail-fast patch anchor.
+        fixture = (
+            "\tprivate int selectedVal;\n"
+            "\tprotected abstract void onChange();\n"
+            "\t\tthis.selectedVal = val;\n"
+            "\t\t\t\tsliderNode.brightness(1.5f);\n"
+            "\t\t\t\t\tselectedVal = minVal + Math.round((sliderNode.x - x) / tickDist);\n"
+            "\t\t\tprotected void onDrag( PointerEvent event ) {\n"
+            "\t\t\t\tif (pressed) {\n"
+            "\t\t\t\t\tPointF p = camera().screenToCamera((int) event.current.x, (int) event.current.y);\n"
+            "\t\t\t\t\tsliderNode.x = GameMath.gate(sliderBG.x - 2, p.x - sliderNode.width()/2, sliderBG.x + sliderBG.width() - 2);\n"
+        )
+        patch = runpy.run_path(str(OPTION_SLIDER_PATCH))["patch"]
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "OptionSlider.java"
+            path.write_text(fixture, encoding="utf-8")
+            patch(path)
+            patched = path.read_text(encoding="utf-8")
+            with self.assertRaises(SystemExit):
+                patch(path)
+
+        self.assertEqual(patched.count("previewDragValue();"), 2)
+        self.assertIn("protected void onDragPreview(int value) {}", patched)
+        self.assertIn("if (value != previewVal)", patched)
+        self.assertIn("previewVal = val;", patched)
+        self.assertIn("previewVal = selectedVal;", patched)
+        self.assertIn("onDragPreview(value);", patched)
+        self.assertNotIn("onChange();\n\t\t\t\t\tpreviewDragValue();", patched)
 
     def test_settings_window_resizes_after_toggle(self):
         patch = (ROOT / "integration/shattered/patches/patch_wndsettings.py").read_text(encoding="utf-8")
