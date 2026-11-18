@@ -17,7 +17,6 @@ public final class BlastSettingsTab extends Component {
     private static final float GAP = 1f;
     private static final int SLIDER_HEIGHT = 21;
     private static final int BUTTON_HEIGHT = 16;
-    private static final int STEP_BUTTON_WIDTH = 18;
     private static final int VALUE_WIDTH = 24;
     private static final int MAX_TEST_RADIUS_STACKS = 20;
 
@@ -26,8 +25,6 @@ public final class BlastSettingsTab extends Component {
     private RenderedTextBlock spawnLabel;
     private RenderedTextBlock spawnValue;
     private OptionSlider spawnSlider;
-    private RedButton spawnDecrease;
-    private RedButton spawnIncrease;
     private CheckBox debugLog;
 
     private CheckBox testInfiniteBomb;
@@ -47,8 +44,6 @@ public final class BlastSettingsTab extends Component {
     private RenderedTextBlock radiusLabel;
     private RenderedTextBlock radiusValue;
     private OptionSlider radiusSlider;
-    private RedButton radiusDecrease;
-    private RedButton radiusIncrease;
 
     private ColorBlock transferLine;
     private RedButton exportSave;
@@ -81,23 +76,6 @@ public final class BlastSettingsTab extends Component {
         spawnSlider.setSelectedValue(BlastSettings.spawnMultiplier());
         add(spawnSlider);
 
-        spawnDecrease = new RedButton("-", 8) {
-            @Override
-            protected void onClick() {
-                super.onClick();
-                changeSpawn(-1);
-            }
-        };
-        add(spawnDecrease);
-
-        spawnIncrease = new RedButton("+", 8) {
-            @Override
-            protected void onClick() {
-                super.onClick();
-                changeSpawn(1);
-            }
-        };
-        add(spawnIncrease);
         refreshSpawn();
 
         debugLog = new CheckBox(BlastMessages.get("settings.debug_log")) {
@@ -227,24 +205,6 @@ public final class BlastSettingsTab extends Component {
         };
         add(radiusSlider);
 
-        radiusDecrease = new RedButton("-", 8) {
-            @Override
-            protected void onClick() {
-                super.onClick();
-                changeRadius(-1);
-            }
-        };
-        add(radiusDecrease);
-
-        radiusIncrease = new RedButton("+", 8) {
-            @Override
-            protected void onClick() {
-                super.onClick();
-                changeRadius(1);
-            }
-        };
-        add(radiusIncrease);
-
         if (DeviceCompat.isAndroid() || DeviceCompat.isDesktop()) {
             transferLine = new ColorBlock(1, 1, 0xFF000000);
             add(transferLine);
@@ -278,34 +238,14 @@ public final class BlastSettingsTab extends Component {
         boolean radiusVisible = show && Dungeon.hero != null && Dungeon.hero.isAlive();
         radiusLabel.visible = radiusValue.visible = radiusVisible;
         radiusSlider.visible = radiusVisible;
-        radiusDecrease.visible = radiusIncrease.visible = radiusVisible;
         refreshRadius();
-    }
-
-    private void changeSpawn(int delta) {
-        int next = BlastSettings.spawnMultiplier() + delta;
-        if (next < BlastSettings.MIN_SPAWN_MULTIPLIER
-                || next > BlastSettings.MAX_SPAWN_MULTIPLIER) return;
-        BlastSettings.setSpawnMultiplier(next);
-        refreshSpawn();
     }
 
     private void refreshSpawn() {
         int multiplier = BlastSettings.spawnMultiplier();
         spawnValue.text(multiplier + "x");
         spawnSlider.setSelectedValue(multiplier);
-        spawnDecrease.active = multiplier > BlastSettings.MIN_SPAWN_MULTIPLIER;
-        spawnIncrease.active = multiplier < BlastSettings.MAX_SPAWN_MULTIPLIER;
         layoutSettingValue(spawnLabel, spawnValue);
-    }
-
-    private void changeRadius(int delta) {
-        Hero hero = Dungeon.hero;
-        if (hero == null || !hero.isAlive() || !BlastSettings.showTests()) return;
-        int current = BlastRadius.stacks(hero);
-        if ((delta < 0 && current == 0) || (delta > 0 && current >= MAX_TEST_RADIUS_STACKS)) return;
-        BlastRadius.setStacks(hero, Math.addExact(current, delta));
-        refreshRadius();
     }
 
     private void refreshRadius() {
@@ -315,8 +255,6 @@ public final class BlastSettingsTab extends Component {
         radiusSlider.setSelectedValue(count);
         boolean active = BlastSettings.showTests() && hero != null && hero.isAlive();
         radiusSlider.enable(active);
-        radiusDecrease.active = active && count > 0;
-        radiusIncrease.active = active && count < MAX_TEST_RADIUS_STACKS;
         layoutSettingValue(radiusLabel, radiusValue);
     }
 
@@ -335,12 +273,7 @@ public final class BlastSettingsTab extends Component {
         layoutSettingValue(spawnLabel, spawnValue);
 
         float spawnTop = Math.max(spawnLabel.bottom(), spawnValue.bottom()) + GAP;
-        float sliderWidth = width - 2 * (STEP_BUTTON_WIDTH + GAP);
-        float buttonOffset = (SLIDER_HEIGHT - BUTTON_HEIGHT) / 2f;
-        spawnDecrease.setRect(0, spawnTop + buttonOffset, STEP_BUTTON_WIDTH, BUTTON_HEIGHT);
-        spawnSlider.setRect(STEP_BUTTON_WIDTH + GAP, spawnTop, sliderWidth, SLIDER_HEIGHT);
-        spawnIncrease.setRect(width - STEP_BUTTON_WIDTH, spawnTop + buttonOffset,
-                STEP_BUTTON_WIDTH, BUTTON_HEIGHT);
+        spawnSlider.setRect(0, spawnTop, width, SLIDER_HEIGHT);
         debugLog.setRect(0, spawnSlider.bottom() + GAP, width, BUTTON_HEIGHT);
 
         float bottom = debugLog.bottom();
@@ -372,12 +305,7 @@ public final class BlastSettingsTab extends Component {
                 layoutSettingValue(radiusLabel, radiusValue);
 
                 float controlsTop = Math.max(radiusLabel.bottom(), radiusValue.bottom()) + GAP;
-                radiusDecrease.setRect(0, controlsTop + buttonOffset,
-                        STEP_BUTTON_WIDTH, BUTTON_HEIGHT);
-                radiusSlider.setRect(STEP_BUTTON_WIDTH + GAP, controlsTop,
-                        sliderWidth, SLIDER_HEIGHT);
-                radiusIncrease.setRect(width - STEP_BUTTON_WIDTH, controlsTop + buttonOffset,
-                        STEP_BUTTON_WIDTH, BUTTON_HEIGHT);
+                radiusSlider.setRect(0, controlsTop, width, SLIDER_HEIGHT);
                 bottom = radiusSlider.bottom();
             }
         }
