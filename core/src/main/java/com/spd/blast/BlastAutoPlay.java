@@ -46,7 +46,7 @@ public final class BlastAutoPlay {
     private static int lastRetryCell = -1;
     private static volatile boolean manualAction;
     private static volatile Hero manualConfirmationHero;
-    private static final AtomicReference<ManualCell> pendingManualCell = new AtomicReference<>();
+    private static final AtomicReference<ManualInput> pendingManualInput = new AtomicReference<>();
     private static volatile boolean waitingForInput;
     private static volatile Hero pausedHero;
     // Timed throws stay on the Hero's turn; free commands can preempt mob turns.
@@ -55,15 +55,31 @@ public final class BlastAutoPlay {
     private static final ArrayDeque<BombInput> pendingFreeBombInputs = new ArrayDeque<>();
     private static FreeBombActor freeBombActor;
 
-    private static final class ManualCell {
+    private abstract static class ManualInput {
         final Hero hero;
         final Level level;
+
+        ManualInput(Hero hero, Level level) {
+            this.hero = hero;
+            this.level = level;
+        }
+    }
+
+    private static final class ManualCell extends ManualInput {
         final int destination;
 
         ManualCell(Hero hero, Level level, int destination) {
-            this.hero = hero;
-            this.level = level;
+            super(hero, level);
             this.destination = destination;
+        }
+    }
+
+    private static final class ManualRest extends ManualInput {
+        final boolean fullRest;
+
+        ManualRest(Hero hero, Level level, boolean fullRest) {
+            super(hero, level);
+            this.fullRest = fullRest;
         }
     }
 
@@ -161,7 +177,7 @@ public final class BlastAutoPlay {
         lastRetryCell = -1;
         manualAction = false;
         manualConfirmationHero = null;
-        pendingManualCell.set(null);
+        pendingManualInput.set(null);
         waitingForInput = false;
         if (!BlastSettings.testAutoPlay()) pausedHero = null;
         pendingBombInputs.clear();
@@ -249,21 +265,44 @@ public final class BlastAutoPlay {
         if (!level.insideMap(cell)) {
             throw new IllegalArgumentException("Invalid manual destination: " + cell);
         }
-        pendingManualCell.set(new ManualCell(hero, level, cell));
+        pendingManualInput.set(new ManualCell(hero, level, cell));
         if (hero.ready) hero.next();
     }
 
-    /** This is called by Hero.act, not the render callback. */
-    public static void performManualCell(Hero hero) {
-        if (!BlastSettings.testAutoPlay()) return;
-        ManualCell input = pendingManualCell.getAndSet(null);
+    /** Rest and map clicks share the same latest-input slot. */
+    public static void requestManualRest(boolean fullRest) {
+        Hero hero = Dungeon.hero;
+        Level level = Dungeon.level;
+        if (!BlastSettings.testAutoPlay() || hero == null || level == null) {
+            throw new IllegalStateException("Cannot request manual rest without auto-play");
+        }
+        pendingManualInput.set(new ManualRest(hero, level, fullRest));
+        if (hero.ready) hero.next();
+    }
+
+    /** Actor-thread dispatch; returns true when native rest has spent this turn. */
+    public static boolean performManualInput(Hero hero) {
+        if (!BlastSettings.testAutoPlay()) return false;
+        ManualInput input = pendingManualInput.getAndSet(null);
         resetForLevel(hero);
-        if (input == null || input.hero != hero || input.level != Dungeon.level) return;
+        if (input == null || input.hero != hero || input.level != Dungeon.level) return false;
         hero.lastAction = null;
         hero.resting = false;
-        if (!hero.handle(input.destination)) {
-            throw new IllegalStateException("Queued manual destination was rejected: " + input.destination);
+        if (input instanceof ManualRest) {
+            hero.curAction = null;
+            manualAction = false;
+            manualConfirmationHero = null;
+            resetPursuitMemory();
+            roaming.reset();
+            lastRetryCell = -1;
+            hero.rest(((ManualRest) input).fullRest);
+            return true;
         }
+        ManualCell cell = (ManualCell) input;
+        if (!hero.handle(cell.destination)) {
+            throw new IllegalStateException("Queued manual destination was rejected: " + cell.destination);
+        }
+        return false;
     }
 
     /** An explicit item action supersedes the last AI movement order. */
@@ -272,7 +311,7 @@ public final class BlastAutoPlay {
         resetForLevel(hero);
         manualAction = false;
         manualConfirmationHero = null;
-        pendingManualCell.set(null);
+        pendingManualInput.set(null);
         hero.curAction = null;
         hero.lastAction = null;
         hero.resting = false;
@@ -328,7 +367,8 @@ public final class BlastAutoPlay {
         waitingForInput = false;
         Hero hero = Dungeon.hero;
         if (BlastSettings.testAutoPlay() && hero != null && hero.ready
-                && (!isPaused() || !pendingBombInputs.isEmpty())) hero.next();
+                && (!isPaused() || !pendingBombInputs.isEmpty()
+                || hero.resting || pendingManualInput.get() != null)) hero.next();
     }
 
     /** Queue tag commands on the actor thread; free actions need not wait for Hero.act. */
@@ -659,7 +699,7 @@ public final class BlastAutoPlay {
         lastRetryCell = -1;
         manualAction = false;
         manualConfirmationHero = null;
-        pendingManualCell.set(null);
+        pendingManualInput.set(null);
         waitingForInput = false;
         pendingBombInputs.clear();
         clearFreeBombInputs();

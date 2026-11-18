@@ -172,7 +172,8 @@ def patch(path: Path) -> None:
     source = replace(source,
         "\tpublic static boolean cancel() {\n\t\tcellSelector.resetKeyHold();",
         "\tpublic static boolean cancel() {\n\t\tcellSelector.resetKeyHold();\n"
-        "\t\tif (com.spd.blast.BlastSettings.testAutoPlay()) return cancelCellSelector();",
+        "\t\tif (com.spd.blast.BlastSettings.testAutoPlay()\n"
+        "\t\t\t\t&& (Dungeon.hero == null || !Dungeon.hero.resting)) return cancelCellSelector();",
         "autoplay ignores queued move during cancellation")
 
     source = replace(source,
