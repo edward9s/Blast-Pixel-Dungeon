@@ -12,11 +12,20 @@ class AutoCombatWeaponTests(unittest.TestCase):
         source = SOURCE.read_text(encoding="utf-8")
         for check in ("QuickSlotButton.autoAim(target, weapon)",
                       "QuickSlotButton.autoAim(target, arrow)",
-                      "bow.knockArrow()", "weapon.cast(hero, choice.aim)",
-                      "weapon.durabilityLeft() <= weapon.durabilityPerUse()"):
+                      "bow.knockArrow()", "weapon.cast(hero, choice.aim)"):
             self.assertIn(check, source)
         self.assertNotIn("Ballistica.PROJECTILE", source)
         self.assertNotIn("pointBlankAccurate(", source)
+
+    def test_last_durability_does_not_exclude_missiles(self):
+        source = SOURCE.read_text(encoding="utf-8")
+        candidates = source.split("private static Choice bestMissile(", 1)[1].split(
+            "private static Choice bestWand(", 1)[0]
+        for restriction in ("durabilityLeft()", "durabilityPerUse()", "extraThrownLeft",
+                            "hasGoodEnchant()", "masteryPotionBonus", "enchantHardened"):
+            self.assertNotIn(restriction, candidates)
+        self.assertIn("item.quantity() <= 0", candidates)
+        self.assertIn("float damage = physicalDamage(hero, target, weapon, weapon);", candidates)
 
     def test_wand_safety_and_aim(self):
         source = SOURCE.read_text(encoding="utf-8")

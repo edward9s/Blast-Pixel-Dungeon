@@ -174,12 +174,6 @@ final class BlastAutoCombat {
             if (!(item instanceof MissileWeapon) || !hero.belongings.backpack.contains(item)
                     || item.quantity() <= 0) continue;
             MissileWeapon weapon = (MissileWeapon) item;
-            // Preserve the native warning before breaking a valuable last throw.
-            if (item.quantity() == 1 && !weapon.extraThrownLeft
-                    && ((weapon.levelKnown && weapon.level() > 0)
-                        || weapon.hasGoodEnchant() || weapon.masteryPotionBonus
-                        || weapon.enchantHardened)
-                    && weapon.durabilityLeft() <= weapon.durabilityPerUse()) continue;
             float damage = physicalDamage(hero, target, weapon, weapon);
             if (damage > 0f && (best == null || damage > best.damage)) {
                 int aim = QuickSlotButton.autoAim(target, weapon);
