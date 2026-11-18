@@ -13,7 +13,6 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Thief;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Wraith;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.NPC;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.Sheep;
-import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.Trap;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
@@ -518,7 +517,7 @@ public final class BlastAutoPlay {
             if (mob.alignment == Char.Alignment.ENEMY) continue;
             boolean ranged = BlastAutoSacrifice.isRangedEnemy(mob.getClass());
             boolean adjacent = Dungeon.level.adjacent(hero.pos, mob.pos);
-            boolean canMelee = hero.canAttack(mob);
+            boolean canMelee = hero.canAttack(mob) && (!ranged || adjacent);
             int goal = canMelee ? -1 : nearCell(hero.pos, mob.pos, safe, distances);
             if (!canMelee && (goal < 0 || hero.rooted)) continue;
 

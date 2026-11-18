@@ -41,11 +41,11 @@ class AutoTargetPriorityTests(unittest.TestCase):
 
         self.assertIn("return mob instanceof NPC;", combat)
         self.assertIn("|| isProtectedNpc(mob)", combat)
-        self.assertIn("&& !isProtectedNpc(mob)", combat)
         self.assertIn("|| isProtectedNpc(combatTarget)", combat)
         self.assertIn("|| attacker instanceof NPC", combat)
         self.assertIn("&& !(lastAttacker instanceof NPC)", combat)
-        self.assertIn("if (isProtectedNpc(target)) return false;", combat)
+        tactics = TACTICS.read_text(encoding="utf-8")
+        self.assertIn("|| BlastAutoPlay.isProtectedNpc(mob)", tactics)
 
         self.assertIn("containsProtectedMob(blast)", bombs)
         self.assertIn("&& BlastAutoPlay.isProtectedNpc(mob)) return true;", bombs)

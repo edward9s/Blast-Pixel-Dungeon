@@ -87,7 +87,9 @@ final class BlastAutoCombat {
                                        SpiritBow.SpiritArrow arrow) {
         Choice wand = bestWand(hero, target);
         if (BlastAutoPlay.highEvasion(hero, target) && wand != null) {
-            return zap(hero, target, wand);
+            Action action = zap(hero, target, wand);
+            if (action != Action.NONE) return action;
+            wand = null;
         }
 
         Choice missile = bestMissile(hero, target, bow, arrow);
@@ -274,7 +276,7 @@ final class BlastAutoCombat {
     // rejects some safe shots but never needs a map-sized pathfinding array.
     private static float lightningMultiplier(Hero hero, Mob target) {
         if (target.buff(WandOfLightning.LightningCharge.class) != null) return 0f;
-        ArrayList<Char> chars = new ArrayList<>(Actor.chars());
+        java.util.Set<Char> chars = Actor.chars();
         ArrayList<Char> affected = new ArrayList<>();
         affected.add(target);
         int charge = hero.buff(WandOfLightning.LightningCharge.class) == null ? 0 : 1;
@@ -405,7 +407,9 @@ final class BlastAutoCombat {
 
     static float estimatedAccuracy(Hero hero, Mob target, KindOfWeapon weapon, boolean thrown) {
         float accuracy = basicAccuracy(hero, thrown);
-        if (weapon != null) accuracy *= weapon.accuracyFactor(hero, target);
+        if (weapon != null && (thrown || !RingOfForce.fightingUnarmed(hero))) {
+            accuracy *= weapon.accuracyFactor(hero, target);
+        }
         // The extra shooting talent is included in the native missile accuracy factor
         // for adjacent targets, and not applied to unrelated melee strikes.
         com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Momentum momentum =
