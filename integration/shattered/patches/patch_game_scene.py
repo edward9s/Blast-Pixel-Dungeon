@@ -162,10 +162,11 @@ def patch(path: Path) -> None:
         "\t\tscene = null;\n\t\tBadges.saveGlobal();",
         "warning cleanup on scene close")
 
-    # Opening an informational window does not cancel the auto-play action.
+    # Informational windows cancel manual actions while paused, as in SPD.
     source = replace(source,
         "\t\t\tcancel();\n\n\t\t\t//If a window is already present",
-        "\t\t\tif (!com.spd.blast.BlastSettings.testAutoPlay()) cancel();\n\n"
+        "\t\t\tif (!com.spd.blast.BlastSettings.testAutoPlay()\n"
+        "\t\t\t\t\t|| com.spd.blast.BlastAutoPlay.isPaused()) cancel();\n\n"
         "\t\t\t//If a window is already present",
         "windows keep auto-play running")
 
@@ -173,6 +174,7 @@ def patch(path: Path) -> None:
         "\tpublic static boolean cancel() {\n\t\tcellSelector.resetKeyHold();",
         "\tpublic static boolean cancel() {\n\t\tcellSelector.resetKeyHold();\n"
         "\t\tif (com.spd.blast.BlastSettings.testAutoPlay()\n"
+        "\t\t\t\t&& !com.spd.blast.BlastAutoPlay.isPaused()\n"
         "\t\t\t\t&& (Dungeon.hero == null || !Dungeon.hero.resting)) return cancelCellSelector();",
         "autoplay ignores queued move during cancellation")
 
