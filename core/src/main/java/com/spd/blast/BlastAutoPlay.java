@@ -31,6 +31,7 @@ public final class BlastAutoPlay {
     private static Hero currentHero;
     private static Level currentLevel;
     private static final BlastAutoRoaming roaming = new BlastAutoRoaming();
+    private static final BlastAutoProgressGuard progress = new BlastAutoProgressGuard();
     private static final BlastAutoHarvest harvesting = new BlastAutoHarvest();
     private static Char lastAttacker;
     private static int attackerCell = -1;
@@ -167,6 +168,7 @@ public final class BlastAutoPlay {
         currentHero = null;
         currentLevel = null;
         roaming.reset();
+        progress.reset();
         harvesting.reset();
         lastAttacker = null;
         attackerCell = -1;
@@ -219,6 +221,7 @@ public final class BlastAutoPlay {
         manualConfirmationHero = null;
         resetPursuitMemory();
         roaming.reset();
+        progress.reset();
         lastRetryCell = -1;
     }
 
@@ -286,6 +289,7 @@ public final class BlastAutoPlay {
         ManualInput input = pendingManualInput.getAndSet(null);
         resetForLevel(hero);
         if (input == null || input.hero != hero || input.level != Dungeon.level) return false;
+        progress.reset();
         hero.lastAction = null;
         hero.resting = false;
         if (input instanceof ManualRest) {
@@ -309,6 +313,7 @@ public final class BlastAutoPlay {
     public static void beginItemAction(Hero hero) {
         if (!BlastSettings.testAutoPlay()) return;
         resetForLevel(hero);
+        progress.reset();
         manualAction = false;
         manualConfirmationHero = null;
         pendingManualInput.set(null);
@@ -452,6 +457,14 @@ public final class BlastAutoPlay {
     /** Returns true only when a wand cast already started its own asynchronous turn. */
     public static boolean chooseAction(Hero hero) {
         resetForLevel(hero);
+        progress.observe(hero.pos);
+        boolean started = chooseActionOnce(hero);
+        HeroAction action = hero.curAction;
+        progress.record(hero.pos, action instanceof HeroAction.Move ? action.dst : -1);
+        return started;
+    }
+
+    private static boolean chooseActionOnce(Hero hero) {
         hero.curAction = null;
         hero.lastAction = null;
         hero.resting = false;
@@ -459,6 +472,9 @@ public final class BlastAutoPlay {
         Blob[] hazards = BlastAutoEnvironment.activeHazards(Dungeon.level);
         boolean[] specialBarriers = BlastAutoEnvironment.activeSpecialBarriers(Dungeon.level);
         boolean[] safe = safeCells(hero, hazards, specialBarriers);
+        progress.refreshHazards(Dungeon.level.width(), Dungeon.level.length(),
+                cell -> BlastAutoEnvironment.hazardousAt(cell, hazards)
+                        || specialBarriers[cell]);
         // Compute reachability once, rather than doing up to nine searches per mob.
         PathFinder.buildDistanceMap(hero.pos, safe);
         int[] distances = PathFinder.distance.clone();
@@ -486,6 +502,8 @@ public final class BlastAutoPlay {
                 for (int offset : PathFinder.NEIGHBOURS8) {
                     int cell = hero.pos + offset;
                     if (Dungeon.level.insideMap(cell) && safe[cell] && distances[cell] == 1) {
+                        progress.hazardousRetreat(hero.pos);
+                        progress.intent(BlastAutoProgressGuard.Intent.RETREAT);
                         hero.curAction = new HeroAction.Move(cell);
                         return false;
                     }
@@ -625,12 +643,26 @@ public final class BlastAutoPlay {
             return false;
         }
 
+        // Suppress failed idle approaches without constraining combat or emergency escape.
+        boolean[] idleSafe = progress.idleSafe(safe, hero.pos);
+        int[] idleDistances = distances;
+        if (idleSafe != safe) {
+            PathFinder.buildDistanceMap(hero.pos, idleSafe);
+            idleDistances = PathFinder.distance.clone();
+        }
+
         // Collect reachable floor loot after visible enemies have been handled.
-        if (BlastAutoPickup.chooseAction(hero, safe, distances,
-                BlastAutoPickupPolicy::isInstantPickup)) return false;
+        if (BlastAutoPickup.chooseAction(hero, idleSafe, idleDistances,
+                BlastAutoPickupPolicy::isInstantPickup)) {
+            progress.intent(BlastAutoProgressGuard.Intent.PICKUP);
+            return false;
+        }
 
         // Use native actions to open visible containers and keyed doors.
-        if (BlastAutoInteract.chooseAction(hero, safe, distances)) return false;
+        if (BlastAutoInteract.chooseAction(hero, idleSafe, idleDistances)) {
+            progress.intent(BlastAutoProgressGuard.Intent.INTERACT);
+            return false;
+        }
 
         if (attackerTurns > 0) {
             attackerTurns--;
@@ -649,19 +681,28 @@ public final class BlastAutoPlay {
         }
 
         // Harvesting belongs to ordinary auto-play even when auto-farming is disabled.
-        if (harvest(hero, safe, distances)) return false;
+        if (harvest(hero, idleSafe, idleDistances)) {
+            progress.intent(BlastAutoProgressGuard.Intent.HARVEST);
+            return false;
+        }
 
         // Only planting new grass depends on the separate farming setting.
         BlastAutoFarming.Action farmingAction =
-                BlastAutoFarming.chooseAction(hero, safe, distances);
+                BlastAutoFarming.chooseAction(hero, idleSafe, idleDistances);
         if (farmingAction != BlastAutoFarming.Action.NONE) {
             // Farming takes priority and cancels the former wandering target.
             roaming.clearDestination();
+            if (farmingAction == BlastAutoFarming.Action.MOVE) {
+                progress.intent(BlastAutoProgressGuard.Intent.FARM);
+            }
             return farmingAction == BlastAutoFarming.Action.BOMB;
         }
 
-        int step = roamStep(hero, safe, distances);
-        if (step >= 0) hero.curAction = new HeroAction.Move(step);
+        int step = roamStep(hero, idleSafe, idleDistances);
+        if (step >= 0) {
+            progress.intent(BlastAutoProgressGuard.Intent.ROAM);
+            hero.curAction = new HeroAction.Move(step);
+        }
         return false;
     }
 
@@ -689,6 +730,7 @@ public final class BlastAutoPlay {
         currentHero = hero;
         currentLevel = Dungeon.level;
         roaming.reset();
+        progress.reset();
         harvesting.reset();
         lastAttacker = null;
         attackerCell = -1;
