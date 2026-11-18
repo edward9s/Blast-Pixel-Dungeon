@@ -87,8 +87,8 @@ class ManualPriorityTests(unittest.TestCase):
         self.assertIn("if (hero.ready) hero.next();", request)
         self.assertIn("pendingManualInput.getAndSet(null)", execute)
         self.assertIn("input.hero != hero || input.level != Dungeon.level", execute)
-        self.assertLess(execute.index("hero.lastAction = null"),
-                        execute.index("hero.handle(cell.destination)"))
+        self.assertNotIn("hero.lastAction = null", execute)
+        self.assertIn("hero.handle(cell.destination)", execute)
         self.assertIn("new AtomicReference<>()", source)
         self.assertGreaterEqual(source.count("pendingManualInput.set(null)"), 3)
 
