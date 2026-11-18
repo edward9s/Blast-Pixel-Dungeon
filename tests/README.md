@@ -285,3 +285,19 @@ freezing extinguish both bomb-sourced and non-bomb-sourced opposing blobs.
 python scripts/test_bomb_safety_patch.py
 python scripts/test_regrowth_bomb_patch.py
 ```
+
+
+\`BlastAutoProgressGuardTest.java\` checks shared auto-play progress memory:
+an unsafe doorway remains excluded from idle navigation while adjacent gas persists;
+it becomes eligible again once that danger clears. Two-cell and three-cell
+movement loops and repeated failed idle moves are suppressed, while combat
+paths and manual actions remain unrestricted. Idle tasks (pickup, interaction,
+harvest, farming, and roaming) share these exclusions, and emergency escape
+continues to use the original safe path.
+
+\`\`\`sh
+javac --release 11 -encoding UTF-8 -d /tmp/blast-tests \
+  core/src/main/java/com/spd/blast/BlastAutoProgressGuard.java \
+  tests/BlastAutoProgressGuardTest.java
+java -cp /tmp/blast-tests com.spd.blast.BlastAutoProgressGuardTest
+\`\`\`
