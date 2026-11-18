@@ -56,7 +56,12 @@ def patch(path: Path) -> None:
         "\t\t\t\t\tselectedVal = minVal + Math.round((sliderNode.x - x) / tickDist);\n\t\t\t\t\tpreviewVal = selectedVal;\n",
         "release preview sync",
     )
-    drag_anchor = "\t\t\t\t\tsliderNode.x = GameMath.gate(sliderBG.x - 2, p.x - sliderNode.width()/2, sliderBG.x + sliderBG.width() - 2);\n"
+    drag_anchor = (
+        "\t\t\tprotected void onDrag( PointerEvent event ) {\n"
+        "\t\t\t\tif (pressed) {\n"
+        "\t\t\t\t\tPointF p = camera().screenToCamera((int) event.current.x, (int) event.current.y);\n"
+        "\t\t\t\t\tsliderNode.x = GameMath.gate(sliderBG.x - 2, p.x - sliderNode.width()/2, sliderBG.x + sliderBG.width() - 2);\n"
+    )
     source = replace_once(
         source,
         drag_anchor,
