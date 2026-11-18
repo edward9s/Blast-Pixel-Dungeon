@@ -21,7 +21,9 @@ import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
 import com.shatteredpixel.shatteredpixeldungeon.levels.RegularLevel;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
 import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.Room;
+import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.special.MagicalFireRoom;
 import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.special.SentryRoom;
+import com.watabou.utils.Point;
 import com.watabou.utils.Rect;
 
 import java.util.Arrays;
@@ -31,8 +33,9 @@ import java.util.List;
 public final class BlastAutoEnvironment {
     static final int MAX_WATER_STEPS = 4;
 
-    private static final List<Class<? extends Blob>> HAZARD_TYPES = Arrays.asList(
+    static final List<Class<? extends Blob>> HAZARD_TYPES = Arrays.asList(
             Fire.class, BombFire.class, Inferno.class, VaultFlameTraps.class,
+            MagicalFireRoom.EternalFire.class,
             ToxicGas.class, CorrosiveGas.class, ParalyticGas.class,
             StenchGas.class, ConfusionGas.class, Electricity.class,
             StormCloud.class, Freezing.class, BombFreezing.class, Blizzard.class,
@@ -64,8 +67,8 @@ public final class BlastAutoEnvironment {
         return false;
     }
 
-    /** Mark the red sentry's special floor only while its sentry is alive. */
-    static boolean[] activeSentryFloors(Level level) {
+    /** Mark active special-room barriers once before auto-play pathfinding. */
+    static boolean[] activeSpecialBarriers(Level level) {
         boolean[] dangerous = new boolean[level.length()];
         if (!(level instanceof RegularLevel)) return dangerous;
 
@@ -81,7 +84,57 @@ public final class BlastAutoEnvironment {
                 }
             }
         }
+        Blob eternalFire = level.blobs.get(MagicalFireRoom.EternalFire.class);
+        if (eternalFire != null && eternalFire.volume > 0) {
+            if (eternalFire.cur == null || eternalFire.cur.length != level.length()) {
+                throw new IllegalStateException("Invalid magical fire navigation state");
+            }
+            markEternalFire(eternalFire.cur, level.width(), dangerous);
+            MagicalFireRoom fireRoom = ((RegularLevel) level).room(MagicalFireRoom.class);
+            if (fireRoom == null || fireRoom.entrance() == null) {
+                throw new IllegalStateException("Active magical fire without its room");
+            }
+            // Free Movement must not bypass the puzzle through surrounding walls.
+            markFireRoomPerimeter(level.width(), fireRoom, fireRoom.entrance(), dangerous);
+        }
         return dangerous;
+    }
+
+    /** Eternal fire ignites characters on its tile and four neighboring tiles. */
+    static void markEternalFire(int[] flames, int width, boolean[] dangerous) {
+        if (width <= 0 || flames.length != dangerous.length || flames.length % width != 0) {
+            throw new IllegalArgumentException("Invalid magical fire grid");
+        }
+        for (int cell = 0; cell < flames.length; cell++) {
+            if (flames[cell] <= 0) continue;
+            dangerous[cell] = true;
+            if (cell % width > 0) dangerous[cell - 1] = true;
+            if (cell % width < width - 1) dangerous[cell + 1] = true;
+            if (cell >= width) dangerous[cell - width] = true;
+            if (cell + width < flames.length) dangerous[cell + width] = true;
+        }
+    }
+
+    /** Keep a live magical-fire room's perimeter closed except at its entrance. */
+    static void markFireRoomPerimeter(int width, Rect room, Point entrance, boolean[] dangerous) {
+        if (width <= 0 || dangerous.length % width != 0
+                || room.left < 0 || room.top < 0 || room.left >= room.right
+                || room.top >= room.bottom || room.right >= width
+                || room.bottom >= dangerous.length / width
+                || entrance == null || entrance.x < room.left || entrance.x > room.right
+                || entrance.y < room.top || entrance.y > room.bottom
+                || (entrance.x != room.left && entrance.x != room.right
+                        && entrance.y != room.top && entrance.y != room.bottom)) {
+            throw new IllegalArgumentException("Invalid magical fire room boundary");
+        }
+        for (int y = room.top; y <= room.bottom; y++) {
+            for (int x = room.left; x <= room.right; x++) {
+                if ((x == room.left || x == room.right || y == room.top || y == room.bottom)
+                        && (x != entrance.x || y != entrance.y)) {
+                    dangerous[x + y * width] = true;
+                }
+            }
+        }
     }
 
     /** Special floors outside the sentry room must remain traversable. */
