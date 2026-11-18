@@ -72,6 +72,12 @@ public final class BlastSettingsTab extends Component {
                 BlastSettings.setSpawnMultiplier(getSelectedValue());
                 refreshSpawn();
             }
+
+            @Override
+            protected void onDragPreview(int value) {
+                spawnValue.text(value + "x");
+                layoutSettingValue(spawnLabel, spawnValue);
+            }
         };
         spawnSlider.setSelectedValue(BlastSettings.spawnMultiplier());
         add(spawnSlider);
@@ -201,6 +207,12 @@ public final class BlastSettingsTab extends Component {
                 if (hero == null || !hero.isAlive() || !BlastSettings.showTests()) return;
                 BlastRadius.setStacks(hero, getSelectedValue());
                 refreshRadius();
+            }
+
+            @Override
+            protected void onDragPreview(int value) {
+                radiusValue.text("+" + value);
+                layoutSettingValue(radiusLabel, radiusValue);
             }
         };
         add(radiusSlider);
