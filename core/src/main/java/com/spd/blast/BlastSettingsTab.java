@@ -18,7 +18,7 @@ public final class BlastSettingsTab extends Component {
     private static final int SLIDER_HEIGHT = 21;
     private static final int BUTTON_HEIGHT = 16;
     private static final int VALUE_WIDTH = 24;
-    private static final int MAX_TEST_RADIUS_STACKS = 20;
+    private static final int[] RADIUS_BOOST_VALUES = {0, 1, 2, 3, 5, 10, 20, 40, 70, 100};
 
     private RenderedTextBlock title;
     private ColorBlock topLine;
@@ -200,18 +200,18 @@ public final class BlastSettingsTab extends Component {
         radiusValue = PixelScene.renderTextBlock("", 7);
         add(radiusValue);
 
-        radiusSlider = new OptionSlider("", "0", "20", 0, MAX_TEST_RADIUS_STACKS) {
+        radiusSlider = new OptionSlider("", "0", "100", 0, RADIUS_BOOST_VALUES.length - 1) {
             @Override
             protected void onChange() {
                 Hero hero = Dungeon.hero;
                 if (hero == null || !hero.isAlive() || !BlastSettings.showTests()) return;
-                BlastRadius.setStacks(hero, getSelectedValue());
+                BlastRadius.setStacks(hero, RADIUS_BOOST_VALUES[getSelectedValue()]);
                 refreshRadius();
             }
 
             @Override
             protected void onDragPreview(int value) {
-                radiusValue.text("+" + value);
+                radiusValue.text("+" + RADIUS_BOOST_VALUES[value]);
                 layoutSettingValue(radiusLabel, radiusValue);
             }
         };
@@ -264,10 +264,23 @@ public final class BlastSettingsTab extends Component {
         Hero hero = Dungeon.hero;
         int count = hero == null ? 0 : BlastRadius.stacks(hero);
         radiusValue.text("+" + count);
-        radiusSlider.setSelectedValue(count);
+        radiusSlider.setSelectedValue(radiusBoostIndex(count));
         boolean active = BlastSettings.showTests() && hero != null && hero.isAlive();
         radiusSlider.enable(active);
         layoutSettingValue(radiusLabel, radiusValue);
+    }
+
+    private static int radiusBoostIndex(int current) {
+        if (current < 0) throw new IllegalArgumentException("Negative explosion boost");
+        int closest = 0;
+        for (int i = 1; i < RADIUS_BOOST_VALUES.length; i++) {
+            if (Math.abs((long) RADIUS_BOOST_VALUES[i] - current)
+                    < Math.abs((long) RADIUS_BOOST_VALUES[closest] - current)) {
+                closest = i;
+            }
+        }
+        // Keep the actual boost unchanged until the player selects a slider value.
+        return closest;
     }
 
     private void layoutSettingValue(RenderedTextBlock label, RenderedTextBlock value) {
