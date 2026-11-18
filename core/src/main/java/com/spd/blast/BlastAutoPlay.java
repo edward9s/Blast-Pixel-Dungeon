@@ -367,8 +367,8 @@ public final class BlastAutoPlay {
         waitingForInput = false;
         Hero hero = Dungeon.hero;
         if (BlastSettings.testAutoPlay() && hero != null && hero.ready
-                && (!isPaused() || hero.resting || pendingManualInput.get() != null
-                || !pendingBombInputs.isEmpty())) hero.next();
+                && (!isPaused() || !pendingBombInputs.isEmpty()
+                || hero.resting || pendingManualInput.get() != null)) hero.next();
     }
 
     /** Queue tag commands on the actor thread; free actions need not wait for Hero.act. */
