@@ -4,6 +4,8 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.Blob;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.Fire;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.ToxicGas;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
+import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.special.MagicalFireRoom;
+import com.watabou.utils.Point;
 import com.watabou.utils.Rect;
 
 /** Environment avoidance and bounded safe-water navigation. */
@@ -34,6 +36,34 @@ public final class BlastAutoEnvironmentTest {
         check(true, BlastAutoEnvironment.hazardousAt(2, hazards), "poison cloud");
         check(false, BlastAutoEnvironment.hazardousAt(3, hazards), "empty tile");
         check(false, BlastAutoEnvironment.hazardousAt(1, new Blob[2]), "no active blobs");
+
+        check(true, BlastAutoEnvironment.HAZARD_TYPES.contains(
+                MagicalFireRoom.EternalFire.class), "eternal fire registered as a hazard");
+        MagicalFireRoom.EternalFire eternalFire = new MagicalFireRoom.EternalFire();
+        eternalFire.cur = new int[]{0, 2, 0, 0};
+        eternalFire.volume = 2;
+        check(true, BlastAutoEnvironment.hazardousAt(1,
+                new Blob[]{eternalFire, null}), "eternal fire blocks movement");
+
+        int[] magicalFlames = new int[49];
+        magicalFlames[3 + 3 * 7] = 1;
+        boolean[] fireBarriers = new boolean[magicalFlames.length];
+        BlastAutoEnvironment.markEternalFire(magicalFlames, 7, fireBarriers);
+        check(true, fireBarriers[3 + 3 * 7], "fire wall blocked");
+        check(true, fireBarriers[2 + 3 * 7], "fire wall west burn zone blocked");
+        check(true, fireBarriers[4 + 3 * 7], "fire wall east burn zone blocked");
+        check(true, fireBarriers[3 + 2 * 7], "fire wall north burn zone blocked");
+        check(true, fireBarriers[3 + 4 * 7], "fire wall south burn zone blocked");
+        check(false, fireBarriers[2 + 2 * 7], "fire wall diagonal stays safe");
+
+        BlastAutoEnvironment.markFireRoomPerimeter(
+                7, new Rect(1, 1, 5, 5), new Point(1, 3), fireBarriers);
+        check(true, fireBarriers[1 + 2 * 7], "cannot phase through fire room wall");
+        check(true, fireBarriers[5 + 3 * 7], "cannot bypass fire from behind");
+        check(true, fireBarriers[3 + 1 * 7], "top fire room wall blocked");
+        check(false, fireBarriers[1 + 3 * 7], "fire room entrance remains open");
+        check(false, fireBarriers[2 + 2 * 7], "ordinary interior remains traversable");
+        check(false, fireBarriers[0], "outside fire room unaffected");
 
         int[] terrain = new int[49];
         terrain[2 + 2 * 7] = Terrain.EMPTY_SP;
