@@ -398,18 +398,21 @@ public final class BlastAutoPlay {
         boolean resume = isPaused();
         Hero hero = Dungeon.hero;
         if (resume) {
-            // A native interrupted manual route becomes the autonomous destination.
+            // Transfer the manual route before autonomous turns may start again.
             if (hero.lastAction instanceof HeroAction.Move) {
                 interruptedDestination = ((HeroAction.Move) hero.lastAction).dst;
                 blockedTravelTurns = 0;
                 hero.lastAction = null;
             }
-        } else if (interruptedDestination >= 0) {
-            // Pausing restores the native resume tag for a saved autonomous route.
-            hero.lastAction = new HeroAction.Move(interruptedDestination);
-            clearInterruptedTravel();
+            pausedHero = null;
+        } else {
+            // Stop autonomous turns before exposing their destination to the UI.
+            pausedHero = hero;
+            if (interruptedDestination >= 0) {
+                hero.lastAction = new HeroAction.Move(interruptedDestination);
+                clearInterruptedTravel();
+            }
         }
-        pausedHero = resume ? null : hero;
         if (resume && hero.ready && !GameScene.manualInputPending()) {
             hero.next();
         }
