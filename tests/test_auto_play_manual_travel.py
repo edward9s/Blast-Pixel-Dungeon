@@ -56,16 +56,21 @@ class InterruptedManualTravelTests(unittest.TestCase):
         self.assertIn("++blockedTravelTurns >= BLOCKED_TRAVEL_TURNS", resume)
         self.assertIn("clearInterruptedTravel();", resume)
 
-    def test_new_user_orders_and_floor_changes_clear_old_destination(self):
+    def test_new_move_replaces_goal_but_manual_actions_keep_it(self):
         self.assertEqual(
             AUTO.count("        clearInterruptedTravel();\n        pendingManualInput.set(null);"),
-            3,  # setting change, explicit item use, floor/hero reset
+            2,  # setting change and floor/hero reset
         )
         begin = method("public static void beginManualAction(Hero hero) {",
                        "/** A newly seen enemy")
+        self.assertIn("hero.curAction instanceof HeroAction.Move", begin)
+        self.assertIn("hero.lastAction instanceof HeroAction.Move", begin)
         self.assertIn("clearInterruptedTravel();", begin)
         rest = method("if (input instanceof ManualRest) {", "ManualCell cell =")
-        self.assertIn("clearInterruptedTravel();", rest)
+        self.assertNotIn("clearInterruptedTravel();", rest)
+        item = method("public static void beginItemAction(Hero hero) {",
+                      "/** A new run")
+        self.assertNotIn("clearInterruptedTravel();", item)
 
     def test_upstream_hero_hook_runs_after_enemy_detection(self):
         hook = HERO_PATCH.split("# Enemy discovery interrupts native manual movement.", 1)[1]
