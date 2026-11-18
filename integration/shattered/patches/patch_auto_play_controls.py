@@ -72,6 +72,24 @@ def patch_toolbar(path: Path) -> None:
     path.write_text(source, encoding="utf-8")
 
 
+def patch_resume_indicator(path: Path) -> None:
+    source = path.read_text(encoding="utf-8")
+    source = replace_once(
+        source,
+        "\t\tif (Dungeon.hero.ready) {\n"
+        "\t\t\tDungeon.hero.resume();\n"
+        "\t\t}",
+        "\t\tif (Dungeon.hero.ready) {\n"
+        "\t\t\tif (com.spd.blast.BlastSettings.testAutoPlay()) {\n"
+        "\t\t\t\tcom.spd.blast.BlastAutoPlay.beginManualAction(Dungeon.hero);\n"
+        "\t\t\t}\n"
+        "\t\t\tDungeon.hero.resume();\n"
+        "\t\t}",
+        "resume indicator manual continuation"
+    )
+    path.write_text(source, encoding="utf-8")
+
+
 def patch_quickslot(path: Path) -> None:
     source = path.read_text(encoding="utf-8")
     source = replace_once(
@@ -133,5 +151,6 @@ if __name__ == "__main__":
     root = Path(sys.argv[1])
     patch_cell_selector(root / "scenes/CellSelector.java")
     patch_toolbar(root / "ui/Toolbar.java")
+    patch_resume_indicator(root / "ui/ResumeIndicator.java")
     patch_quickslot(root / "ui/QuickSlotButton.java")
     patch_item(root / "items/Item.java")
