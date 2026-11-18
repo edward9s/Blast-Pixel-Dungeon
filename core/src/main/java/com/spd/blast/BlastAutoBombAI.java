@@ -7,7 +7,6 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.Regrowth;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.SacrificialFire;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
-import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.MobSpawner;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Necromancer;
 import com.shatteredpixel.shatteredpixeldungeon.items.bombs.Bomb;
 import com.shatteredpixel.shatteredpixeldungeon.items.bombs.RegrowthBomb;
@@ -53,7 +52,7 @@ public final class BlastAutoBombAI {
             if (!mob.isAlive() || mob.alignment != Char.Alignment.ENEMY
                     || !hero.fieldOfView[mob.pos] || mob.invisible > 0
                     || hero.isCharmedBy(mob) || mob.isInvulnerable(Hero.class)
-                    || !BlastAutoPlay.isAwake(mob) || isRare(mob)
+                    || !BlastAutoPlay.isAwake(mob)
                     || BlastAutoPlay.isProtectedNpc(mob)
                     || !BlastAutoSacrifice.readyToSacrifice(
                             BlastAutoSacrifice.nearFlame(
@@ -140,7 +139,7 @@ public final class BlastAutoBombAI {
             if (!mob.isAlive() || mob.alignment != Char.Alignment.ENEMY
                     || mob.invisible > 0
                     || hero.isCharmedBy(mob) || mob.isInvulnerable(Hero.class)
-                    || !BlastAutoPlay.isAwake(mob) || isRare(mob)
+                    || !BlastAutoPlay.isAwake(mob)
                     || BlastAutoPlay.isProtectedNpc(mob)) continue;
             if (regrowth && !regrowthReady(mob.rooted, regrowthAt(mob.pos))) continue;
 
@@ -172,7 +171,7 @@ public final class BlastAutoBombAI {
                 || !target.isAlive() || target.alignment != Char.Alignment.ENEMY
                 || target.invisible > 0 || !hero.fieldOfView[target.pos]
                 || hero.isCharmedBy(target) || !BlastAutoPlay.isAwake(target)
-                || target.isInvulnerable(Hero.class) || isRare(target)
+                || target.isInvulnerable(Hero.class)
                 || BlastAutoPlay.isProtectedNpc(target)) return -1;
 
         int length = Dungeon.level.length();
@@ -222,12 +221,8 @@ public final class BlastAutoBombAI {
     private static boolean containsProtectedMob(boolean[] blast) {
         for (Mob mob : Dungeon.level.mobs) {
             if (mob.isAlive() && blast[mob.pos]
-                    && (isRare(mob) || BlastAutoPlay.isProtectedNpc(mob))) return true;
+                    && BlastAutoPlay.isProtectedNpc(mob)) return true;
         }
         return false;
-    }
-
-    private static boolean isRare(Mob mob) {
-        return MobSpawner.RARE_ALTS.containsValue(mob.getClass());
     }
 }

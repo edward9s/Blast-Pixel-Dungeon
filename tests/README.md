@@ -56,8 +56,9 @@ python scripts/test_update_patches.py
 `BlastAutoBombAITest.java` checks local Regrowth targeting and blast
 footprint decisions. With auto-play, bomb immunity and remote mode active, the
 selected bomb is eligible even if its explosion destroys floor items. Existing
-restrictions for available charges, visible awake enemies, and rare-mob
-protection still apply. For remote throws, the real bomb landing position
+restrictions for available charges, eligible awake enemies, and protected NPCs
+still apply. Rare enemies are eligible targets and do not block collateral
+blast coverage when bomb immunity is active. For remote throws, the real bomb landing position
 determines whether the blast can hit an enemy; a direct hit is not required.
 With either Bombproof buff, only the hero is exempt from BombRegrowth rooting;
 all other grounded characters keep the existing effect. Auto-play alone grants
@@ -149,7 +150,7 @@ java -cp "/tmp/blast-tests:$BLAST_TEST_CLASSPATH" com.spd.blast.BlastAutoCombatT
 `test_auto_play_target_priority.py` verifies that the combat priority
 selection is reached before old-target pursuit or floor pickup, ranged
 opponents require adjacency for ordinary attacks, and bomb selection uses
-the actual landing blast footprint while preserving rare-mob safety checks.
+the actual landing blast footprint while preserving quest and service NPC safety checks.
 
 ```sh
 python -m unittest discover -s tests -p test_auto_play_target_priority.py

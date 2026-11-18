@@ -51,15 +51,15 @@ class AutoTargetPriorityTests(unittest.TestCase):
         self.assertIn("if (isProtectedNpc(target)) return false;", combat)
 
         self.assertIn("containsProtectedMob(blast)", bombs)
-        self.assertIn("isRare(mob) || BlastAutoPlay.isProtectedNpc(mob)", bombs)
+        self.assertIn("&& BlastAutoPlay.isProtectedNpc(mob)) return true;", bombs)
         self.assertIn("|| BlastAutoPlay.isProtectedNpc(mob)", bombs)
         self.assertIn("!BlastAutoPlay.isProtectedNpc(mob)", sacrifice)
 
     def test_bomb_targeting_uses_actual_landing_footprint(self):
         source = BOMBS.read_text(encoding="utf-8")
-        self.assertIn("int center = remoteThrow ? BlastBombTrajectory.throwPos(", source)
+        self.assertIn("int center = remoteThrow\n                    ? BlastBombTrajectory.throwPos(hero.pos, mob.pos) : hero.pos;", source)
         self.assertIn(
-            "blastReachesTarget(bomb.blastWarningCells(landing), mob.pos)",
+            "!blastReachesTarget(blast, mob.pos)",
             source,
         )
         self.assertIn("containsProtectedMob(blast)", source)
