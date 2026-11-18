@@ -59,16 +59,14 @@ public final class BlastAutoCombatTest {
         check(false, BlastAutoPlay.betterTarget(1, 4, 2, 1, 2, 5),
                 "longer safe path loses equal-priority tie");
 
-        // Enemy spellcasters must be reached in melee; a long-reach weapon
-        // is not enough to trigger attacks on them from a distance.
-        check(false, BlastAutoPlay.canMeleeTarget(true, false, true),
-                "ranged enemy outside melee range");
-        check(true, BlastAutoPlay.canMeleeTarget(true, true, true),
-                "adjacent ranged enemy");
-        check(true, BlastAutoPlay.canMeleeTarget(false, false, true),
-                "existing reach-weapon attacks on ordinary mobs");
-        check(false, BlastAutoPlay.canMeleeTarget(false, true, false),
-                "native melee attack still required");
+        // Both enemy types use the same damage comparison, even at point blank.
+        check(true, BlastAutoCombat.preferRemote(3f, 0f), "remote attack before movement");
+        check(true, BlastAutoCombat.preferRemote(6f, 5f), "stronger remote attack");
+        check(true, BlastAutoCombat.preferRemote(5f, 5f), "remote wins damage tie");
+        check(false, BlastAutoCombat.preferRemote(3f, 5f), "stronger melee attack");
+        check(false, BlastAutoCombat.preferRemote(0f, 0f), "no damaging remote attack");
+        check(false, BlastAutoCombat.corrosionDistanceSafe(3), "nearby corrosion");
+        check(true, BlastAutoCombat.corrosionDistanceSafe(4), "minimum corrosion distance");
 
         check(false, BlastAutoPlay.highEvasion(false, 19, 10),
                 "ordinary evasion");

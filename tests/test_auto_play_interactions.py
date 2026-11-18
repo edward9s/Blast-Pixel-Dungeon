@@ -29,10 +29,12 @@ class AutoInteractionTests(unittest.TestCase):
 
     def test_wands_remain_available_for_evasive_enemies(self):
         source = AUTO.read_text(encoding="utf-8")
-        self.assertIn("if (useWand(hero, selected)) return true;", source)
-        self.assertIn("if (!highEvasion(hero, target)) return false;", source)
+        tactics = (ROOT / "core/src/main/java/com/spd/blast/BlastAutoCombat.java").read_text(
+            encoding="utf-8")
+        self.assertIn("BlastAutoCombat.chooseAction(hero, safe, distances)", source)
+        self.assertIn("BlastAutoPlay.highEvasion(hero, target) && wand != null", tactics)
         self.assertIn("if (avoidEvasiveNeutral(hero, mob)) continue;", source)
-        self.assertIn("&& !avoidEvasiveNeutral(hero, mob) && useWand(hero, mob)", source)
+        self.assertNotIn("useWand(", source)
 
 
 if __name__ == "__main__":

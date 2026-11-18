@@ -134,12 +134,16 @@ oscillating between enemies and floor loot. The ignore ends if the enemy
 moves, threatens the hero in melee, or damages the hero. In normal combat,
 an actively attacking adjacent melee opponent takes first priority, then
 thieves (including bandits) and ranged enemies, then ordinary melee mobs.
-Safe path length breaks ties within each tier. Ranged enemies must be
-approached to adjacent melee range for non-bomb attacks, even with a
-long-reach weapon or charged wand. When bomb immunity is active, the
-existing bomb AI can strike remotely if the actual blast footprint reaches
-a target, subject to existing safety restrictions. The controller reuses
-the existing distance map.
+Visible hostile targets are ordered by threat tier and distance. The unified
+combat AI tries executable attacks against them before movement: high-evasion
+enemies prefer safe wands; other attacks compare estimated damage, including
+point-blank accuracy, reach weapons, thrown missiles and Spirit Bow arrows.
+Native auto-aim determines actual aim cells without a map-wide distance array.
+Lightning rejects possible self/NPC arcs; disintegration checks the full
+limited beam for target coverage and protected characters. Corrosion requires
+at least four cells of distance, no existing corrosion at the target, and a
+buffer around quest NPCs. Fireblast remains excluded. Bomb immunity preserves
+the existing bomb-first policy and blast-range approach.
 
 ```sh
 javac --release 11 -encoding UTF-8 -cp "$BLAST_TEST_CLASSPATH" \
@@ -148,8 +152,8 @@ java -cp "/tmp/blast-tests:$BLAST_TEST_CLASSPATH" com.spd.blast.BlastAutoCombatT
 ```
 
 `test_auto_play_target_priority.py` verifies that the combat priority
-selection is reached before old-target pursuit or floor pickup, ranged
-opponents require adjacency for ordinary attacks, and bomb selection uses
+selection is reached before old-target pursuit or floor pickup, hostile ranged
+and melee enemies use the same attack policy, and bomb selection uses
 the actual landing blast footprint while preserving quest and service NPC safety checks.
 
 ```sh
