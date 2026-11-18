@@ -168,7 +168,7 @@ def patch(path: Path) -> None:
         "\t\t\tif (!com.spd.blast.BlastSettings.testAutoPlay()\n"
         "\t\t\t\t\t|| com.spd.blast.BlastAutoPlay.isPaused()) cancel();\n\n"
         "\t\t\t//If a window is already present",
-        "windows keep auto-play running")
+        "windows retain native paused cancellation")
 
     source = replace(source,
         "\tpublic static boolean cancel() {\n\t\tcellSelector.resetKeyHold();",
@@ -176,7 +176,7 @@ def patch(path: Path) -> None:
         "\t\tif (com.spd.blast.BlastSettings.testAutoPlay()\n"
         "\t\t\t\t&& !com.spd.blast.BlastAutoPlay.isPaused()\n"
         "\t\t\t\t&& (Dungeon.hero == null || !Dungeon.hero.resting)) return cancelCellSelector();",
-        "autoplay ignores queued move during cancellation")
+        "autoplay running ignores queued move during cancellation")
 
     source = replace(source,
         "\tpublic static boolean interfaceBlockingHero(){",
