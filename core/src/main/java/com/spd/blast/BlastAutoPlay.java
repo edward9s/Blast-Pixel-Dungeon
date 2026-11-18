@@ -457,8 +457,8 @@ public final class BlastAutoPlay {
         hero.resting = false;
 
         Blob[] hazards = BlastAutoEnvironment.activeHazards(Dungeon.level);
-        boolean[] sentryFloors = BlastAutoEnvironment.activeSentryFloors(Dungeon.level);
-        boolean[] safe = safeCells(hero, hazards, sentryFloors);
+        boolean[] specialBarriers = BlastAutoEnvironment.activeSpecialBarriers(Dungeon.level);
+        boolean[] safe = safeCells(hero, hazards, specialBarriers);
         // Compute reachability once, rather than doing up to nine searches per mob.
         PathFinder.buildDistanceMap(hero.pos, safe);
         int[] distances = PathFinder.distance.clone();
@@ -832,7 +832,7 @@ public final class BlastAutoPlay {
         return trap == null || !trap.active;
     }
 
-    private static boolean[] safeCells(Hero hero, Blob[] hazards, boolean[] sentryFloors) {
+    private static boolean[] safeCells(Hero hero, Blob[] hazards, boolean[] specialBarriers) {
         Level level = Dungeon.level;
         boolean[] safe = Dungeon.findPassable(hero, level.passable, hero.fieldOfView, true).clone();
         boolean phaseEnabled = BlastMovement.enabled();
@@ -846,7 +846,7 @@ public final class BlastAutoPlay {
                     && isTrapSafe(level.traps.get(cell))
                     && !AutoPlayPlantSafety.isHarmful(level.plants.get(cell))
                     && !BlastAutoEnvironment.hazardousAt(cell, hazards)
-                    && !sentryFloors[cell];
+                    && !specialBarriers[cell];
         }
 
         // Inspect occupied cells only; per-cell Actor.findChar() is unnecessary.
@@ -859,7 +859,7 @@ public final class BlastAutoPlay {
                     && !level.pit[cell] && isTrapSafe(level.traps.get(cell))
                     && !AutoPlayPlantSafety.isHarmful(level.plants.get(cell))
                     && !BlastAutoEnvironment.hazardousAt(cell, hazards)
-                    && !sentryFloors[cell]) {
+                    && !specialBarriers[cell]) {
                 safe[cell] = true;
             } else {
                 safe[cell] = false;
