@@ -35,6 +35,8 @@ final class BlastAutoProgressGuard {
         lastOrigin = -1;
         lastDestination = -1;
         nextIntent = Intent.OTHER;
+        failedCell = -1;
+        failedMoves = 0;
     }
 
     /** Compare the actual location with the previously requested movement. */
@@ -149,6 +151,8 @@ final class BlastAutoProgressGuard {
             if (historySize < 2 * period + 1) continue;
             boolean repeated = true;
             boolean idle = false;
+            boolean mixedIntents = false;
+            Intent priorIntent = null;
             for (int step = 0; step < period + 1; step++) {
                 if (positions[historySize - 1 - step]
                         != positions[historySize - 1 - period - step]) {
@@ -158,12 +162,14 @@ final class BlastAutoProgressGuard {
             }
             if (!repeated) continue;
             for (int step = historySize - 2 * period; step < historySize; step++) {
-                if (arrivals[step] != Intent.OTHER && arrivals[step] != Intent.RETREAT) {
+                Intent current = arrivals[step];
+                if (current != Intent.OTHER && current != Intent.RETREAT) {
                     idle = true;
-                    break;
                 }
+                if (priorIntent != null && priorIntent != current) mixedIntents = true;
+                priorIntent = current;
             }
-            if (idle) {
+            if (idle && mixedIntents) {
                 block(positions[historySize - period], false);
                 historySize = 0;
             }
