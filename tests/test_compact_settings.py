@@ -61,7 +61,7 @@ class CompactSettingsTests(unittest.TestCase):
         self.assertIn("MIN_SPAWN_MULTIPLIER = 1", settings)
         self.assertIn("MAX_SPAWN_MULTIPLIER = 10", settings)
         self.assertIn("RADIUS_BOOST_VALUES = {0, 1, 2, 3, 5, 10, 20, 40, 70, 100}", tab)
-        self.assertIn('new OptionSlider("", "1x", "10x",', tab)
+        self.assertIn('new OptionSlider("","1x","10x",', tab)
         self.assertIn('new OptionSlider("", "0", "100", 0, RADIUS_BOOST_VALUES.length - 1)', tab)
 
         for name in ("spawn", "radius"):
