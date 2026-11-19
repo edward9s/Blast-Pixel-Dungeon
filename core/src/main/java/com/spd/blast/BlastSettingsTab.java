@@ -101,29 +101,6 @@ public final class BlastSettingsTab extends Component {
         debugLog.checked(BlastSettings.debugLog());
         add(debugLog);
 
-        weakMobDrops = new CheckBox(BlastMessages.get("settings.weak_mob_drops")) {
-            @Override
-            protected void onClick() {
-                super.onClick();
-                BlastSettings.setWeakMobDrops(checked());
-            }
-        };
-        weakMobDrops.checked(BlastSettings.weakMobDrops());
-        weakMobDrops.multiline = true;
-        add(weakMobDrops);
-
-        weakMobExpEffects = new CheckBox(BlastMessages.get("settings.weak_mob_exp_effects")) {
-            @Override
-            protected void onClick() {
-                super.onClick();
-                BlastSettings.setWeakMobExpEffects(checked());
-            }
-        };
-        weakMobExpEffects.checked(BlastSettings.weakMobExpEffects());
-        weakMobExpEffects.multiline = true;
-        add(weakMobExpEffects);
-
-
         testInfiniteBomb = new CheckBox(BlastMessages.get("settings.infinite_bomb")) {
             @Override
             protected void onClick() {
@@ -217,6 +194,28 @@ public final class BlastSettingsTab extends Component {
         for (CheckBox option : testOptions) {
             option.multiline = true;
         }
+
+        weakMobDrops = new CheckBox(BlastMessages.get("settings.weak_mob_drops")) {
+            @Override
+            protected void onClick() {
+                super.onClick();
+                BlastSettings.setWeakMobDrops(checked());
+            }
+        };
+        weakMobDrops.checked(BlastSettings.weakMobDrops());
+        weakMobDrops.multiline = true;
+        add(weakMobDrops);
+
+        weakMobExpEffects = new CheckBox(BlastMessages.get("settings.weak_mob_exp_effects")) {
+            @Override
+            protected void onClick() {
+                super.onClick();
+                BlastSettings.setWeakMobExpEffects(checked());
+            }
+        };
+        weakMobExpEffects.checked(BlastSettings.weakMobExpEffects());
+        weakMobExpEffects.multiline = true;
+        add(weakMobExpEffects);
 
         radiusLabel = PixelScene.renderTextBlock(BlastMessages.get("settings.radius"), 7);
         add(radiusLabel);
@@ -337,14 +336,7 @@ public final class BlastSettingsTab extends Component {
         debugLog.setRect(0, spawnSlider.bottom() + GAP, width, BUTTON_HEIGHT);
 
         float columnWidth = (width - GAP) / 2f;
-        float rewardsTop = debugLog.bottom() + GAP;
-        weakMobDrops.setRect(0, rewardsTop, columnWidth, BUTTON_HEIGHT);
-        weakMobExpEffects.setRect(columnWidth + GAP, rewardsTop, columnWidth, BUTTON_HEIGHT);
-        float rewardsHeight = Math.max(BUTTON_HEIGHT,
-                Math.max(weakMobDrops.reqHeight(), weakMobExpEffects.reqHeight()));
-        weakMobDrops.setRect(0, rewardsTop, columnWidth, rewardsHeight);
-        weakMobExpEffects.setRect(columnWidth + GAP, rewardsTop, columnWidth, rewardsHeight);
-        float bottom = rewardsTop + rewardsHeight;
+        float bottom = debugLog.bottom();
         if (BlastSettings.showTests()) {
             for (int i = 0; i < testOptions.length; i += 2) {
                 CheckBox left = testOptions[i];
@@ -365,21 +357,31 @@ public final class BlastSettingsTab extends Component {
                 bottom = top + rowHeight;
             }
 
-            if (radiusLabel.visible) {
-                float radiusTop = bottom + GAP;
-                radiusLabel.maxWidth(Math.max(1, (int)Math.floor(width - VALUE_WIDTH - GAP)));
-                radiusLabel.setPos(0, radiusTop);
-                layoutSettingValue(radiusLabel, radiusValue);
+        }
 
-                float controlsTop = Math.max(radiusLabel.bottom(), radiusValue.bottom()) + GAP;
-                radiusSlider.setRect(0, controlsTop, width, SLIDER_HEIGHT);
-                bottom = radiusSlider.bottom();
-            }
+        float rewardsTop = bottom + GAP;
+        weakMobDrops.setRect(0, rewardsTop, columnWidth, BUTTON_HEIGHT);
+        weakMobExpEffects.setRect(columnWidth + GAP, rewardsTop, columnWidth, BUTTON_HEIGHT);
+        float rewardsHeight = Math.max(BUTTON_HEIGHT,
+                Math.max(weakMobDrops.reqHeight(), weakMobExpEffects.reqHeight()));
+        weakMobDrops.setRect(0, rewardsTop, columnWidth, rewardsHeight);
+        weakMobExpEffects.setRect(columnWidth + GAP, rewardsTop, columnWidth, rewardsHeight);
+        bottom = rewardsTop + rewardsHeight;
+
+        if (radiusLabel.visible) {
+            float radiusTop = bottom + GAP;
+            radiusLabel.maxWidth(Math.max(1, (int)Math.floor(width - VALUE_WIDTH - GAP)));
+            radiusLabel.setPos(0, radiusTop);
+            layoutSettingValue(radiusLabel, radiusValue);
+
+            float controlsTop = Math.max(radiusLabel.bottom(), radiusValue.bottom()) + GAP;
+            radiusSlider.setRect(0, controlsTop, width, SLIDER_HEIGHT);
+            bottom = radiusSlider.bottom();
         }
 
         if (transferLine != null) {
             transferLine.size(width, 1);
-            transferLine.y = bottom + GAP;
+            transferLine.y = bottom + 5 * GAP;
             float buttonWidth = (width - GAP) / 2f;
             exportSave.setRect(0, transferLine.y + 1 + GAP, buttonWidth, BUTTON_HEIGHT);
             importSave.setRect(exportSave.right() + GAP, exportSave.top(),
