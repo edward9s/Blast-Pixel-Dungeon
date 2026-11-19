@@ -58,7 +58,7 @@ final class BlastAutoRoaming {
             Arrays.fill(failedDestinations, false);
             System.arraycopy(solid, 0, solidSnapshot, 0, length);
             System.arraycopy(safe, 0, safeSnapshot, 0, length);
-            clearDestination();
+            // A valid current destination should survive ordinary visibility changes.
         }
 
         if (destination == position) {
