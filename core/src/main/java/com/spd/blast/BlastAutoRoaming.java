@@ -12,6 +12,7 @@ final class BlastAutoRoaming {
     private boolean frontierDestination;
     private boolean[] failedDestinations;
     private boolean[] solidSnapshot;
+    private boolean[] safeSnapshot;
     private int progressGoal = -1;
     private int bestGoalDistance = Integer.MAX_VALUE;
     private int stalledRoams;
@@ -20,6 +21,7 @@ final class BlastAutoRoaming {
         clearDestination();
         failedDestinations = null;
         solidSnapshot = null;
+        safeSnapshot = null;
     }
 
     void clearDestination() {
@@ -45,13 +47,17 @@ final class BlastAutoRoaming {
             throw new IllegalArgumentException("Invalid auto-roaming map");
         }
 
-        // Re-evaluate failed corners after solid obstacles change.
+        // A failed frontier is only valid for the map state in which it failed.
+        // Occupying mobs, gas and discovered terrain change safety without changing walls.
         if (failedDestinations == null) {
             failedDestinations = new boolean[length];
             solidSnapshot = solid.clone();
-        } else if (!Arrays.equals(solidSnapshot, solid)) {
+            safeSnapshot = safe.clone();
+        } else if (!Arrays.equals(solidSnapshot, solid)
+                || !Arrays.equals(safeSnapshot, safe)) {
             Arrays.fill(failedDestinations, false);
             System.arraycopy(solid, 0, solidSnapshot, 0, length);
+            System.arraycopy(safe, 0, safeSnapshot, 0, length);
             resetProgress();
         }
 
