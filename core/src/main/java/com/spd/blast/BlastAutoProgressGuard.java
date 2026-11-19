@@ -2,9 +2,9 @@ package com.spd.blast;
 
 import java.util.function.IntPredicate;
 
-/** Remembers failed idle routes across independent auto-play tasks. */
+/** Tracks unsafe retreats and temporary failed steps per automatic task. */
 final class BlastAutoProgressGuard {
-    enum Intent { OTHER, PICKUP, INTERACT, ROAM, HARVEST, FARM, RETREAT }
+    enum Intent { OTHER, TRAVEL, PICKUP, INTERACT, ROAM, HARVEST, FARM, RETREAT }
 
     private static final int HISTORY_SIZE = 7;
     private static final int MAX_BLOCKED_CELLS = 12;
@@ -14,7 +14,7 @@ final class BlastAutoProgressGuard {
     private final int[] positions = new int[HISTORY_SIZE];
     private final Intent[] arrivals = new Intent[HISTORY_SIZE];
     private final int[] blockedCells = new int[MAX_BLOCKED_CELLS];
-    private final boolean[] hazardBlocks = new boolean[MAX_BLOCKED_CELLS];
+    private final Intent[] blockedIntents = new Intent[MAX_BLOCKED_CELLS];
     private final int[] blockTurns = new int[MAX_BLOCKED_CELLS];
     private int historySize;
     private int blockedCount;
@@ -23,12 +23,14 @@ final class BlastAutoProgressGuard {
     private Intent lastIntent = Intent.OTHER;
     private Intent nextIntent = Intent.OTHER;
     private int failedCell = -1;
+    private Intent failedIntent = Intent.OTHER;
     private int failedMoves;
 
     void reset() {
         clearHistory();
         blockedCount = 0;
         failedCell = -1;
+        failedIntent = Intent.OTHER;
         failedMoves = 0;
     }
 
@@ -38,6 +40,7 @@ final class BlastAutoProgressGuard {
         lastDestination = -1;
         nextIntent = Intent.OTHER;
         failedCell = -1;
+        failedIntent = Intent.OTHER;
         failedMoves = 0;
     }
 
@@ -47,6 +50,7 @@ final class BlastAutoProgressGuard {
         if (lastDestination < 0) return;
         if (position == lastDestination && position != lastOrigin) {
             failedCell = -1;
+            failedIntent = Intent.OTHER;
             failedMoves = 0;
             if (historySize == 0) append(lastOrigin, Intent.OTHER);
             append(position, lastIntent);
@@ -54,16 +58,18 @@ final class BlastAutoProgressGuard {
         } else {
             if (position == lastOrigin && lastIntent != Intent.OTHER
                     && lastIntent != Intent.RETREAT) {
-                if (failedCell != lastDestination) {
+                if (failedCell != lastDestination || failedIntent != lastIntent) {
                     failedCell = lastDestination;
+                    failedIntent = lastIntent;
                     failedMoves = 0;
                 }
                 if (++failedMoves >= FAILED_MOVE_LIMIT) {
-                    block(lastDestination, false);
+                    block(lastDestination, lastIntent);
                     failedMoves = 0;
                 }
             } else {
                 failedCell = -1;
+                failedIntent = Intent.OTHER;
                 failedMoves = 0;
             }
             historySize = 0;
@@ -92,13 +98,15 @@ final class BlastAutoProgressGuard {
     /** Age only ordinary failures; hazard exclusions last until danger clears. */
     private void expireTransientBlocks() {
         for (int index = blockedCount - 1; index >= 0; index--) {
-            if (!hazardBlocks[index] && --blockTurns[index] == 0) removeBlocked(index);
+            if (blockedIntents[index] != Intent.RETREAT && --blockTurns[index] == 0) {
+                removeBlocked(index);
+            }
         }
     }
 
     /** Do not immediately re-explore the cell from which we escaped a hazard. */
     void hazardousRetreat(int cell) {
-        block(cell, true);
+        block(cell, Intent.RETREAT);
     }
 
     /** Release hazard exclusions only after the local danger has disappeared. */
@@ -107,7 +115,7 @@ final class BlastAutoProgressGuard {
             throw new IllegalArgumentException("Invalid hazard navigation grid");
         }
         for (int index = blockedCount - 1; index >= 0; index--) {
-            if (!hazardBlocks[index]) continue;
+            if (blockedIntents[index] != Intent.RETREAT) continue;
             int cell = blockedCells[index];
             int x = cell % width;
             int y = cell / width;
@@ -127,10 +135,11 @@ final class BlastAutoProgressGuard {
         }
     }
 
-    /** Tactical routing and hazard escapes still use the original safe map. */
-    boolean[] idleSafe(boolean[] safe, int position) {
-        if (safe == null || position < 0 || position >= safe.length) {
-            throw new IllegalArgumentException("Invalid idle navigation map");
+    /** Apply hazards to all idle tasks; ordinary failed steps affect only their owner. */
+    boolean[] safeFor(boolean[] safe, int position, Intent intent) {
+        if (safe == null || position < 0 || position >= safe.length
+                || intent == null || intent == Intent.OTHER || intent == Intent.RETREAT) {
+            throw new IllegalArgumentException("Invalid automatic navigation request");
         }
         boolean[] filtered = safe;
         for (int index = 0; index < blockedCount; index++) {
@@ -138,7 +147,8 @@ final class BlastAutoProgressGuard {
             if (cell >= safe.length) {
                 throw new IllegalStateException("Blocked cell outside current level");
             }
-            if (cell == position || !safe[cell]) continue;
+            if ((blockedIntents[index] != Intent.RETREAT && blockedIntents[index] != intent)
+                    || cell == position || !safe[cell]) continue;
             if (filtered == safe) filtered = safe.clone();
             filtered[cell] = false;
         }
@@ -180,32 +190,37 @@ final class BlastAutoProgressGuard {
                 priorIntent = current;
             }
             if (idle && mixedIntents) {
-                block(positions[historySize - period], false);
+                // Exclude the repeated step only for the task that requested it.
+                int index = historySize - period;
+                if (arrivals[index] != Intent.OTHER && arrivals[index] != Intent.RETREAT) {
+                    block(positions[index], arrivals[index]);
+                }
                 historySize = 0;
             }
             break;
         }
     }
 
-    private void block(int cell, boolean hazard) {
-        if (cell < 0) throw new IllegalArgumentException("Invalid blocked cell");
+    private void block(int cell, Intent intent) {
+        if (cell < 0 || intent == null || intent == Intent.OTHER) {
+            throw new IllegalArgumentException("Invalid blocked step");
+        }
         for (int index = 0; index < blockedCount; index++) {
-            if (blockedCells[index] == cell) {
-                hazardBlocks[index] |= hazard;
-                if (!hazardBlocks[index]) blockTurns[index] = TRANSIENT_BLOCK_TURNS;
+            if (blockedCells[index] == cell && blockedIntents[index] == intent) {
+                if (intent != Intent.RETREAT) blockTurns[index] = TRANSIENT_BLOCK_TURNS;
                 return;
             }
         }
         if (blockedCount == MAX_BLOCKED_CELLS) {
             // Bound retained state even on levels with many independent obstacles.
             System.arraycopy(blockedCells, 1, blockedCells, 0, MAX_BLOCKED_CELLS - 1);
-            System.arraycopy(hazardBlocks, 1, hazardBlocks, 0, MAX_BLOCKED_CELLS - 1);
+            System.arraycopy(blockedIntents, 1, blockedIntents, 0, MAX_BLOCKED_CELLS - 1);
             System.arraycopy(blockTurns, 1, blockTurns, 0, MAX_BLOCKED_CELLS - 1);
             blockedCount--;
         }
         blockedCells[blockedCount] = cell;
-        hazardBlocks[blockedCount] = hazard;
-        blockTurns[blockedCount] = hazard ? 0 : TRANSIENT_BLOCK_TURNS;
+        blockedIntents[blockedCount] = intent;
+        blockTurns[blockedCount] = intent == Intent.RETREAT ? 0 : TRANSIENT_BLOCK_TURNS;
         blockedCount++;
     }
 
@@ -213,7 +228,7 @@ final class BlastAutoProgressGuard {
         int tail = blockedCount - index - 1;
         if (tail > 0) {
             System.arraycopy(blockedCells, index + 1, blockedCells, index, tail);
-            System.arraycopy(hazardBlocks, index + 1, hazardBlocks, index, tail);
+            System.arraycopy(blockedIntents, index + 1, blockedIntents, index, tail);
             System.arraycopy(blockTurns, index + 1, blockTurns, index, tail);
         }
         blockedCount--;
