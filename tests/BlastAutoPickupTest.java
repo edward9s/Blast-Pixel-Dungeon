@@ -30,6 +30,12 @@ public final class BlastAutoPickupTest {
     public static void main(String[] args) {
         check(true, new Dewdrop());
         check(true, new Gold());
+        if (!BlastAutoPickup.knownLoot(false, true)
+                || !BlastAutoPickup.knownLoot(true, false)
+                || BlastAutoPickup.knownLoot(false, false)) {
+            throw new AssertionError("Visible loot must be eligible even if its seen flag is stale");
+        }
+
         check(true, new EnergyCrystal());
         check(true, new DriedRose.Petal());
         check(true, new GoldenKey());
