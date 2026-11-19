@@ -278,9 +278,23 @@ public final class BlastAutoPlay {
         return currentHero == hero && manualAction;
     }
 
+    /** Keep native suspended manual travel when control returns to auto-play. */
+    private static void retainNativeManualTravel(Hero hero) {
+        if (!manualActionActive(hero) || isPaused()
+                || !(hero.lastAction instanceof HeroAction.Move)) return;
+        int destination = ((HeroAction.Move) hero.lastAction).dst;
+        if (!Dungeon.level.insideMap(destination)) {
+            throw new IllegalStateException("Suspended manual destination outside level: " + destination);
+        }
+        interruptedDestination = destination;
+        blockedTravelTurns = 0;
+        hero.lastAction = null;
+    }
+
     public static boolean finishManualAction(Hero hero) {
         if (!manualActionActive(hero) || hero.curAction != null
                 || manualConfirmationHero == hero) return false;
+        retainNativeManualTravel(hero);
         manualAction = false;
         return true;
     }
@@ -342,6 +356,7 @@ public final class BlastAutoPlay {
         // Hero.handle() alone decides when a native lastAction is superseded.
         hero.resting = false;
         if (input instanceof ManualRest) {
+            retainNativeManualTravel(hero);
             hero.curAction = null;
             manualAction = false;
             manualConfirmationHero = null;
@@ -362,6 +377,7 @@ public final class BlastAutoPlay {
     public static void beginItemAction(Hero hero) {
         if (!BlastSettings.testAutoPlay()) return;
         resetForLevel(hero);
+        retainNativeManualTravel(hero);
         progress.reset();
         manualAction = false;
         manualConfirmationHero = null;
