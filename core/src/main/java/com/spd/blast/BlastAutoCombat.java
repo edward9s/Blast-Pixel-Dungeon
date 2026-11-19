@@ -97,8 +97,7 @@ final class BlastAutoCombat {
 
         Choice missile = bestMissile(hero, target, bow, arrow);
         Choice remote = better(wand, missile);
-        boolean canMelee = hero.canAttack(target)
-                && weaponCollateralSafe(hero, target, hero.belongings.attackingWeapon(), false);
+        boolean canMelee = hero.canAttack(target) && meleeCollateralSafe(hero, target);
         float melee = canMelee ? meleeDamage(hero, target) : 0f;
         if (remote != null && preferRemote(remote.damage, melee)) {
             Action action = remote.wand != null
@@ -319,6 +318,10 @@ final class BlastAutoCombat {
                     && Dungeon.level.distance(target.pos, mob.pos) <= 6) return false;
         }
         return true;
+    }
+
+    static boolean meleeCollateralSafe(Hero hero, Mob target) {
+        return weaponCollateralSafe(hero, target, hero.belongings.attackingWeapon(), false);
     }
 
     /**
