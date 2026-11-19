@@ -59,6 +59,39 @@ STONE_TO_SCROLL = """
 """
 
 
+EXOTIC_TO_SCROLL = """
+\tpublic static class ExoticToScroll extends Recipe {
+\t\t@Override
+\t\tpublic boolean testIngredients(ArrayList<Item> ingredients) {
+\t\t\treturn ingredients.size() == 1
+\t\t\t\t\t&& ingredients.get(0) instanceof ExoticScroll
+\t\t\t\t\t&& ingredients.get(0).quantity() > 0
+\t\t\t\t\t&& ExoticScroll.exoToReg.containsKey(ingredients.get(0).getClass());
+\t\t}
+\t\t@Override
+\t\tpublic int cost(ArrayList<Item> ingredients) {
+\t\t\treturn 6;
+\t\t}
+\t\t@Override
+\t\tpublic Item brew(ArrayList<Item> ingredients) {
+\t\t\tif (!testIngredients(ingredients)) return null;
+\t\t\tExoticScroll exotic = (ExoticScroll) ingredients.get(0);
+\t\t\tScroll scroll = Reflection.newInstance(ExoticScroll.exoToReg.get(exotic.getClass()));
+\t\t\texotic.quantity(exotic.quantity() - 1);
+\t\t\tscroll.identify();
+\t\t\treturn scroll;
+\t\t}
+\t\t@Override
+\t\tpublic Item sampleOutput(ArrayList<Item> ingredients) {
+\t\t\tif (!testIngredients(ingredients)) return null;
+\t\t\tExoticScroll exotic = (ExoticScroll) ingredients.get(0);
+\t\t\treturn exotic.isKnown()
+\t\t\t\t\t? Reflection.newInstance(ExoticScroll.exoToReg.get(exotic.getClass()))
+\t\t\t\t\t: new Scroll.PlaceHolder();
+\t\t}
+\t}
+"""
+
 def replace_once(source: str, old: str, new: str, label: str) -> str:
     count = source.count(old)
     if count != 1:
@@ -77,13 +110,21 @@ def patch(scroll_path: Path, recipe_path: Path) -> None:
     if not scroll.endswith("\t}\n}\n"):
         raise SystemExit("Scroll.java: unexpected class ending")
 
-    scroll = scroll[:-2] + "\n" + STONE_TO_SCROLL + "}\n"
+    scroll = scroll[:-2] + "\n" + STONE_TO_SCROLL + EXOTIC_TO_SCROLL + "}\n"
     recipe = replace_once(
         recipe,
         "\tprivate static Recipe[] twoIngredientRecipes = new Recipe[]{\n",
         "\tprivate static Recipe[] twoIngredientRecipes = new Recipe[]{\n"
         "\t\tnew Scroll.StoneToScroll(),\n",
         "Recipe.java: two-ingredient recipe registration",
+    )
+
+    recipe = replace_once(
+        recipe,
+        "\tprivate static Recipe[] oneIngredientRecipes = new Recipe[]{\n",
+        "\tprivate static Recipe[] oneIngredientRecipes = new Recipe[]{\n"
+        "\t\tnew Scroll.ExoticToScroll(),\n",
+        "Recipe.java: one-ingredient exotic reverse recipe",
     )
 
     scroll_path.write_text(scroll, encoding="utf-8")

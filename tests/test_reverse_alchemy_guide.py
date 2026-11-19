@@ -26,6 +26,10 @@ JOURNAL = """public class WndJournal {
 }
 """
 RECIPE = """public class QuickRecipe {
+\t\t\tcase 4:
+\t\t\t\treturn result;
+\t\t\tcase 5:
+\t\t\t\treturn result;
 \t\t\tcase 8:
 \t\t\t\treturn result;
 }
@@ -65,6 +69,9 @@ class ReverseAlchemyGuideTests(unittest.TestCase):
         self.assertIn("currentPageIdx == REVERSE_STONES_IDX ? 9 : originalIndex", journal)
         self.assertIn("BlastSettings.enchantmentStoneReverseAlchemy()", journal)
         self.assertIn("case 9:", recipe)
+        self.assertIn("new Scroll.ExoticToScroll()", recipe)
+        self.assertIn("ExoticScroll.exoToReg.keySet()", recipe)
+        self.assertIn("r.sampleOutput(inputs)", recipe)
         self.assertIn("new Scroll.StoneToScroll()", recipe)
         self.assertIn("new QuickRecipe(r,", recipe)
         self.assertIn("r.testIngredients(recipeInputs)", recipe)

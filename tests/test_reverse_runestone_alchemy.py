@@ -17,6 +17,9 @@ SCROLL = """public class Scroll {
 }
 """
 RECIPE = """public abstract class Recipe {
+\tprivate static Recipe[] oneIngredientRecipes = new Recipe[]{
+\t\tnew Scroll.ScrollToStone(),
+\t};
 \tprivate static Recipe[] twoIngredientRecipes = new Recipe[]{
 \t\tnew Bomb.EnhanceBomb(),
 \t};
@@ -46,6 +49,12 @@ class ReverseRunestoneAlchemyTests(unittest.TestCase):
         self.assertIn("first.getClass() == second.getClass()", scroll)
         self.assertIn("ingredients.size() != 2", scroll)
         self.assertIn("new Scroll.StoneToScroll()", recipe)
+        self.assertIn("class ExoticToScroll extends Recipe", scroll)
+        self.assertIn("ExoticScroll.exoToReg.containsKey", scroll)
+        self.assertIn("ExoticScroll.exoToReg.get(exotic.getClass())", scroll)
+        self.assertIn("new Scroll.ExoticToScroll()", recipe)
+        self.assertIn("exotic.quantity(exotic.quantity() - 1);", scroll)
+        self.assertIn("exotic.isKnown()", scroll)
         self.assertIn("scroll.identify();", scroll)
         self.assertIn("return 6;", scroll)
         self.assertIn("stone.quantity(stone.quantity() - 1);", scroll)
