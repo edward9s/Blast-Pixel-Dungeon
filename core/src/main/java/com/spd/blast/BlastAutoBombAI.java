@@ -53,7 +53,7 @@ public final class BlastAutoBombAI {
                     || !hero.fieldOfView[mob.pos] || mob.invisible > 0
                     || hero.isCharmedBy(mob) || mob.isInvulnerable(Hero.class)
                     || !BlastAutoPlay.isAwake(mob)
-                    || BlastAutoPlay.isProtectedNpc(mob)
+                    || BlastAutoPlay.isAutoAttackExcluded(mob)
                     || !BlastAutoSacrifice.readyToSacrifice(
                             BlastAutoSacrifice.nearFlame(
                                     flames, Dungeon.level.width(), mob.pos),
@@ -64,7 +64,7 @@ public final class BlastAutoBombAI {
             if (!Dungeon.level.insideMap(center)) continue;
             boolean[] blast = remoteThrow ? bomb.blastWarningCells(center) : blastAtHero;
             if (!blastReachesTarget(blast, mob.pos)
-                    || containsProtectedMob(blast)
+                    || containsExcludedMob(blast)
                     || containsUnreadySacrificeMob(blast, flames)) continue;
 
             int distance = Dungeon.level.distance(hero.pos, mob.pos);
@@ -140,7 +140,7 @@ public final class BlastAutoBombAI {
                     || mob.invisible > 0
                     || hero.isCharmedBy(mob) || mob.isInvulnerable(Hero.class)
                     || !BlastAutoPlay.isAwake(mob)
-                    || BlastAutoPlay.isProtectedNpc(mob)) continue;
+                    || BlastAutoPlay.isAutoAttackExcluded(mob)) continue;
             if (regrowth && !regrowthReady(mob.rooted, regrowthAt(mob.pos))) continue;
 
             int center = remoteThrow
@@ -148,7 +148,7 @@ public final class BlastAutoBombAI {
             if (!Dungeon.level.insideMap(center)) continue;
             boolean[] blast = remoteThrow ? bomb.blastWarningCells(center) : blastAtHero;
             // A blocked first choice must not hide a second, safe ranged target.
-            if (!blastReachesTarget(blast, mob.pos) || containsProtectedMob(blast)) continue;
+            if (!blastReachesTarget(blast, mob.pos) || containsExcludedMob(blast)) continue;
 
             int distance = Dungeon.level.distance(hero.pos, mob.pos);
             if (chosen == null
@@ -172,7 +172,7 @@ public final class BlastAutoBombAI {
                 || target.invisible > 0 || !hero.fieldOfView[target.pos]
                 || hero.isCharmedBy(target) || !BlastAutoPlay.isAwake(target)
                 || target.isInvulnerable(Hero.class)
-                || BlastAutoPlay.isProtectedNpc(target)) return -1;
+                || BlastAutoPlay.isAutoAttackExcluded(target)) return -1;
 
         int length = Dungeon.level.length();
         if (safe.length != length || distances.length != length) {
@@ -197,7 +197,7 @@ public final class BlastAutoBombAI {
 
             boolean[] blast = bomb.blastWarningCells(cell);
             if (!blastReachesTarget(blast, target.pos)
-                    || containsProtectedMob(blast)) continue;
+                    || containsExcludedMob(blast)) continue;
             best = cell;
             shortest = steps;
         }
@@ -218,10 +218,10 @@ public final class BlastAutoBombAI {
         return false;
     }
 
-    private static boolean containsProtectedMob(boolean[] blast) {
+    private static boolean containsExcludedMob(boolean[] blast) {
         for (Mob mob : Dungeon.level.mobs) {
             if (mob.isAlive() && blast[mob.pos]
-                    && BlastAutoPlay.isProtectedNpc(mob)) return true;
+                    && BlastAutoPlay.isAutoAttackExcluded(mob)) return true;
         }
         return false;
     }
