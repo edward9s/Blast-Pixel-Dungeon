@@ -590,6 +590,21 @@ public final class BlastAutoPlay {
                         return false;
                     }
                 }
+                // With no clean adjacent tile, walk through gas to the nearest
+                // reachable clean tile. Other hazards and terrain rules stay blocked.
+                if (BlastAutoEnvironment.gasOnlyAt(hero.pos, hazards)) {
+                    boolean[] gasEscape = safeCells(hero, hazards, specialBarriers, true);
+                    PathFinder.buildDistanceMap(hero.pos, gasEscape);
+                    int exit = BlastAutoEnvironment.nearestSafeExit(
+                            hero.pos, safe, PathFinder.distance);
+                    if (exit >= 0) {
+                        int step = firstStep(exit, gasEscape, PathFinder.distance);
+                        progress.hazardousRetreat(hero.pos);
+                        progress.intent(BlastAutoProgressGuard.Intent.RETREAT);
+                        hero.curAction = new HeroAction.Move(step);
+                        return false;
+                    }
+                }
             }
         }
 
@@ -971,6 +986,11 @@ public final class BlastAutoPlay {
     }
 
     private static boolean[] safeCells(Hero hero, Blob[] hazards, boolean[] specialBarriers) {
+        return safeCells(hero, hazards, specialBarriers, false);
+    }
+
+    private static boolean[] safeCells(Hero hero, Blob[] hazards, boolean[] specialBarriers,
+                                       boolean allowGas) {
         Level level = Dungeon.level;
         boolean[] safe = Dungeon.findPassable(hero, level.passable, hero.fieldOfView, true).clone();
         boolean phaseEnabled = BlastMovement.enabled();
@@ -983,7 +1003,8 @@ public final class BlastAutoPlay {
                     && !level.pit[cell]
                     && isTrapSafe(level.traps.get(cell))
                     && !AutoPlayPlantSafety.isHarmful(level.plants.get(cell))
-                    && !BlastAutoEnvironment.hazardousAt(cell, hazards)
+                    && (!BlastAutoEnvironment.hazardousAt(cell, hazards)
+                        || (allowGas && BlastAutoEnvironment.gasOnlyAt(cell, hazards)))
                     && !specialBarriers[cell];
         }
 
@@ -996,7 +1017,8 @@ public final class BlastAutoPlay {
                     && (level.visited[cell] || level.mapped[cell] || hero.fieldOfView[cell])
                     && !level.pit[cell] && isTrapSafe(level.traps.get(cell))
                     && !AutoPlayPlantSafety.isHarmful(level.plants.get(cell))
-                    && !BlastAutoEnvironment.hazardousAt(cell, hazards)
+                    && (!BlastAutoEnvironment.hazardousAt(cell, hazards)
+                        || (allowGas && BlastAutoEnvironment.gasOnlyAt(cell, hazards)))
                     && !specialBarriers[cell]) {
                 safe[cell] = true;
             } else {
