@@ -92,7 +92,7 @@ public final class BlastAutoSacrifice {
         boolean immediateMeleeThreat = false;
         for (Mob mob : level.mobs) {
             if (!mob.isAlive() || mob.alignment != Char.Alignment.ENEMY
-                    || BlastAutoPlay.isProtectedNpc(mob)
+                    || BlastAutoPlay.isAutoAttackExcluded(mob)
                     || mob.invisible > 0 || !hero.fieldOfView[mob.pos]
                     || hero.isCharmedBy(mob) || !BlastAutoPlay.isAwake(mob)) continue;
             if (isRangedEnemy(mob.getClass())) {
@@ -307,7 +307,7 @@ public final class BlastAutoSacrifice {
 
     private static boolean eligible(Hero hero, Mob mob) {
         return mob.isAlive() && mob.alignment == Char.Alignment.ENEMY
-                && !BlastAutoPlay.isProtectedNpc(mob)
+                && !BlastAutoPlay.isAutoAttackExcluded(mob)
                 && mob.invisible <= 0 && hero.fieldOfView[mob.pos]
                 && !hero.isCharmedBy(mob) && !mob.isInvulnerable(Hero.class)
                 && BlastAutoPlay.isAwake(mob);
