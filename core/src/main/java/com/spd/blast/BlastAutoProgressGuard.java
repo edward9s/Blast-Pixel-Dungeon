@@ -9,11 +9,13 @@ final class BlastAutoProgressGuard {
     private static final int HISTORY_SIZE = 7;
     private static final int MAX_BLOCKED_CELLS = 12;
     private static final int FAILED_MOVE_LIMIT = 3;
+    private static final int TRANSIENT_BLOCK_TURNS = 12;
 
     private final int[] positions = new int[HISTORY_SIZE];
     private final Intent[] arrivals = new Intent[HISTORY_SIZE];
     private final int[] blockedCells = new int[MAX_BLOCKED_CELLS];
     private final boolean[] hazardBlocks = new boolean[MAX_BLOCKED_CELLS];
+    private final int[] blockTurns = new int[MAX_BLOCKED_CELLS];
     private int historySize;
     private int blockedCount;
     private int lastOrigin = -1;
@@ -41,6 +43,7 @@ final class BlastAutoProgressGuard {
 
     /** Compare the actual location with the previously requested movement. */
     void observe(int position) {
+        expireTransientBlocks();
         if (lastDestination < 0) return;
         if (position == lastDestination && position != lastOrigin) {
             failedCell = -1;
@@ -84,6 +87,13 @@ final class BlastAutoProgressGuard {
         lastDestination = destination;
         lastIntent = nextIntent;
         nextIntent = Intent.OTHER;
+    }
+
+    /** Age only ordinary failures; hazard exclusions last until danger clears. */
+    private void expireTransientBlocks() {
+        for (int index = blockedCount - 1; index >= 0; index--) {
+            if (!hazardBlocks[index] && --blockTurns[index] == 0) removeBlocked(index);
+        }
     }
 
     /** Do not immediately re-explore the cell from which we escaped a hazard. */
@@ -182,6 +192,7 @@ final class BlastAutoProgressGuard {
         for (int index = 0; index < blockedCount; index++) {
             if (blockedCells[index] == cell) {
                 hazardBlocks[index] |= hazard;
+                if (!hazardBlocks[index]) blockTurns[index] = TRANSIENT_BLOCK_TURNS;
                 return;
             }
         }
@@ -189,10 +200,12 @@ final class BlastAutoProgressGuard {
             // Bound retained state even on levels with many independent obstacles.
             System.arraycopy(blockedCells, 1, blockedCells, 0, MAX_BLOCKED_CELLS - 1);
             System.arraycopy(hazardBlocks, 1, hazardBlocks, 0, MAX_BLOCKED_CELLS - 1);
+            System.arraycopy(blockTurns, 1, blockTurns, 0, MAX_BLOCKED_CELLS - 1);
             blockedCount--;
         }
         blockedCells[blockedCount] = cell;
         hazardBlocks[blockedCount] = hazard;
+        blockTurns[blockedCount] = hazard ? 0 : TRANSIENT_BLOCK_TURNS;
         blockedCount++;
     }
 
@@ -201,6 +214,7 @@ final class BlastAutoProgressGuard {
         if (tail > 0) {
             System.arraycopy(blockedCells, index + 1, blockedCells, index, tail);
             System.arraycopy(hazardBlocks, index + 1, hazardBlocks, index, tail);
+            System.arraycopy(blockTurns, index + 1, blockTurns, index, tail);
         }
         blockedCount--;
     }
