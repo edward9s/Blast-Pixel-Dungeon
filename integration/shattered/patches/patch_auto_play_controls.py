@@ -34,6 +34,24 @@ def patch_cell_selector(path: Path) -> None:
         " && !com.spd.blast.BlastSettings.testAutoPlay())){",
         "directional movement"
     )
+    source = replace_once(
+        source,
+        "\t\t\tif (Dungeon.hero.handle( cell )) {\n\t\t\t\tDungeon.hero.next();\n\t\t\t}",
+        "\t\t\tif (com.spd.blast.BlastSettings.testAutoPlay()) {\n\t\t\t\tcom.spd.blast.BlastAutoPlay.requestManualCell(cell);\n\t\t\t} else if (Dungeon.hero.handle( cell )) {\n\t\t\t\tDungeon.hero.next();\n\t\t\t}",
+        "directional command ownership",
+    )
+    source = replace_once(
+        source,
+        "\t\t\tenabled = Dungeon.hero.ready = true;\n\t\t\tDungeon.observe();\n\t\t\tif (moveFromActions(leftStickAction)) {\n\t\t\t\tDungeon.hero.ready = false;\n\t\t\t}",
+        "\t\t\tif (com.spd.blast.BlastSettings.testAutoPlay()) {\n\t\t\t\tmoveFromActions(leftStickAction);\n\t\t\t} else {\n\t\t\t\tenabled = Dungeon.hero.ready = true;\n\t\t\t\tDungeon.observe();\n\t\t\t\tif (moveFromActions(leftStickAction)) {\n\t\t\t\t\tDungeon.hero.ready = false;\n\t\t\t\t}\n\t\t\t}",
+        "held stick keeps actor readiness",
+    )
+    source = replace_once(
+        source,
+        "\t\t\tenabled = Dungeon.hero.ready = true;\n\t\t\tDungeon.observe();\n\t\t\tif (moveFromActions(heldAction1, heldAction2)) {\n\t\t\t\tDungeon.hero.ready = false;\n\t\t\t}",
+        "\t\t\tif (com.spd.blast.BlastSettings.testAutoPlay()) {\n\t\t\t\tmoveFromActions(heldAction1, heldAction2);\n\t\t\t} else {\n\t\t\t\tenabled = Dungeon.hero.ready = true;\n\t\t\t\tDungeon.observe();\n\t\t\t\tif (moveFromActions(heldAction1, heldAction2)) {\n\t\t\t\t\tDungeon.hero.ready = false;\n\t\t\t\t}\n\t\t\t}",
+        "held keys keep actor readiness",
+    )
     path.write_text(source, encoding="utf-8")
 
 
