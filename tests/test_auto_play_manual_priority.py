@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 AUTO = ROOT / "core/src/main/java/com/spd/blast/BlastAutoPlay.java"
 HERO = ROOT / "integration/shattered/patches/patch_hero.py"
 SCENE = ROOT / "integration/shattered/patches/patch_game_scene.py"
+CONTROLS = ROOT / "integration/shattered/patches/patch_auto_play_controls.py"
 CHASM = ROOT / "integration/shattered/patches/patch_chasm.py"
 APPLY = ROOT / "integration/shattered/apply.sh"
 
@@ -91,6 +92,18 @@ class ManualPriorityTests(unittest.TestCase):
         self.assertIn("hero.handle(cell.destination)", execute)
         self.assertIn("new AtomicReference<>()", source)
         self.assertGreaterEqual(source.count("pendingManualInput.set(null)"), 3)
+
+    def test_directional_commands_use_actor_queue(self):
+        code = injection(CONTROLS, "directional command ownership")
+        self.assertIn("BlastAutoPlay.requestManualCell(cell)", code)
+        self.assertIn("else if (Dungeon.hero.handle( cell ))", code)
+        for label in ("held stick keeps actor readiness", "held keys keep actor readiness"):
+            code = injection(CONTROLS, label)
+            self.assertIn("if (com.spd.blast.BlastSettings.testAutoPlay())", code)
+            auto, native = code.split("} else {", 1)
+            self.assertIn("moveFromActions(", auto)
+            self.assertNotIn("Dungeon.hero.ready = true", auto)
+            self.assertIn("Dungeon.hero.ready = true", native)
 
     def test_prompt_blocks_manual_action_completion(self):
         code = injection(HERO, "Hero.getCloser chasm confirmation")

@@ -72,6 +72,26 @@ class InterruptedManualTravelTests(unittest.TestCase):
                       "/** A new run")
         self.assertNotIn("clearInterruptedTravel();", item)
 
+    def test_noncombat_interrupt_retains_manual_destination(self):
+        handoff = method("private static void retainNativeManualTravel(Hero hero) {",
+                         "public static boolean finishManualAction(Hero hero) {")
+        for expected in ("!manualActionActive(hero)", "isPaused()",
+                         "hero.lastAction instanceof HeroAction.Move",
+                         "interruptedDestination = destination",
+                         "hero.lastAction = null;"):
+            self.assertIn(expected, handoff)
+        finish = method("public static boolean finishManualAction(Hero hero) {",
+                        "/** Retain an interrupted manual action")
+        self.assertLess(finish.index("retainNativeManualTravel(hero);"),
+                        finish.index("manualAction = false;"))
+        rest = method("if (input instanceof ManualRest) {", "ManualCell cell =")
+        self.assertLess(rest.index("retainNativeManualTravel(hero);"),
+                        rest.index("manualAction = false;"))
+        item = method("public static void beginItemAction(Hero hero) {",
+                      "/** A new run")
+        self.assertLess(item.index("retainNativeManualTravel(hero);"),
+                        item.index("manualAction = false;"))
+
     def test_upstream_hero_hook_runs_after_enemy_detection(self):
         hook = HERO_PATCH.split("# Enemy discovery interrupts native manual movement.", 1)[1]
         hook = hook.split("# Use the normal action dispatch", 1)[0]
