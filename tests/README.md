@@ -257,9 +257,10 @@ java -cp "/tmp/blast-tests:$BLAST_TEST_CLASSPATH" com.spd.blast.BlastAutoRoaming
 `BlastAutoHarvestTest.java` verifies that auto-play retains a selected crop
 when movement around a wall temporarily hides it, then revalidates the crop
 after it becomes visible again. This prevents harvest-versus-roam oscillation.
-`BlastAutoRoamingTest.java` additionally checks that a roaming goal is rejected
-after repeated attempts make no progress, even if another automatic action
-temporarily interrupts movement.
+`BlastAutoRoamingTest.java` additionally checks that unrelated automatic tasks
+cannot cancel an otherwise reachable roaming goal. Failed movement is handled
+centrally by `BlastAutoProgressGuard`; a destination is replaced when it becomes
+unreachable.
 
 ```sh
 javac --release 11 -encoding UTF-8 -cp "$BLAST_TEST_CLASSPATH" \
@@ -287,13 +288,12 @@ python scripts/test_regrowth_bomb_patch.py
 ```
 
 
-\`BlastAutoProgressGuardTest.java\` checks shared auto-play progress memory:
-an unsafe doorway remains excluded from idle navigation while adjacent gas persists;
-it becomes eligible again once that danger clears. Two-cell and three-cell
-movement loops and repeated failed idle moves are suppressed, while combat
-paths and manual actions remain unrestricted. Idle tasks (pickup, interaction,
-harvest, farming, and roaming) share these exclusions, and emergency escape
-continues to use the original safe path.
+\`BlastAutoProgressGuardTest.java\` checks task-scoped navigation failures:
+all idle tasks avoid a doorway while adjacent gas persists, and may revisit it
+when danger clears. Two-cell and three-cell loops and repeated failed moves
+receive temporary exclusions only for the responsible task (pickup, interaction,
+harvest, farming, travel, or roaming); unrelated tasks retain access to the same
+cell. Combat and emergency escape continue using the original safe map.
 
 \`\`\`sh
 javac --release 11 -encoding UTF-8 -d /tmp/blast-tests \

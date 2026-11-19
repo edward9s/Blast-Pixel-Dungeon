@@ -5,33 +5,22 @@ import java.util.Arrays;
 
 /** Explore unknown boundaries first, then roam across known reachable terrain. */
 final class BlastAutoRoaming {
-    private static final int MAX_STALLED_ROAMS = 3;
     private static final int MIN_DISTANT_STEPS = 3;
 
     private int destination = -1;
     private boolean frontierDestination;
-    private boolean[] failedDestinations;
+    private boolean[] exhaustedFrontiers;
     private boolean[] solidSnapshot;
-    private int progressGoal = -1;
-    private int bestGoalDistance = Integer.MAX_VALUE;
-    private int stalledRoams;
 
     void reset() {
         clearDestination();
-        failedDestinations = null;
+        exhaustedFrontiers = null;
         solidSnapshot = null;
     }
 
     void clearDestination() {
         destination = -1;
         frontierDestination = false;
-        resetProgress();
-    }
-
-    private void resetProgress() {
-        progressGoal = -1;
-        bestGoalDistance = Integer.MAX_VALUE;
-        stalledRoams = 0;
     }
 
     int chooseDestination(int position, int width, boolean[] safe, int[] distances,
@@ -45,46 +34,34 @@ final class BlastAutoRoaming {
             throw new IllegalArgumentException("Invalid auto-roaming map");
         }
 
-        // Re-evaluate failed corners after solid obstacles change.
-        if (failedDestinations == null) {
-            failedDestinations = new boolean[length];
+        // Only a topology change reopens frontiers that failed to reveal new ground.
+        // Temporary movement failures are owned by BlastAutoProgressGuard.
+        if (exhaustedFrontiers == null) {
+            exhaustedFrontiers = new boolean[length];
             solidSnapshot = solid.clone();
         } else if (!Arrays.equals(solidSnapshot, solid)) {
-            Arrays.fill(failedDestinations, false);
+            Arrays.fill(exhaustedFrontiers, false);
             System.arraycopy(solid, 0, solidSnapshot, 0, length);
-            resetProgress();
         }
 
         if (destination == position) {
             if (frontierDestination
                     && hasUnknownNeighbor(destination, width, visited, mapped, visible)) {
-                failedDestinations[destination] = true;
+                exhaustedFrontiers[destination] = true;
             }
             clearDestination();
         }
 
-        // Detect repeated visits to the same region without getting closer.
-        // This also bounds loops caused by another automatic action interrupting roaming.
+        // Keep a reachable goal. The common navigation guard handles stalled moves.
         if (destination >= 0 && safe[destination]
-                && distances[destination] != Integer.MAX_VALUE) {
-            int remaining = distances[destination];
-            if (progressGoal != destination || remaining < bestGoalDistance) {
-                progressGoal = destination;
-                bestGoalDistance = remaining;
-                stalledRoams = 0;
-            } else if (++stalledRoams >= MAX_STALLED_ROAMS) {
-                failedDestinations[destination] = true;
-                clearDestination();
-            }
-            if (destination >= 0) return destination;
-        }
+                && distances[destination] != Integer.MAX_VALUE) return destination;
         clearDestination();
 
         int shortest = Integer.MAX_VALUE;
         int ties = 0;
         for (int cell = 0; cell < length; cell++) {
             int steps = distances[cell];
-            if (cell == position || !safe[cell] || failedDestinations[cell]
+            if (cell == position || !safe[cell] || exhaustedFrontiers[cell]
                     || steps <= 0 || steps == Integer.MAX_VALUE || steps > shortest
                     || !hasUnknownNeighbor(cell, width, visited, mapped, visible)) {
                 continue;
@@ -99,8 +76,6 @@ final class BlastAutoRoaming {
         }
         if (destination >= 0) {
             frontierDestination = true;
-            progressGoal = destination;
-            bestGoalDistance = shortest;
             return destination;
         }
 
@@ -112,7 +87,7 @@ final class BlastAutoRoaming {
         int otherCount = 0;
         for (int cell = 0; cell < length; cell++) {
             int steps = distances[cell];
-            if (cell == position || !safe[cell] || failedDestinations[cell]
+            if (cell == position || !safe[cell] || exhaustedFrontiers[cell]
                     || steps <= 1 || steps == Integer.MAX_VALUE) continue;
             if (steps >= MIN_DISTANT_STEPS) {
                 if (Random.Int(++distantCount) == 0) distant = cell;
@@ -121,10 +96,6 @@ final class BlastAutoRoaming {
             }
         }
         destination = distant >= 0 ? distant : other;
-        if (destination >= 0) {
-            progressGoal = destination;
-            bestGoalDistance = distances[destination];
-        }
         return destination;
     }
 
