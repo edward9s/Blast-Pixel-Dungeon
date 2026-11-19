@@ -30,6 +30,7 @@ class AutoCombatWeaponTests(unittest.TestCase):
     def test_auto_weapon_collateral_safety(self):
         source = SOURCE.read_text(encoding="utf-8")
         self.assertIn("weaponCollateralSafe(hero, target, hero.belongings.attackingWeapon(), false)", source)
+        self.assertIn("hero.canAttack(target) && meleeCollateralSafe(hero, target)", source)
         self.assertIn("weaponCollateralSafe(hero, target, arrow, true)", source)
         self.assertIn("weaponCollateralSafe(hero, target, weapon, true)", source)
         self.assertIn("weapon.hasEnchant(Shocking.class, hero)", source)
@@ -41,6 +42,13 @@ class AutoCombatWeaponTests(unittest.TestCase):
         self.assertIn("Dungeon.level.water[from.pos] && !from.flying ? 2 : 1", source)
         self.assertIn("BlastAutoPlay.isAutoAttackExcluded((Mob) ch)", source)
         self.assertIn("mob.fieldOfView[hero.pos] || mob.fieldOfView[target.pos]", source)
+        play = (ROOT / "core/src/main/java/com/spd/blast/BlastAutoPlay.java").read_text(encoding="utf-8")
+        sacrifice = (ROOT / "core/src/main/java/com/spd/blast/BlastAutoSacrifice.java").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("selectedCanMelee && BlastAutoCombat.meleeCollateralSafe(hero, selected)", play)
+        self.assertEqual(play.count("BlastAutoCombat.meleeCollateralSafe(hero, selected)"), 2)
+        self.assertIn("attackable != null && BlastAutoCombat.meleeCollateralSafe(hero, attackable)", sacrifice)
 
     def test_wand_safety_and_aim(self):
         source = SOURCE.read_text(encoding="utf-8")
