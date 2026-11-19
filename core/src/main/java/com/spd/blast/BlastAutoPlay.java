@@ -681,7 +681,7 @@ public final class BlastAutoPlay {
         if (hero.rooted) {
             if (selected != null) {
                 rememberCombatTarget(selected);
-                if (selectedCanMelee) {
+                if (selectedCanMelee && BlastAutoCombat.meleeCollateralSafe(hero, selected)) {
                     hero.curAction = new HeroAction.Attack(selected);
                     return false;
                 }
@@ -708,7 +708,7 @@ public final class BlastAutoPlay {
 
         if (selected != null) {
             rememberCombatTarget(selected);
-            if (selectedCanMelee) {
+            if (selectedCanMelee && BlastAutoCombat.meleeCollateralSafe(hero, selected)) {
                 hero.curAction = new HeroAction.Attack(selected);
             } else {
                 hero.curAction = new HeroAction.Move(firstStep(selectedGoal, safe, distances));
