@@ -39,6 +39,18 @@ public final class BlastAutoPickup {
         retryTurns = 0;
     }
 
+    /** Only native pickup failure starts a retry cooldown. */
+    public static void onPickupFailure(Hero hero, Item item, int cell) {
+        if (hero == currentHero && Dungeon.level == currentLevel
+                && item == attemptedItem && cell == attemptedCell) {
+            retryTurns = RETRY_TURNS;
+        }
+    }
+
+    static boolean knownLoot(boolean seen, boolean visible) {
+        return seen || visible;
+    }
+
     /** One action at a time, using the existing distance map and native pickup. */
     public static boolean chooseAction(Hero hero, boolean[] safe, int[] distances,
                                        Predicate<Item> instantPickup) {
@@ -60,16 +72,17 @@ public final class BlastAutoPickup {
         int shortest = Integer.MAX_VALUE;
         Item nearestItem = null;
         for (Heap heap : level.heaps.valueList()) {
-            if (heap.type != Heap.Type.HEAP || !heap.seen || heap.isEmpty()) continue;
+            if (heap.type != Heap.Type.HEAP || heap.isEmpty()) continue;
+
+            int cell = heap.pos;
+            if (!level.insideMap(cell)
+                    || !knownLoot(heap.seen, hero.fieldOfView[cell])
+                    || !safe[cell] || distances[cell] == Integer.MAX_VALUE) continue;
 
             // The native pickup takes the top item, not an arbitrary lower item.
             Item item = heap.peek();
             if (!isPickupType(item, instantPickup)
                     || !canCollect(hero, item, instantPickup)) continue;
-
-            int cell = heap.pos;
-            if (!level.insideMap(cell) || !safe[cell]
-                    || distances[cell] == Integer.MAX_VALUE) continue;
             if (retryTurns > 0 && item == attemptedItem && cell == attemptedCell) continue;
             if (distances[cell] < shortest) {
                 nearest = cell;
@@ -80,10 +93,9 @@ public final class BlastAutoPickup {
 
         if (nearest < 0) return false;
         if (nearest == hero.pos) {
-            // One failed pickup must not cause a rapid retry loop.
+            // Record the candidate; the native failure callback alone starts cooldown.
             attemptedItem = nearestItem;
             attemptedCell = nearest;
-            retryTurns = RETRY_TURNS;
             hero.curAction = new HeroAction.PickUp(nearest);
         } else {
             hero.curAction = new HeroAction.Move(BlastAutoPlay.firstStep(nearest, safe, distances));
