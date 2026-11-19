@@ -554,7 +554,7 @@ public final class BlastAutoPlay {
         Blob[] hazards = BlastAutoEnvironment.activeHazards(Dungeon.level);
         boolean[] specialBarriers = BlastAutoEnvironment.activeSpecialBarriers(Dungeon.level);
         boolean[] safe = safeCells(hero, hazards, specialBarriers);
-        progress.refreshHazards(Dungeon.level.width(), Dungeon.level.length(),
+        progress.refreshHazards(Dungeon.level.length(),
                 cell -> BlastAutoEnvironment.hazardousAt(cell, hazards)
                         || specialBarriers[cell]);
         // Compute reachability once, rather than doing up to nine searches per mob.

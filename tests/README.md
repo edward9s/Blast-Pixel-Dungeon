@@ -84,12 +84,23 @@ pickups remain non-stackable and are handled by `BlastAutoPickupPolicy`;
 the portable picker receives this policy as a parameter and contains no
 Blast-specific type checks. Gold, energy crystals, journal keys, and rose petals bypass backpack capacity.
 Rose petals are only selected when the hero holds a Dried Rose below level 10;
-ordinary inventory and dew restrictions remain unchanged.
+ordinary inventory and dew restrictions remain unchanged. Loot within the hero's
+current field of view is considered even if its heap's previous seen flag is stale.
+An automatic pickup retry cooldown now starts only when the native Hero pickup
+reports failure; merely scheduling a pickup does not suppress the item.
 
 ```sh
 javac --release 11 -encoding UTF-8 -cp "$BLAST_TEST_CLASSPATH" \
   -d /tmp/blast-tests tests/BlastAutoPickupTest.java
 java -cp "/tmp/blast-tests:$BLAST_TEST_CLASSPATH" com.spd.blast.BlastAutoPickupTest
+```
+
+The native failure callback is inserted by `integration/shattered/patches/patch_hero.py`.
+The source-level integration check confirms it only starts cooldown for actual
+failed native pickups:
+
+```sh
+python -m unittest discover -s tests -p test_auto_pickup_native_failure.py
 ```
 
 
@@ -293,8 +304,9 @@ python scripts/test_regrowth_bomb_patch.py
 
 
 \`BlastAutoProgressGuardTest.java\` checks task-scoped navigation failures:
-all idle tasks avoid a doorway while adjacent gas persists, and may revisit it
-when danger clears. Two-cell and three-cell loops and repeated failed moves
+all idle tasks avoid an actively hazardous doorway, but it is released once
+the doorway itself is safe, even if adjacent gas remains. Two-cell and three-cell
+loops and repeated failed moves
 receive temporary exclusions only for the responsible task (pickup, interaction,
 harvest, farming, travel, or roaming); unrelated tasks retain access to the same
 cell. Combat and emergency escape continue using the original safe map.

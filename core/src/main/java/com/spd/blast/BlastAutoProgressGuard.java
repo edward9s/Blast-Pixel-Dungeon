@@ -109,29 +109,18 @@ final class BlastAutoProgressGuard {
         block(cell, Intent.RETREAT);
     }
 
-    /** Release hazard exclusions only after the local danger has disappeared. */
-    void refreshHazards(int width, int length, IntPredicate dangerous) {
-        if (width <= 0 || length <= 0 || length % width != 0 || dangerous == null) {
+    /** Release a retreat exclusion when its cell is safe again. */
+    void refreshHazards(int length, IntPredicate dangerous) {
+        if (length <= 0 || dangerous == null) {
             throw new IllegalArgumentException("Invalid hazard navigation grid");
         }
         for (int index = blockedCount - 1; index >= 0; index--) {
             if (blockedIntents[index] != Intent.RETREAT) continue;
             int cell = blockedCells[index];
-            int x = cell % width;
-            int y = cell / width;
-            boolean danger = false;
-            for (int dy = -1; dy <= 1 && !danger; dy++) {
-                int yy = y + dy;
-                if (yy < 0 || yy >= length / width) continue;
-                for (int dx = -1; dx <= 1; dx++) {
-                    int xx = x + dx;
-                    if (xx >= 0 && xx < width && dangerous.test(yy * width + xx)) {
-                        danger = true;
-                        break;
-                    }
-                }
+            if (cell >= length) {
+                throw new IllegalStateException("Hazard exclusion outside current level");
             }
-            if (!danger) removeBlocked(index);
+            if (!dangerous.test(cell)) removeBlocked(index);
         }
     }
 
