@@ -24,6 +24,8 @@ public final class BlastAutoProgressGuardTest {
         check(false, idle[24], "gas doorway excluded from idle goals");
         check(true, safe[24], "combat path remains intact");
         guard.refreshHazards(7, 49, cell -> cell == 25);
+        for (int i = 0; i < 12; i++) guard.observe(23);
+        check(false, guard.idleSafe(safe, 23)[24], "active hazard survives ordinary cooldown");
         check(false, guard.idleSafe(safe, 23)[24], "adjacent gas keeps doorway blocked");
         guard.refreshHazards(7, 49, cell -> false);
         check(true, guard.idleSafe(safe, 23)[24], "cleared gas permits revisiting door");
@@ -34,6 +36,9 @@ public final class BlastAutoProgressGuardTest {
         move(cycle, 23, 24, BlastAutoProgressGuard.Intent.ROAM);
         move(cycle, 24, 23, BlastAutoProgressGuard.Intent.RETREAT);
         check(false, cycle.idleSafe(safe, 23)[24], "cross-task two-cell oscillation excluded");
+        for (int i = 0; i < 12; i++) cycle.observe(23);
+        check(true, cycle.idleSafe(safe, 23)[24],
+                "cycle exclusion expires so reachable loot can be reconsidered");
 
         BlastAutoProgressGuard triple = new BlastAutoProgressGuard();
         for (int i = 0; i < 2; i++) {
@@ -65,6 +70,9 @@ public final class BlastAutoProgressGuardTest {
             failure.observe(23);
         }
         check(false, failure.idleSafe(safe, 23)[24], "three blocked move attempts excluded");
+        for (int i = 0; i < 12; i++) failure.observe(23);
+        check(true, failure.idleSafe(safe, 23)[24],
+                "failed movement does not permanently blacklist an idle route");
 
         BlastAutoProgressGuard interruptedFailure = new BlastAutoProgressGuard();
         for (int i = 0; i < 2; i++) {
