@@ -108,6 +108,21 @@ def patch(journal_path: Path, recipe_path: Path, document_page_path: Path) -> No
         "reverse runestone quick recipes",
     )
 
+    recipe = replace_once(
+        recipe,
+        "\t\t\t\treturn result;\n\t\t\tcase 5:\n",
+        "\t\t\t\tresult.add(null);\n"
+        "\t\t\t\tr = new Scroll.ExoticToScroll();\n"
+        "\t\t\t\tfor (Class<? extends ExoticScroll> cls : ExoticScroll.exoToReg.keySet()) {\n"
+        "\t\t\t\t\tExoticScroll exotic = Reflection.newInstance(cls);\n"
+        "\t\t\t\t\tArrayList<Item> inputs = new ArrayList<>(Arrays.asList(exotic));\n"
+        "\t\t\t\t\tresult.add(new QuickRecipe(r, inputs, r.sampleOutput(inputs)));\n"
+        "\t\t\t\t}\n"
+        "\t\t\t\treturn result;\n"
+        "\t\t\tcase 5:\n",
+        "exotic scroll reverse quick recipes",
+    )
+
     document_page = replace_once(
         document_page,
         "\t\t\tWndJournal.AlchemyTab.currentPageIdx = document().pageIdx(page());",
