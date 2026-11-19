@@ -725,21 +725,20 @@ public final class BlastAutoPlay {
             return false;
         }
 
-        // Suppress failed idle approaches without constraining combat or emergency escape.
-        boolean[] idleSafe = progress.idleSafe(safe, hero.pos);
-        int[] idleDistances = distances;
-        if (idleSafe != safe) {
-            PathFinder.buildDistanceMap(hero.pos, idleSafe);
-            idleDistances = PathFinder.distance.clone();
-        }
+        // Each idle task sees only its own failed steps; hazardous retreats affect all.
+        boolean[] idleSafe = progress.safeFor(safe, hero.pos,
+                BlastAutoProgressGuard.Intent.TRAVEL);
+        int[] idleDistances = navigationDistances(hero.pos, safe, distances, idleSafe);
 
         // Resume interrupted player travel after tactical combat and before idle tasks.
         if (resumeInterruptedTravel(hero, idleSafe, idleDistances)) {
-            progress.intent(BlastAutoProgressGuard.Intent.ROAM);
+            progress.intent(BlastAutoProgressGuard.Intent.TRAVEL);
             return false;
         }
 
         // Collect reachable floor loot after visible enemies have been handled.
+        idleSafe = progress.safeFor(safe, hero.pos, BlastAutoProgressGuard.Intent.PICKUP);
+        idleDistances = navigationDistances(hero.pos, safe, distances, idleSafe);
         if (BlastAutoPickup.chooseAction(hero, idleSafe, idleDistances,
                 BlastAutoPickupPolicy::isInstantPickup)) {
             progress.intent(BlastAutoProgressGuard.Intent.PICKUP);
@@ -747,6 +746,8 @@ public final class BlastAutoPlay {
         }
 
         // Use native actions to open visible containers and keyed doors.
+        idleSafe = progress.safeFor(safe, hero.pos, BlastAutoProgressGuard.Intent.INTERACT);
+        idleDistances = navigationDistances(hero.pos, safe, distances, idleSafe);
         if (BlastAutoInteract.chooseAction(hero, idleSafe, idleDistances)) {
             progress.intent(BlastAutoProgressGuard.Intent.INTERACT);
             return false;
@@ -769,12 +770,16 @@ public final class BlastAutoPlay {
         }
 
         // Harvesting belongs to ordinary auto-play even when auto-farming is disabled.
+        idleSafe = progress.safeFor(safe, hero.pos, BlastAutoProgressGuard.Intent.HARVEST);
+        idleDistances = navigationDistances(hero.pos, safe, distances, idleSafe);
         if (harvest(hero, idleSafe, idleDistances)) {
             progress.intent(BlastAutoProgressGuard.Intent.HARVEST);
             return false;
         }
 
         // Only planting new grass depends on the separate farming setting.
+        idleSafe = progress.safeFor(safe, hero.pos, BlastAutoProgressGuard.Intent.FARM);
+        idleDistances = navigationDistances(hero.pos, safe, distances, idleSafe);
         BlastAutoFarming.Action farmingAction =
                 BlastAutoFarming.chooseAction(hero, idleSafe, idleDistances);
         if (farmingAction != BlastAutoFarming.Action.NONE) {
@@ -786,6 +791,8 @@ public final class BlastAutoPlay {
             return farmingAction == BlastAutoFarming.Action.BOMB;
         }
 
+        idleSafe = progress.safeFor(safe, hero.pos, BlastAutoProgressGuard.Intent.ROAM);
+        idleDistances = navigationDistances(hero.pos, safe, distances, idleSafe);
         int step = roamStep(hero, idleSafe, idleDistances);
         if (step >= 0) {
             progress.intent(BlastAutoProgressGuard.Intent.ROAM);
@@ -1017,6 +1024,14 @@ public final class BlastAutoPlay {
             }
         }
         return goal;
+    }
+
+    /** Recompute reachability only for tasks with an active step exclusion. */
+    private static int[] navigationDistances(int origin, boolean[] safe, int[] distances,
+                                             boolean[] taskSafe) {
+        if (taskSafe == safe) return distances;
+        PathFinder.buildDistanceMap(origin, taskSafe);
+        return PathFinder.distance.clone();
     }
 
     /** Follow the existing distance map backwards instead of running another search. */
