@@ -39,12 +39,14 @@ public final class BlastAutoProgressGuardTest {
         check(false, open(hazard, safe, roam, 24), "roaming avoids a hazardous doorway");
         check(false, open(hazard, safe, pickup, 24), "pickup avoids the same doorway");
         check(true, safe[24], "tactical safe map remains unchanged");
-        hazard.refreshHazards(7, 49, cell -> cell == 25);
+        hazard.refreshHazards(49, cell -> cell == 24);
         for (int i = 0; i < 12; i++) hazard.observe(23);
         check(false, open(hazard, safe, pickup, 24), "active hazard does not expire");
-        hazard.refreshHazards(7, 49, cell -> false);
-        check(true, open(hazard, safe, roam, 24), "cleared hazard releases roaming");
-        check(true, open(hazard, safe, pickup, 24), "cleared hazard releases pickup");
+        hazard.refreshHazards(49, cell -> cell == 25);
+        check(true, open(hazard, safe, roam, 24),
+                "gas next to a now-safe tile cannot keep it blocked");
+        check(true, open(hazard, safe, pickup, 24),
+                "loot on a clear tile is accessible despite nearby gas");
 
         BlastAutoProgressGuard cycle = new BlastAutoProgressGuard();
         move(cycle, 23, 24, roam);
@@ -91,7 +93,7 @@ public final class BlastAutoProgressGuardTest {
 
         // A temporary pickup exclusion and a hazardous exclusion can coexist on one cell.
         pickupFailure.hazardousRetreat(24);
-        pickupFailure.refreshHazards(7, 49, cell -> false);
+        pickupFailure.refreshHazards(49, cell -> false);
         check(false, open(pickupFailure, safe, pickup, 24), "clearing hazard keeps pickup cooldown");
         check(true, open(pickupFailure, safe, roam, 24), "clearing hazard restores other tasks");
 
