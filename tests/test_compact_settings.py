@@ -59,9 +59,10 @@ class CompactSettingsTests(unittest.TestCase):
         settings = SETTINGS.read_text(encoding="utf-8")
 
         self.assertIn("MIN_SPAWN_MULTIPLIER = 1", settings)
-        self.assertIn("MAX_SPAWN_MULTIPLIER = 10", settings)
+        self.assertIn("MAX_SPAWN_MULTIPLIER = 100", settings)
         self.assertIn("RADIUS_BOOST_VALUES = {0, 1, 2, 3, 5, 10, 20, 40, 70, 100}", tab)
-        self.assertIn('new OptionSlider("","1x","10x",', tab)
+        self.assertIn("SPAWN_MULTIPLIER_VALUES = {1, 2, 3, 4, 5, 10, 20, 40, 70, 100}", tab)
+        self.assertIn('new OptionSlider("", "1x", "100x", 0, SPAWN_MULTIPLIER_VALUES.length - 1)', tab)
         self.assertIn('new OptionSlider("", "0", "100", 0, RADIUS_BOOST_VALUES.length - 1)', tab)
 
         for name in ("spawn", "radius"):
@@ -71,7 +72,7 @@ class CompactSettingsTests(unittest.TestCase):
         self.assertIn("spawnSlider.setRect(0, spawnTop, width, SLIDER_HEIGHT)", tab)
         self.assertIn("radiusSlider.setRect(0, controlsTop, width, SLIDER_HEIGHT)", tab)
 
-        self.assertIn("BlastSettings.setSpawnMultiplier(getSelectedValue())", tab)
+        self.assertIn("BlastSettings.setSpawnMultiplier(SPAWN_MULTIPLIER_VALUES[getSelectedValue()])", tab)
         self.assertIn("BlastRadius.setStacks(hero, RADIUS_BOOST_VALUES[getSelectedValue()])", tab)
         self.assertIn('spawnValue.text(multiplier + "x")', tab)
         self.assertIn('radiusValue.text("+" + count)', tab)
@@ -86,7 +87,7 @@ class CompactSettingsTests(unittest.TestCase):
         apply_script = APPLY_SCRIPT.read_text(encoding="utf-8")
         self.assertIn('patch_option_slider.py" "$root/ui/OptionSlider.java"', apply_script)
         self.assertEqual(tab.count("protected void onDragPreview(int value)"), 2)
-        self.assertIn('spawnValue.text(value + "x")', tab)
+        self.assertIn('spawnValue.text(SPAWN_MULTIPLIER_VALUES[value] + "x")', tab)
         self.assertIn('radiusValue.text("+" + RADIUS_BOOST_VALUES[value])', tab)
 
         # Small upstream-style fixture exercises every fail-fast patch anchor.
@@ -117,6 +118,14 @@ class CompactSettingsTests(unittest.TestCase):
         self.assertIn("previewVal = selectedVal;", patched)
         self.assertIn("onDragPreview(value);", patched)
         self.assertNotIn("onChange();\n\t\t\t\t\tpreviewDragValue();", patched)
+
+    def test_spawn_slider_keeps_saved_non_step_values_until_changed(self):
+        tab = TAB.read_text(encoding="utf-8")
+        self.assertIn("spawnSlider.setSelectedValue(spawnMultiplierIndex(multiplier))", tab)
+        self.assertIn("spawnSlider.setSelectedValue(spawnMultiplierIndex(BlastSettings.spawnMultiplier()))", tab)
+        self.assertIn("Math.abs(SPAWN_MULTIPLIER_VALUES[i] - current)", tab)
+        self.assertEqual(tab.count("BlastSettings.setSpawnMultiplier("), 1)
+        self.assertIn('spawnValue.text(multiplier + "x")', tab)
 
     def test_explosion_boost_has_ten_non_linear_steps(self):
         tab = TAB.read_text(encoding="utf-8")

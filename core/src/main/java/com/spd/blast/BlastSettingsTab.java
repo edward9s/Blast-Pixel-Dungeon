@@ -18,6 +18,7 @@ public final class BlastSettingsTab extends Component {
     private static final int SLIDER_HEIGHT = 21;
     private static final int BUTTON_HEIGHT = 16;
     private static final int VALUE_WIDTH = 24;
+    private static final int[] SPAWN_MULTIPLIER_VALUES = {1, 2, 3, 4, 5, 10, 20, 40, 70, 100};
     private static final int[] RADIUS_BOOST_VALUES = {0, 1, 2, 3, 5, 10, 20, 40, 70, 100};
 
     private RenderedTextBlock title;
@@ -64,22 +65,20 @@ public final class BlastSettingsTab extends Component {
         spawnValue = PixelScene.renderTextBlock(multiplierText(), 7);
         add(spawnValue);
 
-        spawnSlider = new OptionSlider("","1x","10x",
-                BlastSettings.MIN_SPAWN_MULTIPLIER,
-                BlastSettings.MAX_SPAWN_MULTIPLIER) {
+        spawnSlider = new OptionSlider("", "1x", "100x", 0, SPAWN_MULTIPLIER_VALUES.length - 1) {
             @Override
             protected void onChange() {
-                BlastSettings.setSpawnMultiplier(getSelectedValue());
+                BlastSettings.setSpawnMultiplier(SPAWN_MULTIPLIER_VALUES[getSelectedValue()]);
                 refreshSpawn();
             }
 
             @Override
             protected void onDragPreview(int value) {
-                spawnValue.text(value + "x");
+                spawnValue.text(SPAWN_MULTIPLIER_VALUES[value] + "x");
                 layoutSettingValue(spawnLabel, spawnValue);
             }
         };
-        spawnSlider.setSelectedValue(BlastSettings.spawnMultiplier());
+        spawnSlider.setSelectedValue(spawnMultiplierIndex(BlastSettings.spawnMultiplier()));
         add(spawnSlider);
 
         refreshSpawn();
@@ -256,8 +255,20 @@ public final class BlastSettingsTab extends Component {
     private void refreshSpawn() {
         int multiplier = BlastSettings.spawnMultiplier();
         spawnValue.text(multiplier + "x");
-        spawnSlider.setSelectedValue(multiplier);
+        spawnSlider.setSelectedValue(spawnMultiplierIndex(multiplier));
         layoutSettingValue(spawnLabel, spawnValue);
+    }
+
+    private static int spawnMultiplierIndex(int current) {
+        int closest = 0;
+        for (int i = 1; i < SPAWN_MULTIPLIER_VALUES.length; i++) {
+            if (Math.abs(SPAWN_MULTIPLIER_VALUES[i] - current)
+                    < Math.abs(SPAWN_MULTIPLIER_VALUES[closest] - current)) {
+                closest = i;
+            }
+        }
+        // Opening settings does not rewrite a saved multiplier between slider steps.
+        return closest;
     }
 
     private void refreshRadius() {

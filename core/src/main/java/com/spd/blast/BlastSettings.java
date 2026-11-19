@@ -14,7 +14,7 @@ public final class BlastSettings {
     public static final boolean ENABLE_BOMB_FUSE_EXTINGUISHING = false;
 
     public static final int MIN_SPAWN_MULTIPLIER = 1;
-    public static final int MAX_SPAWN_MULTIPLIER = 10;
+    public static final int MAX_SPAWN_MULTIPLIER = 100;
     public static final int DEFAULT_SPAWN_MULTIPLIER = 1;
 
     private static final String SPAWN_MULTIPLIER = "blast_spawn_multiplier";
@@ -124,7 +124,7 @@ public final class BlastSettings {
 
     private static void validateMultiplier(int value) {
         if (value < MIN_SPAWN_MULTIPLIER || value > MAX_SPAWN_MULTIPLIER) {
-            throw new IllegalArgumentException("Blast spawn multiplier must be 1..10: " + value);
+            throw new IllegalArgumentException("Blast spawn multiplier must be 1..100: " + value);
         }
     }
 }
