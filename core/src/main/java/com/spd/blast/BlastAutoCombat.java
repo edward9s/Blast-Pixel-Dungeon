@@ -126,7 +126,7 @@ final class BlastAutoCombat {
         for (Mob mob : Dungeon.level.mobs) {
             if (!mob.isAlive() || mob.alignment != Char.Alignment.ENEMY
                     || mob.invisible > 0 || !hero.fieldOfView[mob.pos]
-                    || !BlastAutoPlay.isAwake(mob) || BlastAutoPlay.isProtectedNpc(mob)
+                    || !BlastAutoPlay.isAwake(mob) || BlastAutoPlay.isAutoAttackExcluded(mob)
                     || BlastAutoPlay.ignored(mob)
                     || hero.isCharmedBy(mob) || mob.isInvulnerable(Hero.class)) continue;
             targets.add(mob);
@@ -260,7 +260,7 @@ final class BlastAutoCombat {
             int cell = beam.path.get(i);
             if (cell == target.pos) hits = true;
             Char ch = Actor.findChar(cell);
-            if (ch instanceof Mob && BlastAutoPlay.isProtectedNpc((Mob) ch)) return false;
+            if (ch instanceof Mob && BlastAutoPlay.isAutoAttackExcluded((Mob) ch)) return false;
             if (ch != null && ch.alignment == Char.Alignment.ALLY) return false;
         }
         return hits;
@@ -282,7 +282,7 @@ final class BlastAutoCombat {
                 int distance = Dungeon.level.distance(source.pos, ch.pos);
                 if (ch == hero && distance > 1) continue;
                 if (distance > radius) continue;
-                if (ch == hero || (ch instanceof Mob && BlastAutoPlay.isProtectedNpc((Mob) ch))) {
+                if (ch == hero || (ch instanceof Mob && BlastAutoPlay.isAutoAttackExcluded((Mob) ch))) {
                     return 0f;
                 }
                 affected.add(ch);
@@ -307,9 +307,9 @@ final class BlastAutoCombat {
                 || target.buff(Corrosion.class) != null
                 || Blob.volumeAt(target.pos, CorrosiveGas.class) > 0) return false;
         if (Blob.volumeAt(hero.pos, CorrosiveGas.class) > 0) return false;
-        // Gas spreads after the cast. Leave a wider buffer around quest NPCs.
+        // Gas spreads after the cast. Protect excluded targets with a wider buffer.
         for (Mob mob : Dungeon.level.mobs) {
-            if (mob.isAlive() && BlastAutoPlay.isProtectedNpc(mob)
+            if (mob.isAlive() && BlastAutoPlay.isAutoAttackExcluded(mob)
                     && Dungeon.level.distance(target.pos, mob.pos) <= 6) return false;
         }
         return true;
