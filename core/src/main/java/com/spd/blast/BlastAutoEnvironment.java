@@ -67,6 +67,44 @@ public final class BlastAutoEnvironment {
         return false;
     }
 
+    /**
+     * Emergency escape may cross gas, but never another hazard on the same tile.
+     * This keeps gas escape from cutting through flames, electricity or webs.
+     */
+    static boolean gasOnlyAt(int cell, Blob[] hazards) {
+        boolean gas = false;
+        for (Blob blob : hazards) {
+            if (blob == null) break;
+            if (blob.cur[cell] <= 0) continue;
+            if (blob instanceof ToxicGas || blob instanceof CorrosiveGas
+                    || blob instanceof ParalyticGas || blob instanceof StenchGas
+                    || blob instanceof ConfusionGas || blob instanceof SmokeScreen) {
+                gas = true;
+            } else {
+                return false;
+            }
+        }
+        return gas;
+    }
+
+    /** Find the nearest clean tile reachable by an emergency gas-escape route. */
+    static int nearestSafeExit(int origin, boolean[] safe, int[] escapeDistances) {
+        if (safe == null || escapeDistances == null || safe.length != escapeDistances.length
+                || origin < 0 || origin >= safe.length) {
+            throw new IllegalArgumentException("Invalid gas escape navigation map");
+        }
+        int goal = -1;
+        int shortest = Integer.MAX_VALUE;
+        for (int cell = 0; cell < safe.length; cell++) {
+            int distance = escapeDistances[cell];
+            if (cell != origin && safe[cell] && distance > 0 && distance < shortest) {
+                shortest = distance;
+                goal = cell;
+            }
+        }
+        return goal;
+    }
+
     /** Mark active special-room barriers once before auto-play pathfinding. */
     static boolean[] activeSpecialBarriers(Level level) {
         boolean[] dangerous = new boolean[level.length()];
