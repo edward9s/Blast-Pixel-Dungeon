@@ -381,7 +381,7 @@ public final class BlastSettingsTab extends Component {
 
         if (transferLine != null) {
             transferLine.size(width, 1);
-            transferLine.y = bottom + GAP;
+            transferLine.y = bottom + 5 * GAP;
             float buttonWidth = (width - GAP) / 2f;
             exportSave.setRect(0, transferLine.y + 1 + GAP, buttonWidth, BUTTON_HEIGHT);
             importSave.setRect(exportSave.right() + GAP, exportSave.top(),
