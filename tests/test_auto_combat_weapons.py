@@ -40,7 +40,7 @@ class AutoCombatWeaponTests(unittest.TestCase):
                       "corrosionSafe(hero, target)",
                       "Math.min(beam.dist, 6 + 2 * wand.buffedLvl())",
                       "Blob.volumeAt(target.pos, CorrosiveGas.class)",
-                      "BlastAutoPlay.isProtectedNpc"):
+                      "BlastAutoPlay.isAutoAttackExcluded"):
             self.assertIn(check, source)
         self.assertNotIn("wand instanceof WandOfFireblast", source)
         patch = PATCH.read_text(encoding="utf-8")
