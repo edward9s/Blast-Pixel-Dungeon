@@ -187,14 +187,6 @@ public final class BlastSettingsTab extends Component {
         enchantmentReverseAlchemy.checked(BlastSettings.enchantmentStoneReverseAlchemy());
         add(enchantmentReverseAlchemy);
 
-        testOptions = new CheckBox[]{
-                testInfiniteBomb, indestructible, freeMovement, remoteThrow,
-                demolition, autoPlay, autoFarming, enchantmentReverseAlchemy
-        };
-        for (CheckBox option : testOptions) {
-            option.multiline = true;
-        }
-
         weakMobDrops = new CheckBox(BlastMessages.get("settings.weak_mob_drops")) {
             @Override
             protected void onClick() {
@@ -203,7 +195,6 @@ public final class BlastSettingsTab extends Component {
             }
         };
         weakMobDrops.checked(BlastSettings.weakMobDrops());
-        weakMobDrops.multiline = true;
         add(weakMobDrops);
 
         weakMobExpEffects = new CheckBox(BlastMessages.get("settings.weak_mob_exp_effects")) {
@@ -214,8 +205,16 @@ public final class BlastSettingsTab extends Component {
             }
         };
         weakMobExpEffects.checked(BlastSettings.weakMobExpEffects());
-        weakMobExpEffects.multiline = true;
         add(weakMobExpEffects);
+
+        testOptions = new CheckBox[]{
+                testInfiniteBomb, indestructible, freeMovement, remoteThrow,
+                demolition, autoPlay, autoFarming, enchantmentReverseAlchemy,
+                weakMobDrops, weakMobExpEffects
+        };
+        for (CheckBox option : testOptions) {
+            option.multiline = true;
+        }
 
         radiusLabel = PixelScene.renderTextBlock(BlastMessages.get("settings.radius"), 7);
         add(radiusLabel);
@@ -356,17 +355,7 @@ public final class BlastSettingsTab extends Component {
                 }
                 bottom = top + rowHeight;
             }
-
         }
-
-        float rewardsTop = bottom + GAP;
-        weakMobDrops.setRect(0, rewardsTop, columnWidth, BUTTON_HEIGHT);
-        weakMobExpEffects.setRect(columnWidth + GAP, rewardsTop, columnWidth, BUTTON_HEIGHT);
-        float rewardsHeight = Math.max(BUTTON_HEIGHT,
-                Math.max(weakMobDrops.reqHeight(), weakMobExpEffects.reqHeight()));
-        weakMobDrops.setRect(0, rewardsTop, columnWidth, rewardsHeight);
-        weakMobExpEffects.setRect(columnWidth + GAP, rewardsTop, columnWidth, rewardsHeight);
-        bottom = rewardsTop + rewardsHeight;
 
         if (radiusLabel.visible) {
             float radiusTop = bottom + GAP;
