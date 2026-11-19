@@ -2,6 +2,7 @@ package com.spd.blast;
 
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Rat;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.DemonSpawner;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Thief;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Bandit;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Warlock;
@@ -82,18 +83,20 @@ public final class BlastAutoCombatTest {
         check(false, BlastAutoPlay.avoidEvasiveNeutral(Char.Alignment.NEUTRAL, false),
                 "ordinary neutral behavior is unchanged");
 
-        check(true, BlastAutoPlay.isProtectedNpc(new Shopkeeper()),
+        check(true, BlastAutoPlay.isAutoAttackExcluded(new Shopkeeper()),
                 "shopkeeper must not be auto-attacked");
-        check(true, BlastAutoPlay.isProtectedNpc(new Ghost()),
+        check(true, BlastAutoPlay.isAutoAttackExcluded(new Ghost()),
                 "ghost quest giver must not be auto-attacked");
-        check(true, BlastAutoPlay.isProtectedNpc(new Wandmaker()),
+        check(true, BlastAutoPlay.isAutoAttackExcluded(new Wandmaker()),
                 "wandmaker must not be auto-attacked");
-        check(true, BlastAutoPlay.isProtectedNpc(new Blacksmith()),
+        check(true, BlastAutoPlay.isAutoAttackExcluded(new Blacksmith()),
                 "blacksmith must not be auto-attacked");
-        check(true, BlastAutoPlay.isProtectedNpc(new Imp()),
+        check(true, BlastAutoPlay.isAutoAttackExcluded(new Imp()),
                 "imp must not be auto-attacked");
-        check(false, BlastAutoPlay.isProtectedNpc(new Rat()),
+        check(false, BlastAutoPlay.isAutoAttackExcluded(new Rat()),
                 "ordinary enemies remain eligible");
+        check(true, BlastAutoPlay.isAutoAttackExcluded(new DemonSpawner()),
+                "demon spawners must not be auto-attacked");
 
         System.out.println("BlastAutoCombatTest passed");
     }

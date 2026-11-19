@@ -27,6 +27,9 @@ import com.shatteredpixel.shatteredpixeldungeon.items.KindOfWeapon;
 import com.shatteredpixel.shatteredpixeldungeon.items.rings.RingOfAccuracy;
 import com.shatteredpixel.shatteredpixeldungeon.items.rings.RingOfForce;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.Weapon;
+import com.shatteredpixel.shatteredpixeldungeon.items.weapon.enchantments.Eldritch;
+import com.shatteredpixel.shatteredpixeldungeon.items.weapon.enchantments.Shocking;
+import com.shatteredpixel.shatteredpixeldungeon.items.weapon.enchantments.Unstable;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.SpiritBow;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.MagesStaff;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.missiles.MissileWeapon;
@@ -94,7 +97,7 @@ final class BlastAutoCombat {
 
         Choice missile = bestMissile(hero, target, bow, arrow);
         Choice remote = better(wand, missile);
-        boolean canMelee = hero.canAttack(target);
+        boolean canMelee = hero.canAttack(target) && meleeCollateralSafe(hero, target);
         float melee = canMelee ? meleeDamage(hero, target) : 0f;
         if (remote != null && preferRemote(remote.damage, melee)) {
             Action action = remote.wand != null
@@ -126,7 +129,7 @@ final class BlastAutoCombat {
         for (Mob mob : Dungeon.level.mobs) {
             if (!mob.isAlive() || mob.alignment != Char.Alignment.ENEMY
                     || mob.invisible > 0 || !hero.fieldOfView[mob.pos]
-                    || !BlastAutoPlay.isAwake(mob) || BlastAutoPlay.isProtectedNpc(mob)
+                    || !BlastAutoPlay.isAwake(mob) || BlastAutoPlay.isAutoAttackExcluded(mob)
                     || BlastAutoPlay.ignored(mob)
                     || hero.isCharmedBy(mob) || mob.isInvulnerable(Hero.class)) continue;
             targets.add(mob);
@@ -164,7 +167,8 @@ final class BlastAutoCombat {
         if (hero.belongings.lostInventory() || hero.pos == target.pos) return null;
         Choice best = null;
         if (arrow != null) {
-            float damage = physicalDamage(hero, target, arrow, bow);
+            float damage = weaponCollateralSafe(hero, target, arrow, true)
+                    ? physicalDamage(hero, target, arrow, bow) : 0f;
             if (damage > 0f) {
                 int aim = QuickSlotButton.autoAim(target, arrow);
                 if (aim >= 0) best = new Choice(arrow, null, aim, damage);
@@ -174,7 +178,8 @@ final class BlastAutoCombat {
             if (!(item instanceof MissileWeapon) || !hero.belongings.backpack.contains(item)
                     || item.quantity() <= 0) continue;
             MissileWeapon weapon = (MissileWeapon) item;
-            float damage = physicalDamage(hero, target, weapon, weapon);
+            float damage = weaponCollateralSafe(hero, target, weapon, true)
+                    ? physicalDamage(hero, target, weapon, weapon) : 0f;
             if (damage > 0f && (best == null || damage > best.damage)) {
                 int aim = QuickSlotButton.autoAim(target, weapon);
                 if (aim >= 0) best = new Choice(weapon, null, aim, damage);
@@ -260,7 +265,7 @@ final class BlastAutoCombat {
             int cell = beam.path.get(i);
             if (cell == target.pos) hits = true;
             Char ch = Actor.findChar(cell);
-            if (ch instanceof Mob && BlastAutoPlay.isProtectedNpc((Mob) ch)) return false;
+            if (ch instanceof Mob && BlastAutoPlay.isAutoAttackExcluded((Mob) ch)) return false;
             if (ch != null && ch.alignment == Char.Alignment.ALLY) return false;
         }
         return hits;
@@ -282,7 +287,7 @@ final class BlastAutoCombat {
                 int distance = Dungeon.level.distance(source.pos, ch.pos);
                 if (ch == hero && distance > 1) continue;
                 if (distance > radius) continue;
-                if (ch == hero || (ch instanceof Mob && BlastAutoPlay.isProtectedNpc((Mob) ch))) {
+                if (ch == hero || (ch instanceof Mob && BlastAutoPlay.isAutoAttackExcluded((Mob) ch))) {
                     return 0f;
                 }
                 affected.add(ch);
@@ -307,10 +312,73 @@ final class BlastAutoCombat {
                 || target.buff(Corrosion.class) != null
                 || Blob.volumeAt(target.pos, CorrosiveGas.class) > 0) return false;
         if (Blob.volumeAt(hero.pos, CorrosiveGas.class) > 0) return false;
-        // Gas spreads after the cast. Leave a wider buffer around quest NPCs.
+        // Gas spreads after the cast. Protect excluded targets with a wider buffer.
         for (Mob mob : Dungeon.level.mobs) {
-            if (mob.isAlive() && BlastAutoPlay.isProtectedNpc(mob)
+            if (mob.isAlive() && BlastAutoPlay.isAutoAttackExcluded(mob)
                     && Dungeon.level.distance(target.pos, mob.pos) <= 6) return false;
+        }
+        return true;
+    }
+
+    static boolean meleeCollateralSafe(Hero hero, Mob target) {
+        return weaponCollateralSafe(hero, target, hero.belongings.attackingWeapon(), false);
+    }
+
+    /**
+     * Predict the secondary effects of weapon enchantments before an automatic
+     * hit. Native Shocking can chain through any nearby character, including
+     * allies; ignore walls to safely overestimate its possible reach.
+     */
+    private static boolean weaponCollateralSafe(Hero hero, Mob target,
+                                                KindOfWeapon source, boolean missile) {
+        if (!(source instanceof Weapon)) return true;
+        Weapon weapon = (Weapon) source;
+        boolean shocking = weapon.hasEnchant(Shocking.class, hero);
+        boolean eldritch = weapon.hasEnchant(Eldritch.class, hero);
+        boolean unstable = weapon.hasEnchant(Unstable.class, hero);
+
+        // Shared Enchantment can apply the Spirit Bow's enchantment to a thrown
+        // weapon, even when that weapon has no enchantment of its own.
+        if (missile && hero.pointsInTalent(Talent.SHARED_ENCHANTMENT) > 0) {
+            SpiritBow bow = hero.belongings.getItem(SpiritBow.class);
+            if (bow != null) {
+                shocking |= bow.hasEnchant(Shocking.class, hero);
+                eldritch |= bow.hasEnchant(Eldritch.class, hero);
+                unstable |= bow.hasEnchant(Unstable.class, hero);
+            }
+        }
+        if (!shocking && !eldritch && !unstable) return true;
+
+        // Eldritch (including Unstable's random Eldritch proc) can inflict
+        // Terror on shopkeepers when they can see the attacker or target.
+        if (eldritch || unstable) {
+            for (Mob mob : Dungeon.level.mobs) {
+                if (mob.isAlive() && BlastAutoPlay.isAutoAttackExcluded(mob)
+                        && mob.fieldOfView != null
+                        && (mob.fieldOfView[hero.pos] || mob.fieldOfView[target.pos])) {
+                    return false;
+                }
+            }
+        }
+        if (!shocking && !unstable) return true;
+
+        // Native Shocking starts with a two-cell arc, then chains one cell
+        // per hit (two on water). All intermediate characters conduct arcs.
+        ArrayList<Char> reached = new ArrayList<>();
+        reached.add(target);
+        java.util.Set<Char> characters = Actor.chars();
+        for (int i = 0; i < reached.size(); i++) {
+            Char from = reached.get(i);
+            int radius = i == 0 ? 2
+                    : Dungeon.level.water[from.pos] && !from.flying ? 2 : 1;
+            for (Char ch : characters) {
+                if (!ch.isAlive() || ch == hero || reached.contains(ch)
+                        || Dungeon.level.distance(from.pos, ch.pos) > radius) continue;
+                if (ch instanceof Mob && BlastAutoPlay.isAutoAttackExcluded((Mob) ch)) {
+                    return false;
+                }
+                reached.add(ch);
+            }
         }
         return true;
     }

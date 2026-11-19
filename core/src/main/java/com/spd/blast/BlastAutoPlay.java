@@ -8,6 +8,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Burning;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroAction;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.DemonSpawner;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Necromancer;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Thief;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Wraith;
@@ -622,7 +623,7 @@ public final class BlastAutoPlay {
 
         for (Mob mob : Dungeon.level.mobs) {
             if (!mob.isAlive() || mob.alignment == Char.Alignment.ALLY
-                    || isProtectedNpc(mob)
+                    || isAutoAttackExcluded(mob)
                     || mob.invisible > 0 || !isAwake(mob) || ignored(mob)
                     || hero.isCharmedBy(mob)) continue;
 
@@ -680,7 +681,7 @@ public final class BlastAutoPlay {
         if (hero.rooted) {
             if (selected != null) {
                 rememberCombatTarget(selected);
-                if (selectedCanMelee) {
+                if (selectedCanMelee && BlastAutoCombat.meleeCollateralSafe(hero, selected)) {
                     hero.curAction = new HeroAction.Attack(selected);
                     return false;
                 }
@@ -707,7 +708,7 @@ public final class BlastAutoPlay {
 
         if (selected != null) {
             rememberCombatTarget(selected);
-            if (selectedCanMelee) {
+            if (selectedCanMelee && BlastAutoCombat.meleeCollateralSafe(hero, selected)) {
                 hero.curAction = new HeroAction.Attack(selected);
             } else {
                 hero.curAction = new HeroAction.Move(firstStep(selectedGoal, safe, distances));
@@ -851,9 +852,9 @@ public final class BlastAutoPlay {
                 || (steps == otherSteps && distance < otherDistance)));
     }
 
-    /** Quest and service NPCs are never auto-combat targets, regardless of alignment. */
-    static boolean isProtectedNpc(Mob mob) {
-        return mob instanceof NPC;
+    /** Exclude service NPCs and demon spawners from all automatic attacks. */
+    static boolean isAutoAttackExcluded(Mob mob) {
+        return mob instanceof NPC || mob instanceof DemonSpawner;
     }
 
     /** Sleeping enemies are deliberately left alone by automatic combat. */
@@ -927,7 +928,7 @@ public final class BlastAutoPlay {
         }
         if (combatTarget == null) return false;
         if (!combatTarget.isAlive() || combatTarget.alignment == Char.Alignment.ALLY
-                || isProtectedNpc(combatTarget)
+                || isAutoAttackExcluded(combatTarget)
                 || combatTarget.invisible > 0 || !isAwake(combatTarget)
                 || hero.isCharmedBy(combatTarget)
                 || combatTarget.isInvulnerable(Hero.class)
@@ -1091,7 +1092,7 @@ public final class BlastAutoPlay {
         for (Mob mob : Dungeon.level.mobs) {
             if (mob.isAlive() && mob.alignment == Char.Alignment.ENEMY
                     && mob.invisible <= 0 && hero.fieldOfView[mob.pos]
-                    && isAwake(mob)) return true;
+                    && isAwake(mob) && !isAutoAttackExcluded(mob)) return true;
         }
         return false;
     }

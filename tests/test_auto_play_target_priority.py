@@ -32,25 +32,26 @@ class AutoTargetPriorityTests(unittest.TestCase):
         self.assertIn("preferRemote(remote.damage, melee)", tactics)
         self.assertNotIn("pointBlankAccurate(", tactics)
 
-    def test_quest_and_service_npcs_are_excluded_from_combat(self):
+    def test_npcs_and_demon_spawners_are_excluded_from_combat(self):
         combat = COMBAT.read_text(encoding="utf-8")
         bombs = BOMBS.read_text(encoding="utf-8")
         sacrifice = (ROOT / "core/src/main/java/com/spd/blast/BlastAutoSacrifice.java").read_text(
             encoding="utf-8"
         )
 
-        self.assertIn("return mob instanceof NPC;", combat)
-        self.assertIn("|| isProtectedNpc(mob)", combat)
-        self.assertIn("|| isProtectedNpc(combatTarget)", combat)
+        self.assertIn("return mob instanceof NPC || mob instanceof DemonSpawner;", combat)
+        self.assertIn("&& isAwake(mob) && !isAutoAttackExcluded(mob)) return true;", combat)
+        self.assertIn("|| isAutoAttackExcluded(mob)", combat)
+        self.assertIn("|| isAutoAttackExcluded(combatTarget)", combat)
         self.assertIn("|| attacker instanceof NPC", combat)
         self.assertIn("&& !(lastAttacker instanceof NPC)", combat)
         tactics = TACTICS.read_text(encoding="utf-8")
-        self.assertIn("|| BlastAutoPlay.isProtectedNpc(mob)", tactics)
+        self.assertIn("|| BlastAutoPlay.isAutoAttackExcluded(mob)", tactics)
 
-        self.assertIn("containsProtectedMob(blast)", bombs)
-        self.assertIn("&& BlastAutoPlay.isProtectedNpc(mob)) return true;", bombs)
-        self.assertIn("|| BlastAutoPlay.isProtectedNpc(mob)", bombs)
-        self.assertIn("!BlastAutoPlay.isProtectedNpc(mob)", sacrifice)
+        self.assertIn("containsExcludedMob(blast)", bombs)
+        self.assertIn("&& BlastAutoPlay.isAutoAttackExcluded(mob)) return true;", bombs)
+        self.assertIn("|| BlastAutoPlay.isAutoAttackExcluded(mob)", bombs)
+        self.assertIn("!BlastAutoPlay.isAutoAttackExcluded(mob)", sacrifice)
 
     def test_bomb_targeting_uses_actual_landing_footprint(self):
         source = BOMBS.read_text(encoding="utf-8")
@@ -59,7 +60,7 @@ class AutoTargetPriorityTests(unittest.TestCase):
             "!blastReachesTarget(blast, mob.pos)",
             source,
         )
-        self.assertIn("containsProtectedMob(blast)", source)
+        self.assertIn("containsExcludedMob(blast)", source)
         self.assertIn("BlastRemoteBomb.isTimedMode()", source)
 
 
