@@ -45,6 +45,10 @@ public final class BlastAutoRoamingTest {
         equal(16, stalledMap.select(stalled, 24), "first stationary attempt");
         equal(16, stalledMap.select(stalled, 24), "second stationary attempt");
         equal(32, stalledMap.select(stalled, 24), "third stalled attempt skips goal");
+        stalledMap.safe[8] = true;
+        stalledMap.distances[8] = 5;
+        equal(16, stalledMap.select(stalled, 24),
+                "changed navigability releases stale failed frontier");
 
         Map oscillatingMap = new Map();
         oscillatingMap.safe[23] = true;
