@@ -39,32 +39,30 @@ public final class BlastAutoRoamingTest {
     }
 
     public static void main(String[] args) {
-        Map stalledMap = new Map();
-        BlastAutoRoaming stalled = new BlastAutoRoaming();
-        equal(16, stalledMap.select(stalled, 24), "initial goal for stall test");
-        equal(16, stalledMap.select(stalled, 24), "first stationary attempt");
-        equal(16, stalledMap.select(stalled, 24), "second stationary attempt");
-        equal(32, stalledMap.select(stalled, 24), "third stalled attempt skips goal");
-        stalledMap.safe[8] = true;
-        stalledMap.distances[8] = 5;
-        equal(32, stalledMap.select(stalled, 24),
-                "visibility changes do not discard the current destination");
-        stalledMap.distances[32] = 0;
-        equal(16, stalledMap.select(stalled, 32),
-                "changed navigability releases stale failed frontier");
+        Map stableMap = new Map();
+        BlastAutoRoaming stable = new BlastAutoRoaming();
+        equal(16, stableMap.select(stable, 24), "initial reachable frontier");
+        for (int i = 0; i < 5; i++) {
+            equal(16, stableMap.select(stable, 24),
+                    "another automatic task cannot prematurely abandon roaming");
+        }
+        stableMap.safe[8] = true;
+        stableMap.distances[8] = 5;
+        equal(16, stableMap.select(stable, 24),
+                "temporary navigation changes do not reset a reachable goal");
+        stableMap.safe[16] = false;
+        stableMap.distances[16] = Integer.MAX_VALUE;
+        equal(32, stableMap.select(stable, 24), "inaccessible frontier is replaced");
 
-        Map oscillatingMap = new Map();
-        oscillatingMap.safe[23] = true;
-        BlastAutoRoaming oscillating = new BlastAutoRoaming();
-        equal(16, oscillatingMap.select(oscillating, 24), "initial oscillating goal");
-        oscillatingMap.distances[16] = 1;
-        equal(16, oscillatingMap.select(oscillating, 23), "first approach");
-        oscillatingMap.distances[16] = 2;
-        equal(16, oscillatingMap.select(oscillating, 24), "first reversal");
-        oscillatingMap.distances[16] = 1;
-        equal(16, oscillatingMap.select(oscillating, 23), "repeat approach");
-        oscillatingMap.distances[16] = 2;
-        equal(32, oscillatingMap.select(oscillating, 24), "oscillating goal abandoned");
+        Map interruptedMap = new Map();
+        interruptedMap.safe[23] = true;
+        BlastAutoRoaming interruptedRoam = new BlastAutoRoaming();
+        equal(16, interruptedMap.select(interruptedRoam, 24), "original roaming target");
+        interruptedMap.distances[16] = 1;
+        equal(16, interruptedMap.select(interruptedRoam, 23), "approaching original target");
+        interruptedMap.distances[16] = 2;
+        equal(16, interruptedMap.select(interruptedRoam, 24),
+                "intervening task does not mark current frontier failed");
 
         Map map = new Map();
         BlastAutoRoaming roaming = new BlastAutoRoaming();
