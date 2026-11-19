@@ -27,6 +27,21 @@ class AutoCombatWeaponTests(unittest.TestCase):
         self.assertIn("item.quantity() <= 0", candidates)
         self.assertIn("float damage = physicalDamage(hero, target, weapon, weapon);", candidates)
 
+    def test_auto_weapon_collateral_safety(self):
+        source = SOURCE.read_text(encoding="utf-8")
+        self.assertIn("weaponCollateralSafe(hero, target, hero.belongings.attackingWeapon(), false)", source)
+        self.assertIn("weaponCollateralSafe(hero, target, arrow, true)", source)
+        self.assertIn("weaponCollateralSafe(hero, target, weapon, true)", source)
+        self.assertIn("weapon.hasEnchant(Shocking.class, hero)", source)
+        self.assertIn("weapon.hasEnchant(Unstable.class, hero)", source)
+        self.assertIn("weapon.hasEnchant(Eldritch.class, hero)", source)
+        self.assertIn("hero.pointsInTalent(Talent.SHARED_ENCHANTMENT) > 0", source)
+        self.assertIn("bow.hasEnchant(Shocking.class, hero)", source)
+        self.assertIn("int radius = i == 0 ? 2", source)
+        self.assertIn("Dungeon.level.water[from.pos] && !from.flying ? 2 : 1", source)
+        self.assertIn("BlastAutoPlay.isAutoAttackExcluded((Mob) ch)", source)
+        self.assertIn("mob.fieldOfView[hero.pos] || mob.fieldOfView[target.pos]", source)
+
     def test_wand_safety_and_aim(self):
         source = SOURCE.read_text(encoding="utf-8")
         for check in ("wand.blastAutoCanZap(hero)",
@@ -40,7 +55,10 @@ class AutoCombatWeaponTests(unittest.TestCase):
                       "corrosionSafe(hero, target)",
                       "Math.min(beam.dist, 6 + 2 * wand.buffedLvl())",
                       "Blob.volumeAt(target.pos, CorrosiveGas.class)",
-                      "BlastAutoPlay.isAutoAttackExcluded"):
+                      "BlastAutoPlay.isAutoAttackExcluded",
+                      "lightningMultiplier(hero, target)",
+                      "disintegrationSafe(hero, target, wand)",
+                      "corrosionSafe(hero, target)"):
             self.assertIn(check, source)
         self.assertNotIn("wand instanceof WandOfFireblast", source)
         patch = PATCH.read_text(encoding="utf-8")
