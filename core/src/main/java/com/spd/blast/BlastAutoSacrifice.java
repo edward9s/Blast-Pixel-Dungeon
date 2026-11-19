@@ -138,7 +138,7 @@ public final class BlastAutoSacrifice {
                 attackDistance = distance;
             }
         }
-        if (attackable != null) {
+        if (attackable != null && BlastAutoCombat.meleeCollateralSafe(hero, attackable)) {
             hero.curAction = new HeroAction.Attack(attackable);
             trackedEnemy = null;
             waitingSince = Float.NaN;
