@@ -210,9 +210,13 @@ Blizzard, SmokeScreen, Web, and GooWarn. SacrificialFire is excluded from
 that hazard list because it does not damage living characters directly; its
 marking aura is handled by the separate auto-play lure tactic. Active blob
 references are captured once per hero action, not retrieved once per map cell.
-While standing in a harmful blob, the hero tries to step onto a safe adjacent
-cell before other automatic actions. Emergency water movement is prioritized
-ahead of bomb tactics, otherwise normal combat priority is preserved.
+While standing in a harmful blob, the hero first tries to step onto a safe
+adjacent cell. If surrounded by gas, the emergency escape can cross gas-only
+cells to reach the nearest known, reachable safe tile. Other hazards (including
+gas overlapping fire), traps, chasms and blocked terrain remain forbidden.
+If no clean tile is reachable, the escape does not choose an arbitrary hazardous
+step. Emergency water movement is prioritized ahead of bomb tactics; otherwise
+normal combat priority is preserved.
 
 ```sh
 javac --release 11 -encoding UTF-8 -cp "$BLAST_TEST_CLASSPATH" \
