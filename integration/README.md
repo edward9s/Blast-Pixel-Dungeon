@@ -590,3 +590,12 @@ counts and mode-switch restrictions. Damage is credited to
 generate further death counterbombs. Bosses and minibosses do not produce
 death counterbombs. Unlike Tengu's original ability, no boss challenge
 score or boss-fight state is modified.
+
+## Optional low-level monster rewards
+
+Two independently stored Blast settings are off by default:
+
+- **Low-level drops**: bypasses the hero-level cap on normal monster loot, special monster drops, and Master Thieves' Armband stealing. Original drop probabilities and limited-drop counters still apply.
+- **Low-level XP effects**: if a monster loses its XP solely because the hero exceeds its positive `maxLvl`, its original `EXP` powers the existing on-XP effects (equipment identification, artifact leveling/charging, and talent effects), but does not accumulate hero XP or increase hero level. This also covers kills rewarded by ally conversion. Monsters with `EXP = 0` or nonpositive `maxLvl` remain excluded.
+
+Regular enemy XP, hero leveling, and the native drop cap are unchanged when the options are off. Neither setting requires a save-data migration.

@@ -27,6 +27,8 @@ public final class BlastSettingsTab extends Component {
     private RenderedTextBlock spawnValue;
     private OptionSlider spawnSlider;
     private CheckBox debugLog;
+    private CheckBox weakMobDrops;
+    private CheckBox weakMobExpEffects;
 
     private CheckBox testInfiniteBomb;
     private CheckBox indestructible;
@@ -98,6 +100,28 @@ public final class BlastSettingsTab extends Component {
         };
         debugLog.checked(BlastSettings.debugLog());
         add(debugLog);
+
+        weakMobDrops = new CheckBox(BlastMessages.get("settings.weak_mob_drops")) {
+            @Override
+            protected void onClick() {
+                super.onClick();
+                BlastSettings.setWeakMobDrops(checked());
+            }
+        };
+        weakMobDrops.checked(BlastSettings.weakMobDrops());
+        weakMobDrops.multiline = true;
+        add(weakMobDrops);
+
+        weakMobExpEffects = new CheckBox(BlastMessages.get("settings.weak_mob_exp_effects")) {
+            @Override
+            protected void onClick() {
+                super.onClick();
+                BlastSettings.setWeakMobExpEffects(checked());
+            }
+        };
+        weakMobExpEffects.checked(BlastSettings.weakMobExpEffects());
+        weakMobExpEffects.multiline = true;
+        add(weakMobExpEffects);
 
 
         testInfiniteBomb = new CheckBox(BlastMessages.get("settings.infinite_bomb")) {
@@ -312,9 +336,16 @@ public final class BlastSettingsTab extends Component {
         spawnSlider.setRect(0, spawnTop, width, SLIDER_HEIGHT);
         debugLog.setRect(0, spawnSlider.bottom() + GAP, width, BUTTON_HEIGHT);
 
-        float bottom = debugLog.bottom();
+        float columnWidth = (width - GAP) / 2f;
+        float rewardsTop = debugLog.bottom() + GAP;
+        weakMobDrops.setRect(0, rewardsTop, columnWidth, BUTTON_HEIGHT);
+        weakMobExpEffects.setRect(columnWidth + GAP, rewardsTop, columnWidth, BUTTON_HEIGHT);
+        float rewardsHeight = Math.max(BUTTON_HEIGHT,
+                Math.max(weakMobDrops.reqHeight(), weakMobExpEffects.reqHeight()));
+        weakMobDrops.setRect(0, rewardsTop, columnWidth, rewardsHeight);
+        weakMobExpEffects.setRect(columnWidth + GAP, rewardsTop, columnWidth, rewardsHeight);
+        float bottom = rewardsTop + rewardsHeight;
         if (BlastSettings.showTests()) {
-            float columnWidth = (width - GAP) / 2f;
             for (int i = 0; i < testOptions.length; i += 2) {
                 CheckBox left = testOptions[i];
                 CheckBox right = i + 1 < testOptions.length ? testOptions[i + 1] : null;
