@@ -37,6 +37,35 @@ public final class BlastAutoEnvironmentTest {
         check(false, BlastAutoEnvironment.hazardousAt(3, hazards), "empty tile");
         check(false, BlastAutoEnvironment.hazardousAt(1, new Blob[2]), "no active blobs");
 
+        check(true, BlastAutoEnvironment.gasOnlyAt(2, hazards),
+                "gas alone is traversable during a gas escape");
+        check(false, BlastAutoEnvironment.gasOnlyAt(1, hazards),
+                "fire is never a gas escape corridor");
+        check(false, BlastAutoEnvironment.gasOnlyAt(0, hazards),
+                "clear tiles need no gas exception");
+        fire.cur[2] = 1;
+        check(false, BlastAutoEnvironment.gasOnlyAt(2, hazards),
+                "overlapping fire cannot be crossed as gas");
+        fire.cur[2] = 0;
+
+        boolean[] clean = {true, false, false, true, true};
+        int[] gasRoute = {0, 1, 2, 3, Integer.MAX_VALUE};
+        equal(3, BlastAutoEnvironment.nearestSafeExit(0, clean, gasRoute),
+                "escape through two surrounding gas tiles to reachable clean ground");
+        gasRoute[3] = Integer.MAX_VALUE;
+        equal(-1, BlastAutoEnvironment.nearestSafeExit(0, clean, gasRoute),
+                "do not select clean ground with no escape route");
+        gasRoute[3] = 3;
+        gasRoute[4] = 2;
+        equal(4, BlastAutoEnvironment.nearestSafeExit(0, clean, gasRoute),
+                "choose nearest reachable clean exit");
+        try {
+            BlastAutoEnvironment.nearestSafeExit(0, clean, new int[1]);
+            throw new AssertionError("Mismatched escape map lengths must fail");
+        } catch (IllegalArgumentException expected) {
+            // Invalid route data must not lead to movement.
+        }
+
         check(true, BlastAutoEnvironment.HAZARD_TYPES.contains(
                 MagicalFireRoom.EternalFire.class), "eternal fire registered as a hazard");
         MagicalFireRoom.EternalFire eternalFire = new MagicalFireRoom.EternalFire();
