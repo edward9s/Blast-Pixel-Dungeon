@@ -27,6 +27,8 @@ public final class BlastSettings {
     private static final String DEMOLITION = "blast_test_demolition";
     private static final String AUTO_PLAY = "blast_test_auto_play";
     private static final String AUTO_FARMING = "blast_auto_farming";
+    private static final String WEAK_MOB_DROPS = "blast_weak_mob_drops";
+    private static final String WEAK_MOB_EXP_EFFECTS = "blast_weak_mob_exp_effects";
     private static final String ENCHANTMENT_STONE_REVERSE_ALCHEMY = "blast_test_enchantment_stone_reverse_alchemy";
 
     private BlastSettings() {}
@@ -112,6 +114,22 @@ public final class BlastSettings {
 
     public static void setAutoFarming(boolean value) {
         GameSettings.put(AUTO_FARMING, value);
+    }
+
+    public static boolean weakMobDrops() {
+        return GameSettings.getBoolean(WEAK_MOB_DROPS, false);
+    }
+
+    public static void setWeakMobDrops(boolean value) {
+        GameSettings.put(WEAK_MOB_DROPS, value);
+    }
+
+    public static boolean weakMobExpEffects() {
+        return GameSettings.getBoolean(WEAK_MOB_EXP_EFFECTS, false);
+    }
+
+    public static void setWeakMobExpEffects(boolean value) {
+        GameSettings.put(WEAK_MOB_EXP_EFFECTS, value);
     }
 
     public static boolean enchantmentStoneReverseAlchemy() {
