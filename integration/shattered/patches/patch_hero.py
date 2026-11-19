@@ -292,6 +292,16 @@ def patch(path: Path) -> None:
         "Hero.damage attack source"
     )
 
+    # Only an actual native pickup failure can suppress its next automatic retry.
+    s = replace_once(
+        s,
+        "\t\t\t\t} else {\n\n\t\t\t\t\tif (waitOrPickup) {",
+        "\t\t\t\t} else {\n"
+        "\t\t\t\t\tcom.spd.blast.BlastAutoPickup.onPickupFailure(this, item, pos);\n\n"
+        "\t\t\t\t\tif (waitOrPickup) {",
+        "Hero.actPickUp report native pickup failure"
+    )
+
     # No Ankh, death screen, or save deletion when the test is enabled.
     s = replace_once(
         s,
