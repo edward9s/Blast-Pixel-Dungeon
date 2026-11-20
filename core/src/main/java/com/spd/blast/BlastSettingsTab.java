@@ -2,6 +2,7 @@ package com.spd.blast;
 
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
+import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.PixelScene;
 import com.shatteredpixel.shatteredpixeldungeon.ui.CheckBox;
 import com.shatteredpixel.shatteredpixeldungeon.ui.OptionSlider;
@@ -106,6 +107,9 @@ public final class BlastSettingsTab extends Component {
             protected void onClick() {
                 super.onClick();
                 BlastSettings.setTestInfiniteBomb(checked());
+                BlastBombManiac buff = BlastBombManiac.current();
+                if (buff != null) buff.syncInfiniteTypes();
+                Item.updateQuickslot();
             }
         };
         testInfiniteBomb.checked(BlastSettings.testInfiniteBomb());
