@@ -12,6 +12,15 @@ bash integration/shattered/apply.sh /path/to/shattered-pixel-dungeon .
 All patches fail when their expected upstream seam changes. The workflow builds
 against the latest published upstream release and does not silently skip patches.
 
+### Safe automatic mystery meat
+
+When automatic roaming eats food at Starving, mystery meat is now eligible
+under the existing largest-stack rule. `BlastAutoFood` scopes native eating
+with a `ThreadLocal`, and the native `MysteryMeat.satisfy` patch skips only
+the meat's random harmful effect inside that scope. Hunger recovery, eating
+time, food talents, and manual eating remain native. The scope is cleared in
+`finally`, including when eating throws. Uncooked Blandfruit remains excluded.
+
 ### Regrowth bomb rooting and healing
 
 Regrowth bombs cure the Hero and allies and grant stationary Sungrass herbal
