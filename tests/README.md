@@ -2,8 +2,11 @@
 
 ## Automatic mystery meat
 
-`BlastAutoFoodTest.java` checks selection by stack size, raw mystery meat
-eligibility, ties, and exclusion of uncooked Blandfruit.
+`BlastAutoFoodTest.java` checks selection by available stack size, raw Mystery
+Meat eligibility, native Pasty/Ration/meat reserves across the four meat forms,
+finished Meat Pie eligibility, ties, and exclusion of uncooked Blandfruit.
+The Python tests also guard equipped/charged Horn of Plenty priority, the native
+Horn EAT action, and eligibility checks.
 `test_auto_mystery_meat.py` checks the native meat patch, manual-effect
 preservation, patch drift rejection, and integration registration:
 
