@@ -30,6 +30,7 @@ def main() -> None:
         + "\tprivate com.spd.blast.BlastSettingsTab blast; "
         + MARKER
         + "\n"
+        + "\tprivate com.shatteredpixel.shatteredpixeldungeon.ui.ScrollPane blastScroll;\n"
     )
     text = replace_once(text, field_anchor, field_replacement, "settings field")
 
@@ -40,22 +41,33 @@ def main() -> None:
 \t\tif (com.spd.blast.BlastSettings.SHOW_BLAST_TAB) {
 \t\t\tblast = new com.spd.blast.BlastSettingsTab();
 \t\t\tblast.setSize(width, 0);
-\t\t\tblast.setHeightChanged(() -> resize(width,
-\t\t\t\t\t(int)Math.ceil(Math.max(standardHeight, blast.height()))));
-\t\t\theight = Math.max(height, blast.height());
-\t\t\tadd(blast);
+\t\t\theight = PixelScene.landscape() ? standardHeight
+\t\t\t\t\t: Math.max(standardHeight, blast.height());
+\t\t\tblastScroll = new com.shatteredpixel.shatteredpixeldungeon.ui.ScrollPane(blast);
+\t\t\tblast.setHeightChanged(() -> {
+\t\t\t\tint windowHeight = (int)Math.ceil(PixelScene.landscape() ? standardHeight
+\t\t\t\t\t\t: Math.max(standardHeight, blast.height()));
+\t\t\t\tresize(width, windowHeight);
+\t\t\t\tlayoutTabs();
+\t\t\t\tblastScroll.setRect(0, 0, width, windowHeight);
+\t\t\t\tblastScroll.scrollTo(0, 0);
+\t\t\t});
+\t\t\tadd(blastScroll);
 
 \t\t\tadd(new IconTab(Icons.get(Icons.TALENT)) {
 \t\t\t\t@Override
 \t\t\t\tprotected void select(boolean value) {
 \t\t\t\t\tsuper.select(value);
-\t\t\t\t\tblast.visible = blast.active = value;
+\t\t\t\t\tblastScroll.visible = blastScroll.active = value;
 \t\t\t\t\tif (value) last_index = 6;
 \t\t\t\t}
 \t\t\t});
 \t\t}
 
 \t\tresize(width, (int)Math.ceil(height));
+\t\tif (blastScroll != null) {
+\t\t\tblastScroll.setRect(0, 0, width, (int)Math.ceil(height));
+\t\t}
 """
     text = replace_once(text, tab_anchor, tab_replacement, "settings tab")
 
