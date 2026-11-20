@@ -49,7 +49,8 @@ class AutoTargetPriorityTests(unittest.TestCase):
         self.assertIn("|| BlastAutoPlay.isAutoAttackExcluded(mob)", tactics)
 
         self.assertIn("containsExcludedMob(blast)", bombs)
-        self.assertIn("&& BlastAutoPlay.isAutoAttackExcluded(mob)) return true;", bombs)
+        self.assertIn("|| !blast[mob.pos] || ignoresBombCollateral(mob)", bombs)
+        self.assertIn("&& !ignoresBombCollateral(mob)) return true;", bombs)
         self.assertIn("|| BlastAutoPlay.isAutoAttackExcluded(mob)", bombs)
         self.assertIn("!BlastAutoPlay.isAutoAttackExcluded(mob)", sacrifice)
 
