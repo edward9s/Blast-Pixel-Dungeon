@@ -780,6 +780,10 @@ public final class BlastAutoPlay {
         debugDecision = "food";
         if (BlastAutoFood.eatIfStarving(hero)) return true;
 
+        // Craft only while standing beside a pot; never seek one automatically.
+        debugDecision = "alchemy";
+        if (BlastAutoAlchemy.brewIfNearby(hero, safe[hero.pos])) return true;
+
         // Collect reachable floor loot after visible enemies have been handled.
         idleSafe = progress.safeFor(safe, hero.pos, BlastAutoProgressGuard.Intent.PICKUP);
         idleDistances = navigationDistances(hero.pos, safe, distances, idleSafe);
