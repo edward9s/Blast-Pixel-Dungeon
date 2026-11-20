@@ -34,7 +34,7 @@ import com.watabou.utils.Point;
 /** Keep the sacrifice objective active while recruiting and luring melee enemies. */
 public final class BlastAutoSacrifice {
 
-    enum Action { NONE, QUEUED, WAIT }
+    enum Action { NONE, QUEUED, WAIT, PATROL }
 
     private static final int MAX_STALLED_TURNS = 3;
     private static final float MAX_WAIT_TICKS = 12f;
@@ -86,6 +86,13 @@ public final class BlastAutoSacrifice {
         if (!(level instanceof RegularLevel)) return Action.NONE;
         SacrificeRoom room = (SacrificeRoom) ((RegularLevel) level).room(SacrificeRoom.class);
         if (room == null || room.entrance() == null) return Action.NONE;
+
+        // The fire object exists from level generation. Only activate after the
+        // hero has actually acquired the location through sight or mapping.
+        // Visited/mapped cells retain that knowledge after the fire leaves view.
+        if (knownFireCell(fire.cur, level.visited, level.mapped, hero.fieldOfView) < 0) {
+            return Action.NONE;
+        }
 
         // Visible ranged opponents and thieves remain urgent combat exceptions.
         boolean visibleThief = false;
@@ -159,7 +166,7 @@ public final class BlastAutoSacrifice {
         for (int cell = 0; cell < fire.cur.length; cell++) {
             if (fire.cur[cell] <= 0 || !safe[cell]
                     || distances[cell] == Integer.MAX_VALUE
-                    || !(level.visited[cell] || hero.fieldOfView[cell])) continue;
+                    || !knownCell(level.visited, level.mapped, hero.fieldOfView, cell)) continue;
             for (Mob mob : level.mobs) {
                 if (!eligible(hero, mob) || !shouldLure(
                         mob.state == mob.HUNTING && mob.isTargeting(hero),
@@ -179,7 +186,9 @@ public final class BlastAutoSacrifice {
             // If the altar cannot be reached, defend against adjacent attackers.
             if (immediateMeleeThreat) return Action.NONE;
             Action approach = approachUnengagedEnemy(hero, fire.cur, safe, distances);
-            return approach != Action.NONE ? approach : searchOutside(hero, room, safe, distances);
+            // Without a lure target, let ordinary pickup and interaction run
+            // before wandering around the sacrifice room's exterior.
+            return approach != Action.NONE ? approach : Action.PATROL;
         }
 
         if (hero.pos != site) {
@@ -212,6 +221,15 @@ public final class BlastAutoSacrifice {
 
         hero.spendAndNext(Actor.TICK);
         return Action.WAIT;
+    }
+
+    /** Execute a deferred patrol after ordinary floor pickup and interaction. */
+    static Action patrol(Hero hero, boolean[] safe, int[] distances) {
+        if (currentHero != hero || currentLevel != Dungeon.level) {
+            throw new IllegalStateException("Sacrifice patrol without an active level");
+        }
+        SacrificeRoom room = (SacrificeRoom) ((RegularLevel) currentLevel).room(SacrificeRoom.class);
+        return searchOutside(hero, room, safe, distances);
     }
 
     /** Return through the room entrance, then patrol known exterior terrain. */
@@ -249,6 +267,25 @@ public final class BlastAutoSacrifice {
         }
         hero.spendAndNext(Actor.TICK);
         return Action.WAIT;
+    }
+
+    /** A fire position is known when its tile is visible, visited, or mapped. */
+    static int knownFireCell(int[] flames, boolean[] visited, boolean[] mapped,
+                             boolean[] visible) {
+        if (flames == null || visited == null || mapped == null || visible == null
+                || flames.length != visited.length || flames.length != mapped.length
+                || flames.length != visible.length) {
+            throw new IllegalArgumentException("Invalid sacrificial fire discovery map");
+        }
+        for (int cell = 0; cell < flames.length; cell++) {
+            if (flames[cell] > 0 && knownCell(visited, mapped, visible, cell)) return cell;
+        }
+        return -1;
+    }
+
+    private static boolean knownCell(boolean[] visited, boolean[] mapped,
+                                     boolean[] visible, int cell) {
+        return visited[cell] || mapped[cell] || visible[cell];
     }
 
     /** Draw the attention of a visible wandering melee enemy without striking it. */
