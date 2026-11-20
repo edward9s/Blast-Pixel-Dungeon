@@ -24,6 +24,8 @@ public final class BlastRadius extends Buff {
         int current = stacks(hero);
         if (current >= MAX_STACKS) return false;
         setStacks(hero, Math.addExact(current, 1));
+        BlastBombManiac maniac = hero.buff(BlastBombManiac.class);
+        if (maniac != null) maniac.onRadiusPickup();
         return true;
     }
 
