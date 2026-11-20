@@ -234,9 +234,7 @@ public final class BlastSettingsTab extends Component {
             protected void onChange() {
                 Hero hero = Dungeon.hero;
                 if (hero == null || !hero.isAlive() || !BlastSettings.showTests()) return;
-                BlastBombManiac buff = BlastBombManiac.current();
-                if (buff == null) throw new IllegalStateException("Missing Bomb Maniac buff");
-                buff.setTestRadius(RADIUS_BOOST_VALUES[getSelectedValue()]);
+                BlastRadius.setTestBoost(hero, RADIUS_BOOST_VALUES[getSelectedValue()]);
                 refreshRadius();
             }
 
@@ -276,10 +274,8 @@ public final class BlastSettingsTab extends Component {
     /** Clear enabled test features before hiding their controls. */
     private void disableTestOptions() {
         BlastBombManiac buff = BlastBombManiac.current();
-        if (buff != null) {
-            buff.setSecretBombTypes(false);
-            buff.restoreTestRadius();
-        }
+        if (buff != null) buff.setSecretBombTypes(false);
+        BlastRadius.clearTestBoost(Dungeon.hero);
         refreshRadius();
 
         BlastSettings.setTestInfiniteBomb(false);
@@ -334,7 +330,7 @@ public final class BlastSettingsTab extends Component {
 
     private void refreshRadius() {
         Hero hero = Dungeon.hero;
-        int count = hero == null ? 0 : BlastRadius.stacks(hero);
+        int count = BlastRadius.boost(hero);
         radiusValue.text("+" + count);
         radiusSlider.setSelectedValue(radiusBoostIndex(count));
         boolean active = BlastSettings.showTests() && hero != null && hero.isAlive();
