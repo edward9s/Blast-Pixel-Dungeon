@@ -1,5 +1,27 @@
 # Demolition regression checks
 
+## Automatic alchemy near a pot
+
+`BlastAutoAlchemyTest.java` tests the actual `MeatPie.Recipe` with selection of
+Pasty, exact-class ordinary Ration and the four eligible meats. It checks
+missing and zero-quantity ingredients, recipe energy cost, and the one-item
+consumption behavior. It runs against the patched SPD core using the same
+`BLAST_TEST_CLASSPATH` as the other Java tests:
+
+```sh
+javac --release 11 -encoding UTF-8 -cp "$BLAST_TEST_CLASSPATH" \\
+  -d /tmp/blast-tests tests/BlastAutoAlchemyTest.java
+java -cp "/tmp/blast-tests:$BLAST_TEST_CLASSPATH" com.spd.blast.BlastAutoAlchemyTest
+```
+
+The source-level regression checks verify pot proximity without pathfinding,
+safe/idle priority, native recipe energy bookkeeping, empty-stack removal and
+result collection:
+
+```sh
+python -m unittest discover -s tests -p test_auto_alchemy.py
+```
+
 ## Automatic mystery meat
 
 `BlastAutoFoodTest.java` checks selection by available stack size, raw Mystery
