@@ -107,9 +107,12 @@ public final class BlastSettingsTab extends Component {
             protected void onClick() {
                 super.onClick();
                 BlastSettings.setTestInfiniteBomb(checked());
-                BlastBombManiac buff = BlastBombManiac.current();
-                if (buff != null) buff.syncInfiniteTypes();
-                Item.updateQuickslot();
+                if (BlastSecret.canToggleTests()) {
+                    BlastBombManiac buff = BlastBombManiac.current();
+                    if (buff == null) throw new IllegalStateException("Missing Bomb Maniac buff");
+                    buff.setSecretBombTypes(checked());
+                    Item.updateQuickslot();
+                }
             }
         };
         testInfiniteBomb.checked(BlastSettings.testInfiniteBomb());
