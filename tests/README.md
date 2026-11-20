@@ -95,6 +95,22 @@ javac --release 11 -encoding UTF-8 -cp "$BLAST_TEST_CLASSPATH" \
 java -cp "/tmp/blast-tests:$BLAST_TEST_CLASSPATH" com.spd.blast.BlastAutoPickupTest
 ```
 
+The existing Blast **Debug Log** checkbox also traces automatic decisions while
+a visible ordinary floor heap is within two cells of the hero. The single-line
+`[Blast] auto-loot` event contains the hero and item cells, top-item class,
+pickup eligibility (`ready`, `type`, `capacity`, `unsafe`, `blocked`,
+`unreachable`, or `cooldown`), the winning task (`chosen`), and the
+issued action. `ready` means the floor item passes its local conditions and
+the base distance map; task-specific exclusions on intermediate steps may
+still prevent pickup. Logs are emitted only when Debug Log is enabled and
+identical consecutive observations are limited to one in ten decisions.
+Read them from Android logcat, filtering on `[Blast] auto-loot`.
+This instrumentation does not change any automatic action priority.
+
+```sh
+python -m unittest discover -s tests -p test_auto_loot_debug.py
+```
+
 The native failure callback is inserted by `integration/shattered/patches/patch_hero.py`.
 The source-level integration check confirms it only starts cooldown for actual
 failed native pickups:
