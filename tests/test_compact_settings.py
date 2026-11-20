@@ -140,10 +140,34 @@ class CompactSettingsTests(unittest.TestCase):
             1,
         )
 
-    def test_settings_window_resizes_after_toggle(self):
+    def test_blast_scroll_keeps_landscape_window_height_fixed(self):
         patch = (ROOT / "integration/shattered/patches/patch_wndsettings.py").read_text(encoding="utf-8")
         self.assertIn("final float standardHeight = height;", patch)
-        self.assertIn("blast.setHeightChanged(() -> resize(width,", patch)
+        self.assertIn("height = PixelScene.landscape() ? standardHeight", patch)
+        self.assertIn(": Math.max(standardHeight, blast.height());", patch)
+        self.assertIn("ui.ScrollPane(", patch)
+        self.assertIn("new com.watabou.noosa.ui.Component()", patch)
+        self.assertIn("blastScroll.content().add(blast);", patch)
+        self.assertIn("blastScroll.content().setSize(width, blast.height());", patch)
+        # Nonblocking scroll controller can track drags beginning on controls,
+        # while letting button and slider listeners handle the same pointer.
+        self.assertIn("controller.blockLevel = com.watabou.noosa.PointerArea.NEVER_BLOCK;", patch)
+        self.assertIn("controller.givePointerPriority();", patch)
+        self.assertLess(
+            patch.index("controller.blockLevel = com.watabou.noosa.PointerArea.NEVER_BLOCK;"),
+            patch.index("controller.givePointerPriority();"),
+        )
+        # PointerEvent is stack-ordered: the scroll controller must exist
+        # before the checkbox/button/slider listeners are registered.
+        self.assertLess(
+            patch.index("new com.shatteredpixel.shatteredpixeldungeon.ui.ScrollPane("),
+            patch.index("blast = new com.spd.blast.BlastSettingsTab();"),
+        )
+        self.assertIn("blastScroll.visible = blastScroll.active = value;", patch)
+        self.assertIn("blastScroll.setRect(0, 0, width, windowHeight);", patch)
+        self.assertIn("blastScroll.scrollTo(0, 0);", patch)
+        self.assertIn("layoutTabs();", patch)
+        self.assertNotIn("add(blast);", patch)
 
     def test_all_labels_have_no_test_prefix(self):
         locales = sorted((ROOT / "messages").glob("misc*.properties"))
