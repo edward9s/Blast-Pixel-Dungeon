@@ -31,17 +31,23 @@ public final class BlastAutoFoodTest {
 
         same(null, BlastAutoFood.mostAbundant(Collections.emptyList()),
                 "no food");
-        same(null, BlastAutoFood.mostAbundant(Arrays.asList(rawMeat, rawFruit)),
-                "raw food must not trigger an empty eating action");
-        same(smallRation, BlastAutoFood.mostAbundant(Arrays.asList(
+        same(null, BlastAutoFood.mostAbundant(Collections.singletonList(rawFruit)),
+                "uncooked blandfruit must not trigger an empty eating action");
+        same(rawMeat, BlastAutoFood.mostAbundant(Arrays.asList(rawMeat, rawFruit)),
+                "raw meat is now an automatic food candidate");
+        same(rawMeat, BlastAutoFood.mostAbundant(Arrays.asList(
                 rawMeat, rawFruit, ration, smallRation)),
-                "largest edible stack wins, even against more raw food");
+                "largest stack wins, including raw meat");
         same(cookedFruit, BlastAutoFood.mostAbundant(Arrays.asList(
                 smallRation, cookedFruit)),
                 "cooked fruit is edible");
         ration.quantity(3);
         same(ration, BlastAutoFood.mostAbundant(Arrays.asList(ration, smallRation)),
                 "equal quantity preserves inventory order");
+        rawMeat.quantity(3);
+        same(rawMeat, BlastAutoFood.mostAbundant(Arrays.asList(rawMeat, smallRation)),
+                "raw meat wins equal-stack ties when first");
+        rawMeat.quantity(50);
         ration.quantity(0);
         same(smallRation, BlastAutoFood.mostAbundant(Arrays.asList(ration, smallRation)),
                 "empty stack is ignored");
