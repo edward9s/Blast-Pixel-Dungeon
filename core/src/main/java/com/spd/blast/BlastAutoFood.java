@@ -6,23 +6,22 @@ import com.shatteredpixel.shatteredpixeldungeon.items.food.Blandfruit;
 import com.shatteredpixel.shatteredpixeldungeon.items.food.Food;
 import com.shatteredpixel.shatteredpixeldungeon.items.food.MysteryMeat;
 
-/** Native eating during idle auto-play; never consumes unsafe raw food. */
-final class BlastAutoFood {
+/** Native eating during idle auto-play; raw meat is made safe by the native meat patch. */
+public final class BlastAutoFood {
 
     private static final ThreadLocal<Boolean> automaticConsumption = new ThreadLocal<>();
 
     private BlastAutoFood() {}
 
     /** Suppress only the manual-item reset caused by native Food.execute. */
-    static boolean isEatingAutomatically() {
+    public static boolean isEatingAutomatically() {
         return Boolean.TRUE.equals(automaticConsumption.get());
     }
 
     static Food mostAbundant(Iterable<? extends Food> foods) {
         Food selected = null;
         for (Food food : foods) {
-            if (food.quantity() <= 0 || food instanceof MysteryMeat
-                    || (food instanceof Blandfruit
+            if (food.quantity() <= 0 || (food instanceof Blandfruit
                         && ((Blandfruit) food).potionAttrib == null)) continue;
             if (selected == null || food.quantity() > selected.quantity()) {
                 selected = food;
