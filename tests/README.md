@@ -104,7 +104,16 @@ issued action. `ready` means the floor item passes its local conditions and
 the base distance map; task-specific exclusions on intermediate steps may
 still prevent pickup. Logs are emitted only when Debug Log is enabled and
 identical consecutive observations are limited to one in ten decisions.
-Read them from Android logcat, filtering on `[Blast] auto-loot`.
+Debug output is written to `game1/blast-debug.txt`, `game2/blast-debug.txt`,
+and so on (according to the active save slot). Entering a new game or
+continuing a save replaces that slot's previous debug file; switching
+floors only appends to the same file. The file is flushed on every event,
+limited to 1 MiB, and copied by the existing **Export save** action into
+`Documents/spd_saves/<app name>/gameN/blast-debug.txt`.
+Entering with Debug Log disabled removes the old file for that slot.
+Disabling logging mid-game closes the file; re-enabling appends to the
+same session. No ADB or additional storage permission is needed beyond
+the permission already required to export saves.
 This instrumentation does not change any automatic action priority.
 
 ```sh
