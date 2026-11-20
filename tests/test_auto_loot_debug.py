@@ -48,7 +48,7 @@ class AutoLootDebugTest(unittest.TestCase):
         )[0]
         self.assertIn("hero.fieldOfView[cell]", diagnostic)
         self.assertIn("distance > 2", diagnostic)
-        self.assertIn("heap.peek() instanceof Gold", diagnostic)
+        self.assertIn("candidate instanceof Gold", diagnostic)
         self.assertIn("!isPickupType(item, instantPickup)", diagnostic)
         self.assertIn("!canCollect(hero, item, instantPickup)", diagnostic)
         self.assertIn("!pickupSafe[cell]", diagnostic)
