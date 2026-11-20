@@ -4,7 +4,6 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Hunger;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.items.food.Blandfruit;
 import com.shatteredpixel.shatteredpixeldungeon.items.food.Food;
-import com.shatteredpixel.shatteredpixeldungeon.items.food.MysteryMeat;
 
 /** Native eating during idle auto-play; raw meat is made safe by the native meat patch. */
 public final class BlastAutoFood {
@@ -13,7 +12,7 @@ public final class BlastAutoFood {
 
     private BlastAutoFood() {}
 
-    /** Suppress only the manual-item reset caused by native Food.execute. */
+    /** Mark native Food.execute as automatic, including raw meat's effect suppression. */
     public static boolean isEatingAutomatically() {
         return Boolean.TRUE.equals(automaticConsumption.get());
     }
