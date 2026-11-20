@@ -218,6 +218,7 @@ public final class BlastAutoBombAI {
         return false;
     }
 
+    // Rare enemies are valid targets and do not block collateral bomb damage.
     private static boolean containsExcludedMob(boolean[] blast) {
         for (Mob mob : Dungeon.level.mobs) {
             if (mob.isAlive() && blast[mob.pos]
