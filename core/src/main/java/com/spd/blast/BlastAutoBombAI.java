@@ -8,6 +8,8 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.SacrificialFire;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Necromancer;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.NPC;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.Shopkeeper;
 import com.shatteredpixel.shatteredpixeldungeon.items.bombs.Bomb;
 import com.shatteredpixel.shatteredpixeldungeon.items.bombs.RegrowthBomb;
 
@@ -206,7 +208,7 @@ public final class BlastAutoBombAI {
 
     private static boolean containsUnreadySacrificeMob(boolean[] blast, int[] flames) {
         for (Mob mob : Dungeon.level.mobs) {
-            if (!mob.isAlive() || !blast[mob.pos]) continue;
+            if (!mob.isAlive() || !blast[mob.pos] || ignoresBombCollateral(mob)) continue;
             if (mob.alignment != Char.Alignment.ENEMY
                     || !BlastAutoSacrifice.readyToSacrifice(
                             BlastAutoSacrifice.nearFlame(
@@ -218,10 +220,23 @@ public final class BlastAutoBombAI {
         return false;
     }
 
+    /**
+     * In SPD v4.0.2, neutral non-shop NPCs ignore damage and harmful buffs
+     * (or are explicitly invulnerable). Shopkeepers instead react to harm,
+     * so they must still be protected even though they cannot be killed.
+     * Allied NPCs are not exempt from collateral protection.
+     */
+    static boolean ignoresBombCollateral(Mob mob) {
+        return mob instanceof NPC && mob.alignment == Char.Alignment.NEUTRAL
+                && !(mob instanceof Shopkeeper);
+    }
+
+    // Rare enemies are valid targets, but service NPCs and spawners remain protected.
     private static boolean containsExcludedMob(boolean[] blast) {
         for (Mob mob : Dungeon.level.mobs) {
             if (mob.isAlive() && blast[mob.pos]
-                    && BlastAutoPlay.isAutoAttackExcluded(mob)) return true;
+                    && BlastAutoPlay.isAutoAttackExcluded(mob)
+                    && !ignoresBombCollateral(mob)) return true;
         }
         return false;
     }

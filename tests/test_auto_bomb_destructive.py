@@ -41,12 +41,17 @@ class AutoBombDestructiveTests(unittest.TestCase):
         source = SOURCE.read_text(encoding="utf-8")
         self.assertNotIn("isRare(", source)
         self.assertNotIn("RARE_ALTS", source)
+        play = (SOURCE.parent / "BlastAutoPlay.java").read_text(encoding="utf-8")
+        self.assertIn("return mob instanceof NPC || mob instanceof DemonSpawner;", play)
         self.assertEqual(source.count("if (!autoBombAvailable(hero))"), 2)
         self.assertIn("if (!autoBombAvailable(hero) || BlastSettings.testRemoteThrow()", source)
-        self.assertEqual(source.count("containsProtectedMob(blast)"), 3)
-        self.assertIn("&& BlastAutoPlay.isProtectedNpc(mob)) return true;", source)
-        self.assertIn("|| BlastAutoPlay.isProtectedNpc(target)) return -1;", source)
+        self.assertEqual(source.count("containsExcludedMob(blast)"), 3)
+        self.assertIn("&& !ignoresBombCollateral(mob)) return true;", source)
+        self.assertIn("|| BlastAutoPlay.isAutoAttackExcluded(target)) return -1;", source)
         self.assertIn("|| containsUnreadySacrificeMob(blast, flames)", source)
+        self.assertIn("|| !blast[mob.pos] || ignoresBombCollateral(mob)", source)
+        self.assertIn("mob instanceof NPC && mob.alignment == Char.Alignment.NEUTRAL", source)
+        self.assertIn("&& !(mob instanceof Shopkeeper)", source)
 
 
 if __name__ == "__main__":
