@@ -143,7 +143,8 @@ public final class BlastAutoPickup {
         else if (retryTurns > 0 && item == attemptedItem && cell == attemptedCell) {
             status = "cooldown";
         } else status = "ready";
-        return item.getClass().getSimpleName() + "@" + cell + " status=" + status;
+        String type = item instanceof Gold ? "Gold" : item.getClass().getSimpleName();
+        return type + "@" + cell + " status=" + status;
     }
 
     static boolean isPickupType(Item item, Predicate<Item> instantPickup) {
