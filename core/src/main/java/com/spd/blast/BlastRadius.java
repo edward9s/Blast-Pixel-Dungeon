@@ -42,7 +42,10 @@ public final class BlastRadius extends Buff {
             throw new IllegalArgumentException("Invalid pickup radius boost: " + count);
         }
         BlastRadius radius = hero.buff(BlastRadius.class);
-        if (radius == null && count > 0) radius = Buff.affect(hero, BlastRadius.class);
+        if (radius == null && count > 0) {
+            radius = Buff.affect(hero, BlastRadius.class);
+            if (radius == null) throw new IllegalStateException("Cannot apply blast radius buff");
+        }
         if (radius != null) {
             radius.stacks = count;
             if (count == 0 && radius.testBoost < 0) radius.detach();
