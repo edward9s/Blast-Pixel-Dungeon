@@ -8,6 +8,13 @@ PLAY = (ROOT / "core/src/main/java/com/spd/blast/BlastAutoPlay.java").read_text(
 PICKUP = (ROOT / "core/src/main/java/com/spd/blast/BlastAutoPickup.java").read_text(encoding="utf-8")
 SETTINGS = (ROOT / "core/src/main/java/com/spd/blast/BlastSettings.java").read_text(encoding="utf-8")
 LOG = (ROOT / "core/src/main/java/com/spd/blast/BlastLog.java").read_text(encoding="utf-8")
+INTERLEVEL_PATCH = (
+    ROOT / "integration/shattered/patches/patch_interlevel_debug.py"
+).read_text(encoding="utf-8")
+APPLY = (ROOT / "integration/shattered/apply.sh").read_text(encoding="utf-8")
+SAVE_TRANSFER = (
+    ROOT / "core/src/main/java/com/spd/blast/BlastSaveTransfer.java"
+).read_text(encoding="utf-8")
 
 
 class AutoLootDebugTest(unittest.TestCase):
@@ -18,6 +25,22 @@ class AutoLootDebugTest(unittest.TestCase):
         self.assertIn("if (!BlastSettings.debugLog() || nearbyDebugLoot == null)", PLAY)
         self.assertIn("BlastLog.debug(trace);", PLAY)
         self.assertIn("if (BlastSettings.debugLog())", LOG)
+
+    def test_debug_file_is_per_save_and_exported(self):
+        self.assertIn('private static final String FILE_NAME = "blast-debug.txt";', LOG)
+        self.assertIn("GamesInProgress.gameFolder(slot) + \"/\" + FILE_NAME", LOG)
+        self.assertIn("FileUtils.getFileHandle(path)", LOG)
+        self.assertIn("file.write(append)", LOG)
+        self.assertIn("writer.flush();", LOG)
+        self.assertIn("open(false);", LOG)
+        self.assertIn("FileUtils.deleteFile(GamesInProgress.gameFolder(slot)", LOG)
+        self.assertIn("if (!value) BlastLog.stop();", SETTINGS)
+        self.assertIn("BlastLog.beginGame(GamesInProgress.curSlot)", INTERLEVEL_PATCH)
+        self.assertEqual(
+            INTERLEVEL_PATCH.count("BlastLog.beginGame(GamesInProgress.curSlot)"), 2
+        )
+        self.assertIn("patch_interlevel_debug.py", APPLY)
+        self.assertIn("replaceSnapshot(sourceDir, targetDir, false)", SAVE_TRANSFER)
 
     def test_nearby_visible_loot_only_and_no_pickup_side_effects(self):
         diagnostic = PICKUP.split("static String nearbyDiagnostic(", 1)[1].split(
