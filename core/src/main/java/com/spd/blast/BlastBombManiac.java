@@ -28,12 +28,14 @@ public final class BlastBombManiac extends Buff {
     private static final String ACTIVE = "blast_bomb_active";
     private static final String TYPES = "blast_bomb_types";
     private static final String SAVED_TYPES = "blast_bomb_saved_types";
+    private static final String TEST_RADIUS_BASELINE = "blast_test_radius_baseline";
 
     private int capacity = 1;
     private int activeBombs;
     private int selected;
     private final ArrayList<Class<? extends Bomb>> types = new ArrayList<>();
     private ArrayList<Class<? extends Bomb>> savedTypes;
+    private int testRadiusBaseline = -1;
     private transient CellSelector.Listener targeting;
     private transient Mob autoTarget;
 
@@ -84,6 +86,30 @@ public final class BlastBombManiac extends Buff {
             selected = types.indexOf(previousType);
             if (selected < 0) selected = 0;
         }
+    }
+
+    /** Remember the hero's actual blast radius before the first test-slider change. */
+    public void setTestRadius(int count) {
+        if (target != Dungeon.hero || !BlastSettings.showTests()) {
+            throw new IllegalStateException("Blast radius testing requires an active test hero");
+        }
+        if (testRadiusBaseline < 0) testRadiusBaseline = BlastRadius.stacks(Dungeon.hero);
+        BlastRadius.setStacks(Dungeon.hero, count);
+    }
+
+    /** A legitimate radius pickup earned during testing must not be discarded. */
+    public void onRadiusPickup() {
+        if (testRadiusBaseline >= 0) testRadiusBaseline = Math.max(testRadiusBaseline, BlastRadius.MAX_STACKS);
+    }
+
+    /** Restore normal blast radius when hiding test options. */
+    public void restoreTestRadius() {
+        if (testRadiusBaseline < 0) return;
+        if (target != Dungeon.hero) {
+            throw new IllegalStateException("Cannot restore radius for another hero");
+        }
+        BlastRadius.setStacks(Dungeon.hero, testRadiusBaseline);
+        testRadiusBaseline = -1;
     }
 
     public int deployed() {
@@ -425,6 +451,7 @@ public final class BlastBombManiac extends Buff {
         bundle.put(SELECTED, selected);
         storeTypes(bundle, TYPES, types);
         if (savedTypes != null) storeTypes(bundle, SAVED_TYPES, savedTypes);
+        if (testRadiusBaseline >= 0) bundle.put(TEST_RADIUS_BASELINE, testRadiusBaseline);
     }
 
     @Override
@@ -445,6 +472,11 @@ public final class BlastBombManiac extends Buff {
             if (!types.containsAll(savedTypes)) {
                 throw new IllegalStateException("Saved bomb types are missing from active types");
             }
+        }
+        testRadiusBaseline = -1;
+        if (bundle.contains(TEST_RADIUS_BASELINE)) {
+            testRadiusBaseline = bundle.getInt(TEST_RADIUS_BASELINE);
+            if (testRadiusBaseline < 0) throw new IllegalStateException("Invalid blast radius baseline");
         }
     }
 
