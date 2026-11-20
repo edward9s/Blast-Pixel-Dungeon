@@ -12,6 +12,39 @@ bash integration/shattered/apply.sh /path/to/shattered-pixel-dungeon .
 All patches fail when their expected upstream seam changes. The workflow builds
 against the latest published upstream release and does not silently skip patches.
 
+### Safe automatic mystery meat
+
+When automatic roaming eats at Starving, it first uses an equipped, charged
+Horn of Plenty through its native EAT action (which also handles magic immunity).
+If the Horn cannot feed the hero, Mystery Meat is eligible alongside other food.
+The automatic selection never eats Pasties; it reserves one plain Ration and one
+recipe-compatible meat (Mystery, Stewed, Chargrilled, or Frozen) per Pasty in the
+inventory, then prefers the largest remaining eligible quantity. Finished Meat
+Pies remain eligible. Reserves protect ingredients only from automatic eating;
+manual use and alchemy are unchanged. `BlastAutoFood` scopes native eating
+with a `ThreadLocal`, and the native `MysteryMeat.satisfy` patch skips only
+the meat's random harmful effect inside that scope. Hunger recovery, eating
+time, food talents, and manual eating remain native. The scope is cleared in
+`finally`, including when eating throws. Uncooked Blandfruit remains excluded.
+
+### Automatic meat-pie alchemy
+
+During unpaused auto-play, after combat, interrupted manual travel, and
+Starving-time eating, the hero can craft one Meat Pie when already adjacent
+to an alchemy pot. No navigation or scene switch is attempted; the current
+tile must be safe, no visible awake hostile may be present, and the backpack
+must contain a Pasty, an ordinary Ration (exact `Food` class), and one meat
+accepted by `MeatPie.Recipe`. The hero also needs at least six global alchemy
+energy. No portable toolkit use or energy conversion is attempted.
+
+The real `MeatPie.Recipe` consumes one of each ingredient. Empty source stacks
+are removed, the six energy is deducted, crafting statistics and badges are
+updated, and the result is collected or dropped on the current tile when
+inventory is full. One craft spends one game tick so long ingredient stacks
+cannot monopolize the actor loop. The next auto-play turn reevaluates all
+requirements. The existing Pasty/ration/meat eating reserves still apply
+away from a pot; manual crafting remains unchanged.
+
 ### Regrowth bomb rooting and healing
 
 Regrowth bombs cure the Hero and allies and grant stationary Sungrass herbal

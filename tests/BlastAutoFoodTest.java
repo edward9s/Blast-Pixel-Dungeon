@@ -1,15 +1,20 @@
 package com.spd.blast;
 
 import com.shatteredpixel.shatteredpixeldungeon.items.food.Blandfruit;
+import com.shatteredpixel.shatteredpixeldungeon.items.food.ChargrilledMeat;
 import com.shatteredpixel.shatteredpixeldungeon.items.food.Food;
+import com.shatteredpixel.shatteredpixeldungeon.items.food.FrozenCarpaccio;
+import com.shatteredpixel.shatteredpixeldungeon.items.food.MeatPie;
 import com.shatteredpixel.shatteredpixeldungeon.items.food.MysteryMeat;
+import com.shatteredpixel.shatteredpixeldungeon.items.food.Pasty;
 import com.shatteredpixel.shatteredpixeldungeon.items.food.SmallRation;
+import com.shatteredpixel.shatteredpixeldungeon.items.food.StewedMeat;
 import com.shatteredpixel.shatteredpixeldungeon.items.potions.PotionOfHealing;
 
 import java.util.Arrays;
 import java.util.Collections;
 
-/** Regression checks for automatic starvation food selection. */
+/** Regression checks for native starvation food selection and pie ingredient reserves. */
 public final class BlastAutoFoodTest {
 
     private static void same(Food expected, Food actual, String label) {
@@ -29,22 +34,69 @@ public final class BlastAutoFoodTest {
         cookedFruit.potionAttrib = new PotionOfHealing();
         cookedFruit.quantity(4);
 
-        same(null, BlastAutoFood.mostAbundant(Collections.emptyList()),
-                "no food");
-        same(null, BlastAutoFood.mostAbundant(Arrays.asList(rawMeat, rawFruit)),
-                "raw food must not trigger an empty eating action");
-        same(smallRation, BlastAutoFood.mostAbundant(Arrays.asList(
+        same(null, BlastAutoFood.mostAbundant(Collections.emptyList()), "no food");
+        same(null, BlastAutoFood.mostAbundant(Collections.singletonList(rawFruit)),
+                "uncooked blandfruit must not trigger an empty eating action");
+        same(rawMeat, BlastAutoFood.mostAbundant(Arrays.asList(rawMeat, rawFruit)),
+                "raw meat is an automatic food candidate");
+        same(rawMeat, BlastAutoFood.mostAbundant(Arrays.asList(
                 rawMeat, rawFruit, ration, smallRation)),
-                "largest edible stack wins, even against more raw food");
+                "largest available stack wins, including raw meat");
         same(cookedFruit, BlastAutoFood.mostAbundant(Arrays.asList(
-                smallRation, cookedFruit)),
-                "cooked fruit is edible");
+                smallRation, cookedFruit)), "cooked fruit is edible");
         ration.quantity(3);
         same(ration, BlastAutoFood.mostAbundant(Arrays.asList(ration, smallRation)),
                 "equal quantity preserves inventory order");
+        rawMeat.quantity(3);
+        same(rawMeat, BlastAutoFood.mostAbundant(Arrays.asList(rawMeat, smallRation)),
+                "raw meat wins equal-stack ties when first");
+        rawMeat.quantity(50);
         ration.quantity(0);
         same(smallRation, BlastAutoFood.mostAbundant(Arrays.asList(ration, smallRation)),
                 "empty stack is ignored");
+
+        Pasty pasty = new Pasty();
+        pasty.quantity(3);
+        MeatPie pie = new MeatPie();
+        pie.quantity(1);
+        same(null, BlastAutoFood.mostAbundant(Collections.singletonList(pasty)),
+                "never eat pasty automatically");
+        same(pie, BlastAutoFood.mostAbundant(Arrays.asList(pasty, pie)),
+                "finished meat pie remains edible");
+
+        ration.quantity(3);
+        rawMeat.quantity(3);
+        smallRation.quantity(1);
+        same(smallRation, BlastAutoFood.mostAbundant(Arrays.asList(
+                pasty, ration, rawMeat, smallRation)),
+                "all three rations and meats remain reserved for three pasties");
+
+        ration.quantity(5);
+        rawMeat.quantity(4);
+        same(ration, BlastAutoFood.mostAbundant(Arrays.asList(pasty, ration, rawMeat)),
+                "eat surplus ration before protected meat (2 versus 1)");
+
+        ration.quantity(3);
+        rawMeat.quantity(8);
+        same(rawMeat, BlastAutoFood.mostAbundant(Arrays.asList(pasty, ration, rawMeat)),
+                "eat only surplus meat when ration supply exactly matches pasties");
+
+        ChargrilledMeat grilled = new ChargrilledMeat();
+        grilled.quantity(4);
+        StewedMeat stewed = new StewedMeat();
+        stewed.quantity(2);
+        FrozenCarpaccio frozen = new FrozenCarpaccio();
+        frozen.quantity(1);
+        rawMeat.quantity(1);
+        pasty.quantity(8);
+        ration.quantity(0);
+        same(null, BlastAutoFood.mostAbundant(Arrays.asList(
+                pasty, rawMeat, grilled, stewed, frozen, ration)),
+                "all native pie-compatible meat variants count toward the reserve");
+        pasty.quantity(5);
+        same(grilled, BlastAutoFood.mostAbundant(Arrays.asList(
+                pasty, rawMeat, grilled, stewed, frozen)),
+                "surplus mixed meats are edible without consuming protected total");
 
         System.out.println("BlastAutoFoodTest passed");
     }

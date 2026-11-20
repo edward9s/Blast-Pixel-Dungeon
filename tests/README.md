@@ -1,5 +1,42 @@
 # Demolition regression checks
 
+## Automatic alchemy near a pot
+
+`BlastAutoAlchemyTest.java` tests the actual `MeatPie.Recipe` with selection of
+Pasty, exact-class ordinary Ration and the four eligible meats. It checks
+missing and zero-quantity ingredients, recipe energy cost, and the one-item
+consumption behavior. It runs against the patched SPD core using the same
+`BLAST_TEST_CLASSPATH` as the other Java tests:
+
+```sh
+javac --release 11 -encoding UTF-8 -cp "$BLAST_TEST_CLASSPATH" \\
+  -d /tmp/blast-tests tests/BlastAutoAlchemyTest.java
+java -cp "/tmp/blast-tests:$BLAST_TEST_CLASSPATH" com.spd.blast.BlastAutoAlchemyTest
+```
+
+The source-level regression checks verify pot proximity without pathfinding,
+safe/idle priority, native recipe energy bookkeeping, empty-stack removal and
+result collection:
+
+```sh
+python -m unittest discover -s tests -p test_auto_alchemy.py
+```
+
+## Automatic mystery meat
+
+`BlastAutoFoodTest.java` checks selection by available stack size, raw Mystery
+Meat eligibility, native Pasty/Ration/meat reserves across the four meat forms,
+finished Meat Pie eligibility, ties, and exclusion of uncooked Blandfruit.
+The Python tests also guard equipped/charged Horn of Plenty priority, the native
+Horn EAT action, and eligibility checks.
+`test_auto_mystery_meat.py` checks the native meat patch, manual-effect
+preservation, patch drift rejection, and integration registration:
+
+```sh
+python -m unittest discover -s tests -p test_auto_mystery_meat.py
+```
+
+
 `BlastDemolitionTest.java` runs the actual patched `Bomb.explode` and
 `ArcaneBomb.explode` methods without opening a graphics/audio backend. It checks
 default/off behavior, all three locked door types, all three chest types,
