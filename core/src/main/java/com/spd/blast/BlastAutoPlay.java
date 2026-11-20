@@ -794,6 +794,15 @@ public final class BlastAutoPlay {
             return false;
         }
 
+        // Sacrifice patrol is only an idle task. Picking up known loot and
+        // opening reachable containers must not be starved by its roaming.
+        if (sacrifice == BlastAutoSacrifice.Action.PATROL) {
+            debugDecision = "sacrifice-patrol";
+            BlastAutoSacrifice.Action patrol = BlastAutoSacrifice.patrol(hero, safe, distances);
+            if (patrol == BlastAutoSacrifice.Action.WAIT) return true;
+            if (patrol == BlastAutoSacrifice.Action.QUEUED) return false;
+        }
+
         debugDecision = "attacker";
         if (attackerTurns > 0) {
             attackerTurns--;
