@@ -47,6 +47,39 @@ public final class BlastAutoSacrificeTest {
             }
         }
 
+        // A generated fire remains dormant until its actual burning tile is known.
+        boolean[] visited = new boolean[width * width];
+        boolean[] mapped = new boolean[width * width];
+        boolean[] visible = new boolean[width * width];
+        check(true, BlastAutoSacrifice.knownFireCell(fire, visited, mapped, visible) == -1,
+                "undiscovered fire must not activate sacrifice AI");
+        visible[2 + 2 * width] = true;
+        check(true, BlastAutoSacrifice.knownFireCell(fire, visited, mapped, visible)
+                == 2 + 2 * width, "visible burning tile is discovered");
+        visible[2 + 2 * width] = false;
+        visited[2 + 2 * width] = true;
+        check(true, BlastAutoSacrifice.knownFireCell(fire, visited, mapped, visible)
+                == 2 + 2 * width, "visited fire remains known out of view");
+        visited[2 + 2 * width] = false;
+        mapped[2 + 2 * width] = true;
+        check(true, BlastAutoSacrifice.knownFireCell(fire, visited, mapped, visible)
+                == 2 + 2 * width, "mapped fire has a known location");
+        mapped[2 + 2 * width] = false;
+        visible[0] = true;
+        check(true, BlastAutoSacrifice.knownFireCell(fire, visited, mapped, visible) == -1,
+                "seeing the room without its fire does not activate");
+        fire[2 + 2 * width] = 0;
+        visible[2 + 2 * width] = true;
+        check(true, BlastAutoSacrifice.knownFireCell(fire, visited, mapped, visible) == -1,
+                "extinguished fire must not remain active");
+        fire[2 + 2 * width] = 1;
+        try {
+            BlastAutoSacrifice.knownFireCell(fire, new boolean[1], mapped, visible);
+            throw new AssertionError("Discovery map sizes must match");
+        } catch (IllegalArgumentException expected) {
+            // Mismatched map arrays are a programming error.
+        }
+
         // A cell on the right map edge must not wrap to the next row's left edge.
         fire = new int[width * width];
         fire[4] = 2;
