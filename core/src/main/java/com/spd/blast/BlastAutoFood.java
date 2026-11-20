@@ -25,7 +25,7 @@ public final class BlastAutoFood {
     }
 
     /** Use only meat types accepted by SPD's MeatPie.Recipe. */
-    private static boolean pieMeat(Food food) {
+    static boolean pieMeat(Food food) {
         return food instanceof MysteryMeat || food instanceof StewedMeat
                 || food instanceof ChargrilledMeat || food instanceof FrozenCarpaccio;
     }
