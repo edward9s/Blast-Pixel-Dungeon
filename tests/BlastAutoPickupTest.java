@@ -8,6 +8,7 @@ import com.shatteredpixel.shatteredpixeldungeon.items.keys.CrystalKey;
 import com.shatteredpixel.shatteredpixeldungeon.items.keys.GoldenKey;
 import com.shatteredpixel.shatteredpixeldungeon.items.keys.IronKey;
 import com.shatteredpixel.shatteredpixeldungeon.items.keys.WornKey;
+import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.bombs.Bomb;
 import com.shatteredpixel.shatteredpixeldungeon.items.potions.PotionOfHealing;
@@ -49,6 +50,31 @@ public final class BlastAutoPickupTest {
         check(true, new BlastPhasePotion());
         check(true, new BlastBombproofScroll());
         check(true, new Bomb());
+
+        // A non-pickable item on top must not hide collectible loot below it.
+        Heap heap = new Heap();
+        Item covered = new DriedRose();
+        Item gold = new Gold();
+        heap.items.add(covered);
+        heap.items.add(gold);
+        Item eligible = BlastAutoPickup.firstEligibleItem(heap,
+                item -> BlastAutoPickup.isPickupType(item, BLAST_INSTANT));
+        if (eligible != gold) {
+            throw new AssertionError("Eligible loot beneath other items was skipped");
+        }
+        BlastAutoPickup.exposeForPickup(heap, eligible);
+        if (heap.peek() != gold || heap.items.size() != 2
+                || !heap.items.contains(covered)) {
+            throw new AssertionError("Exposing buried loot must preserve the heap");
+        }
+        if (BlastAutoPickup.firstEligibleItem(heap, item -> false) != null) {
+            throw new AssertionError("Ineligible heaps must remain unselected");
+        }
+        // Capacity restrictions can also reject an otherwise auto-pickable top item.
+        heap.items.addFirst(new PotionOfHealing());
+        if (BlastAutoPickup.firstEligibleItem(heap, item -> item == gold) != gold) {
+            throw new AssertionError("Rejected top items must not block lower loot");
+        }
 
         Item radius = new BlastRadiusPickup();
         Item haste = new BlastHastePickup();

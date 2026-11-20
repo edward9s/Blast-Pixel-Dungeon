@@ -71,6 +71,7 @@ public final class BlastAutoPickup {
         int nearest = -1;
         int shortest = Integer.MAX_VALUE;
         Item nearestItem = null;
+        Heap nearestHeap = null;
         for (Heap heap : level.heaps.valueList()) {
             if (heap.type != Heap.Type.HEAP || heap.isEmpty()) continue;
 
@@ -79,20 +80,24 @@ public final class BlastAutoPickup {
                     || !knownLoot(heap.seen, hero.fieldOfView[cell])
                     || !safe[cell] || distances[cell] == Integer.MAX_VALUE) continue;
 
-            // The native pickup takes the top item, not an arbitrary lower item.
-            Item item = heap.peek();
-            if (!isPickupType(item, instantPickup)
-                    || !canCollect(hero, item, instantPickup)) continue;
-            if (retryTurns > 0 && item == attemptedItem && cell == attemptedCell) continue;
+            Item item = firstEligibleItem(heap, candidate ->
+                    isPickupType(candidate, instantPickup)
+                    && canCollect(hero, candidate, instantPickup)
+                    && !(retryTurns > 0 && candidate == attemptedItem
+                            && cell == attemptedCell));
+            if (item == null) continue;
             if (distances[cell] < shortest) {
                 nearest = cell;
                 shortest = distances[cell];
                 nearestItem = item;
+                nearestHeap = heap;
             }
         }
 
         if (nearest < 0) return false;
         if (nearest == hero.pos) {
+            // Native pickup consumes the top item, so expose the eligible item first.
+            exposeForPickup(nearestHeap, nearestItem);
             // Record the candidate; the native failure callback alone starts cooldown.
             attemptedItem = nearestItem;
             attemptedCell = nearest;
@@ -115,6 +120,7 @@ public final class BlastAutoPickup {
             throw new IllegalArgumentException("Invalid pickup diagnostic map");
         }
         Heap selected = null;
+        Item selectedItem = null;
         int nearest = 3;
         for (Heap heap : level.heaps.valueList()) {
             int cell = heap.pos;
@@ -122,18 +128,23 @@ public final class BlastAutoPickup {
                     || !level.insideMap(cell) || !hero.fieldOfView[cell]) continue;
             int distance = level.distance(hero.pos, cell);
             if (distance > 2) continue;
+            Item candidate = firstEligibleItem(heap, item ->
+                    isPickupType(item, instantPickup)
+                    && canCollect(hero, item, instantPickup));
+            if (candidate == null) candidate = heap.peek();
             if (selected == null
-                    || (heap.peek() instanceof Gold && !(selected.peek() instanceof Gold))
-                    || ((heap.peek() instanceof Gold) == (selected.peek() instanceof Gold)
+                    || (candidate instanceof Gold && !(selectedItem instanceof Gold))
+                    || ((candidate instanceof Gold) == (selectedItem instanceof Gold)
                         && distance < nearest)) {
                 selected = heap;
+                selectedItem = candidate;
                 nearest = distance;
             }
         }
         if (selected == null) return null;
 
         int cell = selected.pos;
-        Item item = selected.peek();
+        Item item = selectedItem;
         String status;
         if (!isPickupType(item, instantPickup)) status = "type";
         else if (!canCollect(hero, item, instantPickup)) status = "capacity";
@@ -145,6 +156,24 @@ public final class BlastAutoPickup {
         } else status = "ready";
         String type = item instanceof Gold ? "Gold" : item.getClass().getSimpleName();
         return type + "@" + cell + " status=" + status;
+    }
+
+    /** Pick the first eligible item, even when an ineligible item covers it. */
+    static Item firstEligibleItem(Heap heap, Predicate<Item> eligible) {
+        for (Item item : heap.items) {
+            if (eligible.test(item)) return item;
+        }
+        return null;
+    }
+
+    /** Reorder only during automatic pickup; native doPickUp still owns the result. */
+    static void exposeForPickup(Heap heap, Item item) {
+        if (heap.peek() == item) return;
+        if (!heap.items.remove(item)) {
+            throw new IllegalStateException("Automatic pickup item missing from heap");
+        }
+        heap.items.addFirst(item);
+        if (heap.sprite != null) heap.sprite.view(heap).place(heap.pos);
     }
 
     static boolean isPickupType(Item item, Predicate<Item> instantPickup) {
