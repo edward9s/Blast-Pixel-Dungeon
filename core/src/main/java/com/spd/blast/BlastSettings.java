@@ -50,6 +50,7 @@ public final class BlastSettings {
 
     public static void setDebugLog(boolean value) {
         GameSettings.put(DEBUG_LOG, value);
+        if (!value) BlastLog.stop();
     }
 
     public static boolean testInfiniteBomb() {
