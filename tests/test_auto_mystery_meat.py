@@ -75,6 +75,28 @@ class AutomaticMysteryMeatTests(unittest.TestCase):
         self.assertIn("food instanceof Blandfruit", food)
         self.assertIn("hunger == null || !hunger.isStarving()", food)
 
+    def test_horn_eating_precedes_inventory_food(self):
+        food = FOOD.read_text(encoding="utf-8")
+        method = food.split("static boolean eatIfStarving(Hero hero) {", 1)[1]
+        self.assertIn("hunger == null || !hunger.isStarving()", method)
+        self.assertIn("hero.belongings.getAllItems(HornOfPlenty.class)", method)
+        self.assertIn("horn.actions(hero).contains(HornOfPlenty.AC_EAT)", method)
+        self.assertIn("eatAutomatically(hero, horn, HornOfPlenty.AC_EAT)", method)
+        self.assertLess(method.index("eatAutomatically(hero, horn"),
+                        method.index("Food food = mostAbundant("))
+        self.assertIn("eatAutomatically(hero, food, Food.AC_EAT)", method)
+
+    def test_pasty_and_native_meat_pie_ingredients_are_reserved(self):
+        food = FOOD.read_text(encoding="utf-8")
+        self.assertIn("food instanceof Pasty", food)
+        self.assertIn("food.getClass() == Food.class", food)
+        for meat_type in ("MysteryMeat", "StewedMeat", "ChargrilledMeat",
+                          "FrozenCarpaccio"):
+            self.assertIn("food instanceof " + meat_type, food)
+        self.assertIn("rations - pasties", food)
+        self.assertIn("meats - pasties", food)
+        self.assertIn("available > mostAvailable", food)
+
     def test_patch_used_by_both_builds(self):
         apply = APPLY.read_text(encoding="utf-8")
         self.assertEqual(apply.count('python "$patches/patch_auto_mystery_meat.py"'), 1)
