@@ -140,10 +140,17 @@ class CompactSettingsTests(unittest.TestCase):
             1,
         )
 
-    def test_settings_window_resizes_after_toggle(self):
+    def test_blast_scroll_keeps_landscape_window_height_fixed(self):
         patch = (ROOT / "integration/shattered/patches/patch_wndsettings.py").read_text(encoding="utf-8")
         self.assertIn("final float standardHeight = height;", patch)
-        self.assertIn("blast.setHeightChanged(() -> resize(width,", patch)
+        self.assertIn("height = PixelScene.landscape() ? standardHeight", patch)
+        self.assertIn(": Math.max(standardHeight, blast.height());", patch)
+        self.assertIn("ui.ScrollPane(blast)", patch)
+        self.assertIn("blastScroll.visible = blastScroll.active = value;", patch)
+        self.assertIn("blastScroll.setRect(0, 0, width, windowHeight);", patch)
+        self.assertIn("blastScroll.scrollTo(0, 0);", patch)
+        self.assertIn("layoutTabs();", patch)
+        self.assertNotIn("add(blast);", patch)
 
     def test_all_labels_have_no_test_prefix(self):
         locales = sorted((ROOT / "messages").glob("misc*.properties"))
