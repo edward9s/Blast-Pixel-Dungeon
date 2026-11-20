@@ -37,6 +37,7 @@ def patch(regrowth_path: Path, bomb_path: Path) -> None:
     bomb = replace_once(
         bomb,
         "import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.Regrowth;\n",
+        "import com.spd.blast.BlastSettings;\n"
         "import com.spd.blast.BombRegrowth;\n",
         "regrowth bomb import",
     )
@@ -75,7 +76,9 @@ def patch(regrowth_path: Path, bomb_path: Path) -> None:
         "\t\t\t\t\t\tPotionOfHealing.heal(ch);",
         "\t\t\t\t\t\tPotionOfHealing.cure(ch);\n"
         "\t\t\t\t\t\tif (ch == Dungeon.hero && Dungeon.isChallenged(Challenges.NO_HEALING)) {\n"
-        "\t\t\t\t\t\t\tPotionOfHealing.heal(ch);\n"
+        "\t\t\t\t\t\t\tif (!BlastSettings.testAutoPlay()) {\n"
+        "\t\t\t\t\t\t\t\tPotionOfHealing.heal(ch);\n"
+        "\t\t\t\t\t\t\t}\n"
         "\t\t\t\t\t\t} else {\n"
         "\t\t\t\t\t\t\tBuff.affect(ch, Sungrass.Health.class).boost((int) (0.8f * ch.HT + 14));\n"
         "\t\t\t\t\t\t}",
@@ -85,7 +88,7 @@ def patch(regrowth_path: Path, bomb_path: Path) -> None:
     # Verify both files before changing either; unexpected upstream changes fail.
     regrowth_path.write_text(regrowth, encoding="utf-8")
     bomb_path.write_text(bomb, encoding="utf-8")
-    print("patched regrowth bomb: Bombproof-aware rooting and stationary herbal healing")
+    print("patched regrowth bomb: Bombproof-aware rooting, herbal healing, and auto-play pharmacophobia safety")
 
 
 if __name__ == "__main__":
