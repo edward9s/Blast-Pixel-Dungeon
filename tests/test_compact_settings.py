@@ -149,6 +149,14 @@ class CompactSettingsTests(unittest.TestCase):
         self.assertIn("new com.watabou.noosa.ui.Component()", patch)
         self.assertIn("blastScroll.content().add(blast);", patch)
         self.assertIn("blastScroll.content().setSize(width, blast.height());", patch)
+        # Nonblocking scroll controller can track drags beginning on controls,
+        # while letting button and slider listeners handle the same pointer.
+        self.assertIn("controller.blockLevel = com.watabou.noosa.PointerArea.NEVER_BLOCK;", patch)
+        self.assertIn("controller.givePointerPriority();", patch)
+        self.assertLess(
+            patch.index("controller.blockLevel = com.watabou.noosa.PointerArea.NEVER_BLOCK;"),
+            patch.index("controller.givePointerPriority();"),
+        )
         # PointerEvent is stack-ordered: the scroll controller must exist
         # before the checkbox/button/slider listeners are registered.
         self.assertLess(
