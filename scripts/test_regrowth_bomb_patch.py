@@ -54,9 +54,17 @@ def main() -> None:
         assert "&& shouldRoot(ch)" in shared
         assert "Blob.seed( i, 10, BombRegrowth.class )" in special
         assert "import com.spd.blast.BombRegrowth;" in special
+        assert "import com.spd.blast.BlastSettings;" in special
         assert "PotionOfHealing.cure(ch);" in special
         assert "Buff.affect(ch, Sungrass.Health.class).boost((int) (0.8f * ch.HT + 14));" in special
-        assert "if (ch == Dungeon.hero && Dungeon.isChallenged(Challenges.NO_HEALING))" in special
+        assert (
+            "\t\t\t\t\t\tif (ch == Dungeon.hero && Dungeon.isChallenged(Challenges.NO_HEALING)) {\n"
+            "\t\t\t\t\t\t\tif (!BlastSettings.testAutoPlay()) {\n"
+            "\t\t\t\t\t\t\t\tPotionOfHealing.heal(ch);\n"
+            "\t\t\t\t\t\t\t}\n"
+            "\t\t\t\t\t\t} else {\n"
+            "\t\t\t\t\t\t\tBuff.affect(ch, Sungrass.Health.class).boost((int) (0.8f * ch.HT + 14));\n"
+        ) in special
         assert special.count("PotionOfHealing.heal(ch);") == 1
         assert "//same as a healing potion" not in special
 
