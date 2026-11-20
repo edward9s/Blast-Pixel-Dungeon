@@ -27,11 +27,13 @@ public final class BlastBombManiac extends Buff {
     private static final String SELECTED = "blast_bomb_selected";
     private static final String ACTIVE = "blast_bomb_active";
     private static final String TYPES = "blast_bomb_types";
+    private static final String SAVED_TYPES = "blast_bomb_saved_types";
 
     private int capacity = 1;
     private int activeBombs;
     private int selected;
     private final ArrayList<Class<? extends Bomb>> types = new ArrayList<>();
+    private ArrayList<Class<? extends Bomb>> savedTypes;
     private transient CellSelector.Listener targeting;
     private transient Mob autoTarget;
 
@@ -64,19 +66,23 @@ public final class BlastBombManiac extends Buff {
         return BlastSettings.testInfiniteBomb();
     }
 
-    /** Change registered bomb types only when the secret conditions are met. */
+    /** Temporarily add all bomb kinds without losing normally imbued kinds. */
     public void setSecretBombTypes(boolean enabled) {
         if (target != Dungeon.hero || !BlastSecret.canToggleTests()) {
             throw new IllegalStateException("Secret bomb type change requires the easter egg conditions");
         }
         if (enabled) {
+            if (savedTypes == null) savedTypes = new ArrayList<>(types);
             for (Class<? extends Bomb> kind : Bomb.EnhanceBomb.validIngredients.values()) {
                 if (!types.contains(kind)) types.add(kind);
             }
-        } else {
+        } else if (savedTypes != null) {
+            Class<? extends Bomb> previousType = types.get(selected);
             types.clear();
-            types.add(Bomb.class);
-            selected = 0;
+            types.addAll(savedTypes);
+            savedTypes = null;
+            selected = types.indexOf(previousType);
+            if (selected < 0) selected = 0;
         }
     }
 
@@ -159,6 +165,7 @@ public final class BlastBombManiac extends Buff {
         }
         @SuppressWarnings("unchecked")
         Class<? extends Bomb> kind = (Class<? extends Bomb>) consumed.getClass();
+        if (savedTypes != null && !savedTypes.contains(kind)) savedTypes.add(kind);
         if (!types.contains(kind)) {
             types.add(kind);
             selected = types.size() - 1;
@@ -416,8 +423,8 @@ public final class BlastBombManiac extends Buff {
         bundle.put(CAPACITY, capacity);
         bundle.put(ACTIVE, activeBombs);
         bundle.put(SELECTED, selected);
-        bundle.put(TYPES, types.size());
-        for (int i = 0; i < types.size(); i++) bundle.put(TYPES + i, types.get(i).getName());
+        storeTypes(bundle, TYPES, types);
+        if (savedTypes != null) storeTypes(bundle, SAVED_TYPES, savedTypes);
     }
 
     @Override
@@ -426,24 +433,49 @@ public final class BlastBombManiac extends Buff {
         capacity = bundle.getInt(CAPACITY);
         activeBombs = bundle.getInt(ACTIVE);
         selected = bundle.getInt(SELECTED);
-        int count = bundle.getInt(TYPES);
-        if (capacity < 1 || count < 1 || activeBombs < 0) throw new IllegalStateException("Invalid Bomb Maniac save");
-        types.clear();
+        if (capacity < 1 || activeBombs < 0) throw new IllegalStateException("Invalid Bomb Maniac save");
+        restoreTypes(bundle, TYPES, types);
+        if (selected < 0 || selected >= types.size()) {
+            throw new IllegalStateException("Invalid Bomb Maniac selection");
+        }
+        savedTypes = null;
+        if (bundle.contains(SAVED_TYPES)) {
+            savedTypes = new ArrayList<>();
+            restoreTypes(bundle, SAVED_TYPES, savedTypes);
+            if (!types.containsAll(savedTypes)) {
+                throw new IllegalStateException("Saved bomb types are missing from active types");
+            }
+        }
+    }
+
+    private static void storeTypes(Bundle bundle, String key, ArrayList<Class<? extends Bomb>> kinds) {
+        bundle.put(key, kinds.size());
+        for (int i = 0; i < kinds.size(); i++) bundle.put(key + i, kinds.get(i).getName());
+    }
+
+    private static void restoreTypes(Bundle bundle, String key, ArrayList<Class<? extends Bomb>> kinds) {
+        int count = bundle.getInt(key);
+        if (count < 1) throw new IllegalStateException("Invalid bomb type count: " + key);
+        kinds.clear();
         for (int i = 0; i < count; i++) {
-            String name = bundle.getString(TYPES + i);
+            String name = bundle.getString(key + i);
             try {
-                Class<?> kind = Class.forName(name);
-                if (!Bomb.class.isAssignableFrom(kind)) throw new IllegalStateException("Not a bomb: " + name);
+                Class<?> loaded = Class.forName(name);
+                if (!Bomb.class.isAssignableFrom(loaded)) {
+                    throw new IllegalStateException("Not a bomb: " + name);
+                }
                 @SuppressWarnings("unchecked")
-                Class<? extends Bomb> bombType = (Class<? extends Bomb>) kind;
-                types.add(bombType);
-                bombAt(i);
+                Class<? extends Bomb> kind = (Class<? extends Bomb>) loaded;
+                if (kinds.contains(kind) || Reflection.newInstance(kind) == null) {
+                    throw new IllegalStateException("Invalid bomb type: " + name);
+                }
+                kinds.add(kind);
             } catch (ClassNotFoundException e) {
                 throw new IllegalStateException("Unknown bomb type: " + name, e);
             }
         }
-        if (types.get(0) != Bomb.class || selected < 0 || selected >= count) {
-            throw new IllegalStateException("Invalid Bomb Maniac selection");
+        if (kinds.get(0) != Bomb.class) {
+            throw new IllegalStateException("Initial bomb type missing: " + key);
         }
     }
 }
