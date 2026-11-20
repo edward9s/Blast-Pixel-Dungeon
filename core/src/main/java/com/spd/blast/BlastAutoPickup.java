@@ -103,6 +103,49 @@ public final class BlastAutoPickup {
         return true;
     }
 
+    /**
+     * Explain the closest currently visible floor item without altering pickup state.
+     * Debug-only: prioritizes nearby gold, so a missed coin is easy to identify.
+     */
+    static String nearbyDiagnostic(Hero hero, boolean[] safe, int[] distances,
+                                   boolean[] pickupSafe, Predicate<Item> instantPickup) {
+        Level level = Dungeon.level;
+        if (safe.length != level.length() || distances.length != level.length()
+                || pickupSafe.length != level.length()) {
+            throw new IllegalArgumentException("Invalid pickup diagnostic map");
+        }
+        Heap selected = null;
+        int nearest = 3;
+        for (Heap heap : level.heaps.valueList()) {
+            int cell = heap.pos;
+            if (heap.type != Heap.Type.HEAP || heap.isEmpty()
+                    || !level.insideMap(cell) || !hero.fieldOfView[cell]) continue;
+            int distance = level.distance(hero.pos, cell);
+            if (distance > 2) continue;
+            if (selected == null
+                    || (heap.peek() instanceof Gold && !(selected.peek() instanceof Gold))
+                    || ((heap.peek() instanceof Gold) == (selected.peek() instanceof Gold)
+                        && distance < nearest)) {
+                selected = heap;
+                nearest = distance;
+            }
+        }
+        if (selected == null) return null;
+
+        int cell = selected.pos;
+        Item item = selected.peek();
+        String status;
+        if (!isPickupType(item, instantPickup)) status = "type";
+        else if (!canCollect(hero, item, instantPickup)) status = "capacity";
+        else if (!safe[cell]) status = "unsafe";
+        else if (!pickupSafe[cell]) status = "blocked";
+        else if (distances[cell] == Integer.MAX_VALUE) status = "unreachable";
+        else if (retryTurns > 0 && item == attemptedItem && cell == attemptedCell) {
+            status = "cooldown";
+        } else status = "ready";
+        return item.getClass().getSimpleName() + "@" + cell + " status=" + status;
+    }
+
     static boolean isPickupType(Item item, Predicate<Item> instantPickup) {
         return item.stackable || instantPickup.test(item);
     }
