@@ -145,7 +145,16 @@ class CompactSettingsTests(unittest.TestCase):
         self.assertIn("final float standardHeight = height;", patch)
         self.assertIn("height = PixelScene.landscape() ? standardHeight", patch)
         self.assertIn(": Math.max(standardHeight, blast.height());", patch)
-        self.assertIn("ui.ScrollPane(blast)", patch)
+        self.assertIn("ui.ScrollPane(", patch)
+        self.assertIn("new com.watabou.noosa.ui.Component()", patch)
+        self.assertIn("blastScroll.content().add(blast);", patch)
+        self.assertIn("blastScroll.content().setSize(width, blast.height());", patch)
+        # PointerEvent is stack-ordered: the scroll controller must exist
+        # before the checkbox/button/slider listeners are registered.
+        self.assertLess(
+            patch.index("new com.shatteredpixel.shatteredpixeldungeon.ui.ScrollPane("),
+            patch.index("blast = new com.spd.blast.BlastSettingsTab();"),
+        )
         self.assertIn("blastScroll.visible = blastScroll.active = value;", patch)
         self.assertIn("blastScroll.setRect(0, 0, width, windowHeight);", patch)
         self.assertIn("blastScroll.scrollTo(0, 0);", patch)
