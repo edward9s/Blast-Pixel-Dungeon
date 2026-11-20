@@ -92,6 +92,7 @@ public final class BlastSettingsTab extends Component {
                 super.onClick();
                 BlastSettings.setDebugLog(checked());
                 if (checked() && BlastSecret.canToggleTests()) {
+                    if (BlastSettings.showTests()) disableTestOptions();
                     BlastSettings.toggleTests();
                     refreshTestVisibility();
                     layout();
@@ -233,7 +234,7 @@ public final class BlastSettingsTab extends Component {
             protected void onChange() {
                 Hero hero = Dungeon.hero;
                 if (hero == null || !hero.isAlive() || !BlastSettings.showTests()) return;
-                BlastRadius.setStacks(hero, RADIUS_BOOST_VALUES[getSelectedValue()]);
+                BlastRadius.setTestBoost(hero, RADIUS_BOOST_VALUES[getSelectedValue()]);
                 refreshRadius();
             }
 
@@ -270,6 +271,33 @@ public final class BlastSettingsTab extends Component {
         refreshTestVisibility();
     }
 
+    /** Clear enabled test features before hiding their controls. */
+    private void disableTestOptions() {
+        BlastBombManiac buff = BlastBombManiac.current();
+        if (buff != null) buff.setSecretBombTypes(false);
+        BlastRadius.clearTestBoost(Dungeon.hero);
+        refreshRadius();
+
+        BlastSettings.setTestInfiniteBomb(false);
+        BlastSettings.setTestIndestructible(false);
+        BlastSettings.setTestFreeMovement(false);
+        BlastSettings.setTestRemoteThrow(false);
+        BlastSettings.setTestDemolition(false);
+        BlastSettings.setTestAutoPlay(false);
+        BlastSettings.setAutoFarming(false);
+        BlastSettings.setEnchantmentStoneReverseAlchemy(false);
+        BlastSettings.setWeakMobDrops(false);
+        BlastSettings.setWeakMobExpEffects(false);
+
+        for (CheckBox option : testOptions) option.checked(false);
+
+        BlastTestBuffs.syncHero();
+        BlastAutoPlay.onSettingChanged();
+        BlastRemoteBomb.restoreRemoteModeIfNecessary();
+        if (Dungeon.level != null) BlastBombWarnings.refresh(Dungeon.level);
+        Item.updateQuickslot();
+    }
+
     private void refreshTestVisibility() {
         boolean show = BlastSettings.showTests();
         for (CheckBox option : testOptions) {
@@ -302,7 +330,7 @@ public final class BlastSettingsTab extends Component {
 
     private void refreshRadius() {
         Hero hero = Dungeon.hero;
-        int count = hero == null ? 0 : BlastRadius.stacks(hero);
+        int count = BlastRadius.boost(hero);
         radiusValue.text("+" + count);
         radiusSlider.setSelectedValue(radiusBoostIndex(count));
         boolean active = BlastSettings.showTests() && hero != null && hero.isAlive();

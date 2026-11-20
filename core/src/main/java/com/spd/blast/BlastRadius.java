@@ -10,8 +10,10 @@ import com.watabou.utils.Bundle;
 /** At most one additional explosion tile of reach, granted by a radius pickup. */
 public final class BlastRadius extends Buff {
     private static final String STACKS = "blast_radius_stacks";
+    private static final String TEST_BOOST = "blast_radius_test_boost";
     public static final int MAX_STACKS = 1;
     private int stacks;
+    private int testBoost = -1;
 
     {
         type = buffType.POSITIVE;
@@ -33,36 +35,66 @@ public final class BlastRadius extends Buff {
         return radius == null ? 0 : radius.stacks;
     }
 
-    /** Set the actual buff stack count, including zero to remove it. */
+    /** Normal pickup bonus is always either zero or one. */
     public static void setStacks(Hero hero, int count) {
         if (hero == null) throw new IllegalArgumentException("Hero required");
-        if (count < 0) throw new IllegalArgumentException("Negative blast radius stacks");
-        BlastRadius radius = hero.buff(BlastRadius.class);
-        if (count == 0) {
-            if (radius != null) radius.detach();
-        } else {
-            if (radius == null) radius = Buff.affect(hero, BlastRadius.class);
-            if (radius == null) throw new IllegalStateException("Cannot apply blast radius buff");
-            radius.stacks = count;
+        if (count < 0 || count > MAX_STACKS) {
+            throw new IllegalArgumentException("Invalid pickup radius boost: " + count);
         }
+        BlastRadius radius = hero.buff(BlastRadius.class);
+        if (radius == null && count > 0) {
+            radius = Buff.affect(hero, BlastRadius.class);
+            if (radius == null) throw new IllegalStateException("Cannot apply blast radius buff");
+        }
+        if (radius != null) {
+            radius.stacks = count;
+            if (count == 0 && radius.testBoost < 0) radius.detach();
+        }
+        refresh(hero);
+    }
+
+    /** Test boost overrides the visible radius without changing the pickup bonus. */
+    public static void setTestBoost(Hero hero, int count) {
+        if (hero == null) throw new IllegalArgumentException("Hero required");
+        if (count < 0) throw new IllegalArgumentException("Negative test radius boost");
+        BlastRadius radius = hero.buff(BlastRadius.class);
+        if (radius == null) radius = Buff.affect(hero, BlastRadius.class);
+        if (radius == null) throw new IllegalStateException("Cannot apply blast radius buff");
+        radius.testBoost = count;
+        refresh(hero);
+    }
+
+    public static void clearTestBoost(Hero hero) {
+        if (hero == null) return;
+        BlastRadius radius = hero.buff(BlastRadius.class);
+        if (radius == null || radius.testBoost < 0) return;
+        radius.testBoost = -1;
+        if (radius.stacks == 0) radius.detach();
+        refresh(hero);
+    }
+
+    /** Effective boost used by explosions and the test slider. */
+    public static int boost(Hero hero) {
+        if (hero == null) return 0;
+        BlastRadius radius = hero.buff(BlastRadius.class);
+        if (radius == null) return 0;
+        return radius.testBoost >= 0 ? radius.testBoost : radius.stacks;
+    }
+
+    private static void refresh(Hero hero) {
         BuffIndicator.refreshHero();
         if (Dungeon.hero == hero && Dungeon.level != null) {
             BlastBombWarnings.refresh(Dungeon.level);
         }
     }
 
-    /** Whether the Hero has any added blast reach. */
     public static boolean hasBoost() {
-        Hero hero = Dungeon.hero;
-        BlastRadius radius = hero == null ? null : hero.buff(BlastRadius.class);
-        return radius != null && radius.stacks > 0;
+        return boost(Dungeon.hero) > 0;
     }
 
     public static int apply(int original) {
         if (original < 0) throw new IllegalArgumentException("Negative explosion radius");
-        Hero hero = Dungeon.hero;
-        BlastRadius radius = hero == null ? null : hero.buff(BlastRadius.class);
-        return Math.addExact(original, radius == null ? 0 : radius.stacks);
+        return Math.addExact(original, boost(Dungeon.hero));
     }
 
     @Override
@@ -83,7 +115,7 @@ public final class BlastRadius extends Buff {
 
     @Override
     public String iconTextDisplay() {
-        return "+" + stacks;
+        return "+" + (testBoost >= 0 ? testBoost : stacks);
     }
 
     @Override
@@ -93,18 +125,24 @@ public final class BlastRadius extends Buff {
 
     @Override
     public String desc() {
-        return BlastMessages.get("radius.buff_desc", stacks);
+        return BlastMessages.get("radius.buff_desc", testBoost >= 0 ? testBoost : stacks);
     }
 
     @Override
     public void storeInBundle(Bundle bundle) {
         super.storeInBundle(bundle);
         bundle.put(STACKS, stacks);
+        if (testBoost >= 0) bundle.put(TEST_BOOST, testBoost);
     }
 
     @Override
     public void restoreFromBundle(Bundle bundle) {
         super.restoreFromBundle(bundle);
         stacks = bundle.getInt(STACKS);
+        if (stacks < 0 || stacks > MAX_STACKS) {
+            throw new IllegalStateException("Invalid pickup radius boost");
+        }
+        testBoost = bundle.contains(TEST_BOOST) ? bundle.getInt(TEST_BOOST) : -1;
+        if (testBoost < -1) throw new IllegalStateException("Invalid test radius boost");
     }
 }
