@@ -46,9 +46,12 @@ class AutoBombDestructiveTests(unittest.TestCase):
         self.assertEqual(source.count("if (!autoBombAvailable(hero))"), 2)
         self.assertIn("if (!autoBombAvailable(hero) || BlastSettings.testRemoteThrow()", source)
         self.assertEqual(source.count("containsExcludedMob(blast)"), 3)
-        self.assertIn("&& BlastAutoPlay.isAutoAttackExcluded(mob)) return true;", source)
+        self.assertIn("&& !ignoresBombCollateral(mob)) return true;", source)
         self.assertIn("|| BlastAutoPlay.isAutoAttackExcluded(target)) return -1;", source)
         self.assertIn("|| containsUnreadySacrificeMob(blast, flames)", source)
+        self.assertIn("|| !blast[mob.pos] || ignoresBombCollateral(mob)", source)
+        self.assertIn("mob instanceof NPC && mob.alignment == Char.Alignment.NEUTRAL", source)
+        self.assertIn("&& !(mob instanceof Shopkeeper)", source)
 
 
 if __name__ == "__main__":
