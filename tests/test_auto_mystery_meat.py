@@ -73,10 +73,7 @@ class AutomaticMysteryMeatTests(unittest.TestCase):
         self.assertIn("finally {", food)
         self.assertNotIn("food instanceof MysteryMeat", food)
         self.assertIn("food instanceof Blandfruit", food)
-        self.assertIn("if (!hunger.isStarving())", food.replace(
-            "if (hunger == null || !hunger.isStarving())",
-            "if (!hunger.isStarving())",
-        ))
+        self.assertIn("hunger == null || !hunger.isStarving()", food)
 
     def test_patch_used_by_both_builds(self):
         apply = APPLY.read_text(encoding="utf-8")
