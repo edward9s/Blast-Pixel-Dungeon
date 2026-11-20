@@ -39,12 +39,18 @@ def main() -> None:
 
 \t\tfinal float standardHeight = height;
 \t\tif (com.spd.blast.BlastSettings.SHOW_BLAST_TAB) {
+\t\t\t// Pointer listeners run newest-first. Create the scroll controller before
+\t\t\t// the settings buttons so they receive clicks before the scroll area.
+\t\t\tblastScroll = new com.shatteredpixel.shatteredpixeldungeon.ui.ScrollPane(
+\t\t\t\t\tnew com.watabou.noosa.ui.Component());
 \t\t\tblast = new com.spd.blast.BlastSettingsTab();
 \t\t\tblast.setSize(width, 0);
+\t\t\tblastScroll.content().add(blast);
+\t\t\tblastScroll.content().setSize(width, blast.height());
 \t\t\theight = PixelScene.landscape() ? standardHeight
 \t\t\t\t\t: Math.max(standardHeight, blast.height());
-\t\t\tblastScroll = new com.shatteredpixel.shatteredpixeldungeon.ui.ScrollPane(blast);
 \t\t\tblast.setHeightChanged(() -> {
+\t\t\t\tblastScroll.content().setSize(width, blast.height());
 \t\t\t\tint windowHeight = (int)Math.ceil(PixelScene.landscape() ? standardHeight
 \t\t\t\t\t\t: Math.max(standardHeight, blast.height()));
 \t\t\t\tresize(width, windowHeight);
