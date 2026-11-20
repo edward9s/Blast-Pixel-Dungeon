@@ -95,6 +95,31 @@ javac --release 11 -encoding UTF-8 -cp "$BLAST_TEST_CLASSPATH" \
 java -cp "/tmp/blast-tests:$BLAST_TEST_CLASSPATH" com.spd.blast.BlastAutoPickupTest
 ```
 
+The existing Blast **Debug Log** checkbox also traces automatic decisions while
+a visible ordinary floor heap is within two cells of the hero. The single-line
+`[Blast] auto-loot` event contains the hero and item cells, top-item class,
+pickup eligibility (`ready`, `type`, `capacity`, `unsafe`, `blocked`,
+`unreachable`, or `cooldown`), the winning task (`chosen`), and the
+issued action. `ready` means the floor item passes its local conditions and
+the base distance map; task-specific exclusions on intermediate steps may
+still prevent pickup. Logs are emitted only when Debug Log is enabled and
+identical consecutive observations are limited to one in ten decisions.
+Debug output is written to `game1/blast-debug.txt`, `game2/blast-debug.txt`,
+and so on (according to the active save slot). Entering a new game or
+continuing a save replaces that slot's previous debug file; switching
+floors only appends to the same file. The file is flushed on every event,
+limited to 1 MiB, and copied by the existing **Export save** action into
+`Documents/spd_saves/<app name>/gameN/blast-debug.txt`.
+Entering with Debug Log disabled removes the old file for that slot.
+Disabling logging mid-game closes the file; re-enabling appends to the
+same session. No ADB or additional storage permission is needed beyond
+the permission already required to export saves.
+This instrumentation does not change any automatic action priority.
+
+```sh
+python -m unittest discover -s tests -p test_auto_loot_debug.py
+```
+
 The native failure callback is inserted by `integration/shattered/patches/patch_hero.py`.
 The source-level integration check confirms it only starts cooldown for actual
 failed native pickups:

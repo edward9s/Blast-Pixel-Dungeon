@@ -47,6 +47,10 @@ public final class BlastAutoPlay {
     private static Mob ignoredTarget;
     private static int ignoredTargetCell = -1;
     private static int lastRetryCell = -1;
+    private static String debugDecision;
+    private static String nearbyDebugLoot;
+    private static String lastLootTrace;
+    private static int repeatedLootTrace;
     private static volatile boolean manualAction;
     private static volatile int interruptedDestination = -1;
     private static int blockedTravelTurns;
@@ -181,6 +185,8 @@ public final class BlastAutoPlay {
         ignoredTarget = null;
         ignoredTargetCell = -1;
         lastRetryCell = -1;
+        lastLootTrace = null;
+        repeatedLootTrace = 0;
         manualAction = false;
         manualConfirmationHero = null;
         clearInterruptedTravel();
@@ -543,10 +549,13 @@ public final class BlastAutoPlay {
         boolean started = chooseActionOnce(hero);
         HeroAction action = hero.curAction;
         progress.record(hero.pos, action instanceof HeroAction.Move ? action.dst : -1);
+        logNearbyLoot(hero, action, started);
         return started;
     }
 
     private static boolean chooseActionOnce(Hero hero) {
+        debugDecision = "hazard";
+        nearbyDebugLoot = null;
         hero.curAction = null;
         hero.lastAction = null;
         hero.resting = false;
@@ -560,6 +569,11 @@ public final class BlastAutoPlay {
         // Compute reachability once, rather than doing up to nine searches per mob.
         PathFinder.buildDistanceMap(hero.pos, safe);
         int[] distances = PathFinder.distance.clone();
+        if (BlastSettings.debugLog()) {
+            nearbyDebugLoot = BlastAutoPickup.nearbyDiagnostic(hero, safe, distances,
+                    progress.safeFor(safe, hero.pos, BlastAutoProgressGuard.Intent.PICKUP),
+                    BlastAutoPickupPolicy::isInstantPickup);
+        }
         if (lastRetryCell != hero.pos) lastRetryCell = -1;
         // A suspended pursuit expires while the hero handles another threat.
         if (suspendedTarget != null && ++suspendedTargetTurns > LOST_TARGET_TURNS) {
@@ -610,16 +624,20 @@ public final class BlastAutoPlay {
 
         // Bombard ranged enemies before sacrificial-fire luring or melee pursuit.
         // The trajectory and blast radius determine whether unseen targets can be hit.
+        debugDecision = "ranged-bomb";
         if (BlastAutoBombAI.actAgainstRanged(hero)) return true;
 
         // Keep sacrificial-fire luring ahead of bomb attacks on other enemies.
+        debugDecision = "sacrifice";
         BlastAutoSacrifice.Action sacrifice = BlastAutoSacrifice.chooseAction(hero, safe, distances);
         if (sacrifice == BlastAutoSacrifice.Action.WAIT) return true;
         if (sacrifice == BlastAutoSacrifice.Action.QUEUED) return false;
 
         // Blast-specific tactics are isolated from the portable AI policy.
+        debugDecision = "bomb";
         if (BlastAutoBombAI.actAgainstOtherEnemies(hero)) return true;
 
+        debugDecision = "combat";
         BlastAutoCombat.Action combat = BlastAutoCombat.chooseAction(hero, safe, distances);
         if (combat != BlastAutoCombat.Action.NONE) {
             return combat == BlastAutoCombat.Action.STARTED;
@@ -693,6 +711,7 @@ public final class BlastAutoPlay {
         }
 
         // Rooted heroes cannot chase. Hostile ranged attacks were tried above.
+        debugDecision = "rooted";
         if (hero.rooted) {
             if (selected != null) {
                 rememberCombatTarget(selected);
@@ -705,6 +724,7 @@ public final class BlastAutoPlay {
             return true;
         }
 
+        debugDecision = "retreat";
         if (attackerTurns > 0 && lastAttacker != null
                 && lastAttacker.isAlive() && lastAttacker.isInvulnerable(Hero.class)
                 && !(lastAttacker instanceof NPC)
@@ -721,6 +741,7 @@ public final class BlastAutoPlay {
             return false;
         }
 
+        debugDecision = "neutral";
         if (selected != null) {
             rememberCombatTarget(selected);
             if (selectedCanMelee && BlastAutoCombat.meleeCollateralSafe(hero, selected)) {
@@ -732,8 +753,10 @@ public final class BlastAutoPlay {
         }
 
         // Keep pursuing the last observed position before switching to floor loot.
+        debugDecision = "pursuit";
         if (pursueLastSeenTarget(hero, safe, distances)) return false;
 
+        debugDecision = "necromancer";
         if (hiddenNecromancer != null) {
             hero.curAction = new HeroAction.Move(
                     firstStep(hiddenNecromancerGoal, safe, distances));
@@ -746,6 +769,7 @@ public final class BlastAutoPlay {
         int[] idleDistances = navigationDistances(hero.pos, safe, distances, idleSafe);
 
         // Resume interrupted player travel after tactical combat and before idle tasks.
+        debugDecision = "manual-route";
         if (resumeInterruptedTravel(hero, idleSafe, idleDistances)) {
             progress.intent(BlastAutoProgressGuard.Intent.TRAVEL);
             return false;
@@ -754,6 +778,7 @@ public final class BlastAutoPlay {
         // Collect reachable floor loot after visible enemies have been handled.
         idleSafe = progress.safeFor(safe, hero.pos, BlastAutoProgressGuard.Intent.PICKUP);
         idleDistances = navigationDistances(hero.pos, safe, distances, idleSafe);
+        debugDecision = "pickup";
         if (BlastAutoPickup.chooseAction(hero, idleSafe, idleDistances,
                 BlastAutoPickupPolicy::isInstantPickup)) {
             progress.intent(BlastAutoProgressGuard.Intent.PICKUP);
@@ -763,11 +788,13 @@ public final class BlastAutoPlay {
         // Use native actions to open visible containers and keyed doors.
         idleSafe = progress.safeFor(safe, hero.pos, BlastAutoProgressGuard.Intent.INTERACT);
         idleDistances = navigationDistances(hero.pos, safe, distances, idleSafe);
+        debugDecision = "interact";
         if (BlastAutoInteract.chooseAction(hero, idleSafe, idleDistances)) {
             progress.intent(BlastAutoProgressGuard.Intent.INTERACT);
             return false;
         }
 
+        debugDecision = "attacker";
         if (attackerTurns > 0) {
             attackerTurns--;
             if (lastAttacker != null && lastAttacker.isAlive()
@@ -787,6 +814,7 @@ public final class BlastAutoPlay {
         // Harvesting belongs to ordinary auto-play even when auto-farming is disabled.
         idleSafe = progress.safeFor(safe, hero.pos, BlastAutoProgressGuard.Intent.HARVEST);
         idleDistances = navigationDistances(hero.pos, safe, distances, idleSafe);
+        debugDecision = "harvest";
         if (harvest(hero, idleSafe, idleDistances)) {
             progress.intent(BlastAutoProgressGuard.Intent.HARVEST);
             return false;
@@ -795,6 +823,7 @@ public final class BlastAutoPlay {
         // Only planting new grass depends on the separate farming setting.
         idleSafe = progress.safeFor(safe, hero.pos, BlastAutoProgressGuard.Intent.FARM);
         idleDistances = navigationDistances(hero.pos, safe, distances, idleSafe);
+        debugDecision = "farm";
         BlastAutoFarming.Action farmingAction =
                 BlastAutoFarming.chooseAction(hero, idleSafe, idleDistances);
         if (farmingAction != BlastAutoFarming.Action.NONE) {
@@ -808,12 +837,43 @@ public final class BlastAutoPlay {
 
         idleSafe = progress.safeFor(safe, hero.pos, BlastAutoProgressGuard.Intent.ROAM);
         idleDistances = navigationDistances(hero.pos, safe, distances, idleSafe);
+        debugDecision = "roam";
         int step = roamStep(hero, idleSafe, idleDistances);
         if (step >= 0) {
             progress.intent(BlastAutoProgressGuard.Intent.ROAM);
             hero.curAction = new HeroAction.Move(step);
+        } else {
+            debugDecision = "idle";
         }
         return false;
+    }
+
+    /** Only the existing Debug Log switch enables nearby-loot decision traces. */
+    private static void logNearbyLoot(Hero hero, HeroAction action, boolean started) {
+        if (!BlastSettings.debugLog() || nearbyDebugLoot == null) {
+            lastLootTrace = null;
+            repeatedLootTrace = 0;
+            return;
+        }
+        String command;
+        if (action instanceof HeroAction.Move) {
+            command = "move@" + ((HeroAction.Move) action).dst;
+        } else if (action instanceof HeroAction.PickUp) {
+            command = "pickup@" + ((HeroAction.PickUp) action).dst;
+        } else {
+            command = action == null ? (started ? "turn" : "wait")
+                    : action.getClass().getSimpleName();
+        }
+        String trace = "auto-loot pos=" + hero.pos + " "
+                + nearbyDebugLoot + " chosen=" + debugDecision + " action=" + command;
+        if (trace.equals(lastLootTrace)) {
+            if (++repeatedLootTrace < 10) return;
+            repeatedLootTrace = 0;
+        } else {
+            lastLootTrace = trace;
+            repeatedLootTrace = 0;
+        }
+        BlastLog.debug(trace);
     }
 
     /** Wraiths and targets with at least twice the hero's accuracy qualify. */
@@ -849,6 +909,8 @@ public final class BlastAutoPlay {
         ignoredTarget = null;
         ignoredTargetCell = -1;
         lastRetryCell = -1;
+        lastLootTrace = null;
+        repeatedLootTrace = 0;
         manualAction = false;
         manualConfirmationHero = null;
         clearInterruptedTravel();
