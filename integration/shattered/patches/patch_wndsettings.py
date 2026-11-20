@@ -39,10 +39,17 @@ def main() -> None:
 
 \t\tfinal float standardHeight = height;
 \t\tif (com.spd.blast.BlastSettings.SHOW_BLAST_TAB) {
-\t\t\t// Pointer listeners run newest-first. Create the scroll controller before
-\t\t\t// the settings buttons so they receive clicks before the scroll area.
+\t\t\t// Keep the scroll controller nonblocking so buttons still receive taps.
+\t\t\t// Give it pointer priority after layout to allow drags over checkboxes.
 \t\t\tblastScroll = new com.shatteredpixel.shatteredpixeldungeon.ui.ScrollPane(
-\t\t\t\t\tnew com.watabou.noosa.ui.Component());
+\t\t\t\t\tnew com.watabou.noosa.ui.Component()) {
+\t\t\t\t@Override
+\t\t\t\tprotected void layout() {
+\t\t\t\t\tsuper.layout();
+\t\t\t\t\tcontroller.blockLevel = com.watabou.noosa.PointerArea.NEVER_BLOCK;
+\t\t\t\t\tcontroller.givePointerPriority();
+\t\t\t\t}
+\t\t\t};
 \t\t\tblast = new com.spd.blast.BlastSettingsTab();
 \t\t\tblast.setSize(width, 0);
 \t\t\tblastScroll.content().add(blast);
