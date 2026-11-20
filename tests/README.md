@@ -1,5 +1,17 @@
 # Demolition regression checks
 
+## Automatic mystery meat
+
+`BlastAutoFoodTest.java` checks selection by stack size, raw mystery meat
+eligibility, ties, and exclusion of uncooked Blandfruit.
+`test_auto_mystery_meat.py` checks the native meat patch, manual-effect
+preservation, patch drift rejection, and integration registration:
+
+```sh
+python -m unittest discover -s tests -p test_auto_mystery_meat.py
+```
+
+
 `BlastDemolitionTest.java` runs the actual patched `Bomb.explode` and
 `ArcaneBomb.explode` methods without opening a graphics/audio backend. It checks
 default/off behavior, all three locked door types, all three chest types,
