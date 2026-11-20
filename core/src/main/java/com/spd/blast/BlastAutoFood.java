@@ -9,14 +9,13 @@ import com.shatteredpixel.shatteredpixeldungeon.items.food.MysteryMeat;
 /** Native eating during idle auto-play; never consumes unsafe raw food. */
 final class BlastAutoFood {
 
-    private static final ThreadLocal<Boolean> automaticEating =
-            ThreadLocal.withInitial(() -> false);
+    private static final ThreadLocal<Boolean> automaticConsumption = new ThreadLocal<>();
 
     private BlastAutoFood() {}
 
     /** Suppress only the manual-item reset caused by native Food.execute. */
-    static boolean automaticEating() {
-        return automaticEating.get();
+    static boolean isEatingAutomatically() {
+        return Boolean.TRUE.equals(automaticConsumption.get());
     }
 
     static Food mostAbundant(Iterable<? extends Food> foods) {
@@ -40,11 +39,11 @@ final class BlastAutoFood {
         Food food = mostAbundant(hero.belongings.getAllItems(Food.class));
         if (food == null) return false;
 
-        automaticEating.set(true);
+        automaticConsumption.set(true);
         try {
             food.execute(hero, Food.AC_EAT);
         } finally {
-            automaticEating.set(false);
+            automaticConsumption.remove();
         }
         return true;
     }
