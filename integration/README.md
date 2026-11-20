@@ -14,8 +14,14 @@ against the latest published upstream release and does not silently skip patches
 
 ### Safe automatic mystery meat
 
-When automatic roaming eats food at Starving, mystery meat is now eligible
-under the existing largest-stack rule. `BlastAutoFood` scopes native eating
+When automatic roaming eats at Starving, it first uses an equipped, charged
+Horn of Plenty through its native EAT action (which also handles magic immunity).
+If the Horn cannot feed the hero, Mystery Meat is eligible alongside other food.
+The automatic selection never eats Pasties; it reserves one plain Ration and one
+recipe-compatible meat (Mystery, Stewed, Chargrilled, or Frozen) per Pasty in the
+inventory, then prefers the largest remaining eligible quantity. Finished Meat
+Pies remain eligible. Reserves protect ingredients only from automatic eating;
+manual use and alchemy are unchanged. `BlastAutoFood` scopes native eating
 with a `ThreadLocal`, and the native `MysteryMeat.satisfy` patch skips only
 the meat's random harmful effect inside that scope. Hunger recovery, eating
 time, food talents, and manual eating remain native. The scope is cleared in
