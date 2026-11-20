@@ -64,6 +64,22 @@ public final class BlastBombManiac extends Buff {
         return BlastSettings.testInfiniteBomb();
     }
 
+    /** Change registered bomb types only when the secret conditions are met. */
+    public void setSecretBombTypes(boolean enabled) {
+        if (target != Dungeon.hero || !BlastSecret.canToggleTests()) {
+            throw new IllegalStateException("Secret bomb type change requires the easter egg conditions");
+        }
+        if (enabled) {
+            for (Class<? extends Bomb> kind : Bomb.EnhanceBomb.validIngredients.values()) {
+                if (!types.contains(kind)) types.add(kind);
+            }
+        } else {
+            types.clear();
+            types.add(Bomb.class);
+            selected = 0;
+        }
+    }
+
     public int deployed() {
         return activeBombs;
     }
