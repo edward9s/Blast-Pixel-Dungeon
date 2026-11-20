@@ -27,12 +27,10 @@ public final class BlastBombManiac extends Buff {
     private static final String SELECTED = "blast_bomb_selected";
     private static final String ACTIVE = "blast_bomb_active";
     private static final String TYPES = "blast_bomb_types";
-    private static final String INFINITE_TYPES = "blast_bomb_infinite_types";
 
     private int capacity = 1;
     private int activeBombs;
     private int selected;
-    private boolean infiniteTypes;
     private final ArrayList<Class<? extends Bomb>> types = new ArrayList<>();
     private transient CellSelector.Listener targeting;
     private transient Mob autoTarget;
@@ -48,10 +46,9 @@ public final class BlastBombManiac extends Buff {
 
     /** Every living hero past the tutorial receives this buff, independently of test settings. */
     public static void ensureHero() {
-        if (!SPDSettings.intro() && Dungeon.hero != null && Dungeon.hero.isAlive()) {
-            BlastBombManiac buff = Dungeon.hero.buff(BlastBombManiac.class);
-            if (buff == null) buff = Buff.affect(Dungeon.hero, BlastBombManiac.class);
-            buff.syncInfiniteTypes();
+        if (!SPDSettings.intro() && Dungeon.hero != null && Dungeon.hero.isAlive()
+                && Dungeon.hero.buff(BlastBombManiac.class) == null) {
+            Buff.affect(Dungeon.hero, BlastBombManiac.class);
         }
     }
 
@@ -67,12 +64,11 @@ public final class BlastBombManiac extends Buff {
         return BlastSettings.testInfiniteBomb();
     }
 
-    /** Infinite bombs temporarily unlocks all alchemical bomb types.
-     * Disabling it deliberately resets the unlocked list to the original bomb. */
-    public void syncInfiniteTypes() {
-        boolean enabled = BlastSettings.testInfiniteBomb();
-        if (enabled == infiniteTypes) return;
-
+    /** Change registered bomb types only when the secret conditions are met. */
+    public void setSecretBombTypes(boolean enabled) {
+        if (target != Dungeon.hero || !BlastSecret.canToggleTests()) {
+            throw new IllegalStateException("Secret bomb type change requires the easter egg conditions");
+        }
         if (enabled) {
             for (Class<? extends Bomb> kind : Bomb.EnhanceBomb.validIngredients.values()) {
                 if (!types.contains(kind)) types.add(kind);
@@ -82,7 +78,6 @@ public final class BlastBombManiac extends Buff {
             types.add(Bomb.class);
             selected = 0;
         }
-        infiniteTypes = enabled;
     }
 
     public int deployed() {
@@ -421,7 +416,6 @@ public final class BlastBombManiac extends Buff {
         bundle.put(CAPACITY, capacity);
         bundle.put(ACTIVE, activeBombs);
         bundle.put(SELECTED, selected);
-        bundle.put(INFINITE_TYPES, infiniteTypes);
         bundle.put(TYPES, types.size());
         for (int i = 0; i < types.size(); i++) bundle.put(TYPES + i, types.get(i).getName());
     }
@@ -451,7 +445,5 @@ public final class BlastBombManiac extends Buff {
         if (types.get(0) != Bomb.class || selected < 0 || selected >= count) {
             throw new IllegalStateException("Invalid Bomb Maniac selection");
         }
-        infiniteTypes = bundle.getBoolean(INFINITE_TYPES);
-        syncInfiniteTypes();
     }
 }
