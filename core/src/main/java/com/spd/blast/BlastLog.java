@@ -28,12 +28,15 @@ public final class BlastLog {
         slot = saveSlot;
         opened = false;
         failed = false;
-        if (BlastSettings.debugLog()) {
-            try {
+        try {
+            if (BlastSettings.debugLog()) {
                 open(false);
-            } catch (RuntimeException error) {
-                report(error);
+            } else {
+                // Do not export a stale log from a previous visit to this save.
+                FileUtils.deleteFile(GamesInProgress.gameFolder(slot) + "/" + FILE_NAME);
             }
+        } catch (RuntimeException error) {
+            report(error);
         }
     }
 
