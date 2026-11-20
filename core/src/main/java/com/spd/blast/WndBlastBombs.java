@@ -17,14 +17,17 @@ import com.watabou.input.PointerEvent;
 import com.watabou.noosa.ColorBlock;
 import com.watabou.noosa.Game;
 import com.watabou.noosa.ui.Component;
+import com.watabou.utils.PlatformSupport;
 import com.watabou.utils.PointF;
+import com.watabou.utils.RectF;
 
 /** Responsive bomb selector with a scrollable, persistent selection outline. */
 public final class WndBlastBombs extends Window {
     private static final int MAX_WIDTH = 144;
     private static final int ROW_HEIGHT = 20;
     private static final int GAP = 2;
-    private static final int MAX_LIST_HEIGHT = 110;
+    private static final int SCREEN_MARGIN = 3;
+    private static final int BOTTOM_PADDING = 2;
 
     private final ScrollPane list;
     private final float listTop;
@@ -74,7 +77,7 @@ public final class WndBlastBombs extends Window {
         // Keep two columns on portrait and landscape, including narrow displays.
         final int columns = 2;
         final int rows = (buff.typeCount() + columns - 1) / columns;
-        final int contentHeight = rows * (ROW_HEIGHT + GAP);
+        final int contentHeight = rows * ROW_HEIGHT + (rows - 1) * GAP;
         final float columnWidth = (width - (columns - 1) * GAP - 2f) / columns;
         final Component content = new Component() {};
         content.setSize(width, contentHeight);
@@ -199,10 +202,18 @@ public final class WndBlastBombs extends Window {
         add(list);
 
         listTop = imbue.bottom() + 4;
-        int available = (int) (PixelScene.uiCamera.height - chrome.marginVer() - listTop - 8);
-        listHeight = Math.min(contentHeight,
-                Math.min(MAX_LIST_HEIGHT, Math.max(ROW_HEIGHT, available)));
-        resize(width, (int) (listTop + listHeight + 2));
+        // Grow with registered bomb types, but keep the entire window inside
+        // the same safe screen area used by Window.resize().
+        RectF insets = Game.platform.getSafeInsets(PlatformSupport.INSET_BLK);
+        int safeHeight = (int) ((Game.height - insets.top - insets.bottom)
+                / PixelScene.defaultZoom);
+        int maxBodyHeight = safeHeight - chrome.marginVer() - SCREEN_MARGIN * 2;
+        int available = maxBodyHeight - (int) Math.ceil(listTop) - BOTTOM_PADDING;
+        if (available <= 0) {
+            throw new IllegalStateException("Not enough room for bomb selection list");
+        }
+        listHeight = Math.min(contentHeight, available);
+        resize(width, (int) Math.ceil(listTop) + listHeight + BOTTOM_PADDING);
         positionList();
     }
 
