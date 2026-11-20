@@ -382,7 +382,7 @@ public final class BlastAutoPlay {
 
     /** An explicit item action supersedes the last AI movement order. */
     public static void beginItemAction(Hero hero) {
-        if (!BlastSettings.testAutoPlay() || BlastAutoFood.automaticEating()) return;
+        if (!BlastSettings.testAutoPlay() || BlastAutoFood.isEatingAutomatically()) return;
         resetForLevel(hero);
         retainNativeManualTravel(hero);
         progress.reset();
