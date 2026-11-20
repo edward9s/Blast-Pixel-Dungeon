@@ -26,6 +26,18 @@ class NativeAutoPickupTests(unittest.TestCase):
         self.assertIn("hero == currentHero && Dungeon.level == currentLevel", callback)
         self.assertIn("retryTurns = RETRY_TURNS;", callback)
 
+    def test_buried_loot_uses_native_pickup_after_reordering(self):
+        action = PICKUP.split("public static boolean chooseAction(", 1)[1].split(
+            "static String nearbyDiagnostic(", 1
+        )[0]
+        self.assertIn("firstEligibleItem(heap, candidate ->", action)
+        self.assertIn("exposeForPickup(nearestHeap, nearestItem);", action)
+        self.assertIn("hero.curAction = new HeroAction.PickUp(nearest);", action)
+        self.assertLess(action.index("if (nearest == hero.pos)"),
+                        action.index("exposeForPickup(nearestHeap, nearestItem);"))
+        self.assertIn("for (Item item : heap.items)", PICKUP)
+        self.assertIn("heap.items.addFirst(item);", PICKUP)
+
     def test_native_hero_reports_only_failed_pickup(self):
         self.assertIn("Hero.actPickUp report native pickup failure", PATCH)
         self.assertIn("BlastAutoPickup.onPickupFailure(this, item, pos);", PATCH)
