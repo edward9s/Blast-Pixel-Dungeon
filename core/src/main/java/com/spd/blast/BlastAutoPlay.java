@@ -382,7 +382,7 @@ public final class BlastAutoPlay {
 
     /** An explicit item action supersedes the last AI movement order. */
     public static void beginItemAction(Hero hero) {
-        if (!BlastSettings.testAutoPlay()) return;
+        if (!BlastSettings.testAutoPlay() || BlastAutoFood.isEatingAutomatically()) return;
         resetForLevel(hero);
         retainNativeManualTravel(hero);
         progress.reset();
@@ -774,6 +774,11 @@ public final class BlastAutoPlay {
             progress.intent(BlastAutoProgressGuard.Intent.TRAVEL);
             return false;
         }
+
+        // Feed only during idle auto-play, after combat and interrupted manual travel.
+        // Food.execute owns the animated eating turn and its native time cost.
+        debugDecision = "food";
+        if (BlastAutoFood.eatIfStarving(hero)) return true;
 
         // Collect reachable floor loot after visible enemies have been handled.
         idleSafe = progress.safeFor(safe, hero.pos, BlastAutoProgressGuard.Intent.PICKUP);
