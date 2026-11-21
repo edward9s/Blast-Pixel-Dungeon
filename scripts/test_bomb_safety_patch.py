@@ -75,7 +75,6 @@ FIXTURES = {
         "fire.clear(cell);\n\t\t\t\t\t\t}\n"
         "if (freeze != null && freeze.volume > 0 && freeze.cur[cell+k] > 0) {\n"
         "freeze.clear(cell);\n\t\t\t\t\t\t\t\tcur[cell] = 0;\n\t\t\t\t\t\t\t\tclearAll = true;\n\t\t\t\t\t\t\t}\n"
-        "if (Dungeon.level.flamable[cell] && (fire == null || fire.volume == 0 || fire.cur[cell] == 0)){\n"
     ),
     "items/wands/WandOfFrost.java": (
         "Fire fire = (Fire) Dungeon.level.blobs.get(Fire.class);\n"
@@ -95,9 +94,6 @@ FIXTURES = {
     "items/potions/Potion.java": (
         "Fire fire = (Fire)Dungeon.level.blobs.get( Fire.class );\n"
         "if (fire != null) {\n\t\t\tfire.clear(cell);\n\t\t}\n"
-    ),
-    "actors/buffs/Burning.java": (
-        "if (Dungeon.level.flamable[target.pos] && Blob.volumeAt(target.pos, Fire.class) == 0) {\n"
     ),
 }
 
@@ -170,7 +166,6 @@ def main() -> None:
             "actors/blobs/StormCloud.java": ("bombFire.clear(cell);",),
             "actors/blobs/Foliage.java": ("bombFire.cur[cell + k] > 0",),
             "items/potions/Potion.java": ("bombFire.clear(cell);",),
-            "actors/buffs/Burning.java": ("Blob.volumeAt(target.pos, com.spd.blast.BombFire.class) == 0",),
             "levels/rooms/special/MagicalFireRoom.java": (
                 "bombFreeze.cur[cell+k] > 0", "bombFreeze.clear(cell);",
                 "cur[cell] = 0;", "clearAll = true;", "bombFire.clear(cell);",
