@@ -35,7 +35,7 @@ public final class BlastAutoFoodTest {
         cookedFruit.quantity(4);
 
         same(null, BlastAutoFood.mostAbundant(Collections.emptyList()), "no food");
-        same(null, BlastAutoFood.mostAbundantWithin(Collections.emptyList(), 450, 1f),
+        same(null, BlastAutoFood.bestFitWithin(Collections.emptyList(), 450, 1f),
                 "no usable food within hunger budget");
         same(null, BlastAutoFood.mostAbundant(Collections.singletonList(rawFruit)),
                 "uncooked blandfruit must not trigger an empty eating action");
@@ -104,20 +104,24 @@ public final class BlastAutoFoodTest {
         ration.quantity(2);
         rawMeat.quantity(2);
         pasty.quantity(0);
-        same(rawMeat, BlastAutoFood.mostAbundantWithin(Arrays.asList(ration, rawMeat), 150, 1f),
+        same(rawMeat, BlastAutoFood.bestFitWithin(Arrays.asList(ration, rawMeat), 150, 1f),
                 "fit 150-point meat rather than waste a 300-point ration");
-        same(null, BlastAutoFood.mostAbundantWithin(Collections.singletonList(ration), 150, 1f),
+        same(null, BlastAutoFood.bestFitWithin(Collections.singletonList(ration), 150, 1f),
                 "do not eat a ration whose energy would overflow");
-        same(ration, BlastAutoFood.mostAbundantWithin(Collections.singletonList(ration), 300, 1f),
+        same(ration, BlastAutoFood.bestFitWithin(Collections.singletonList(ration), 300, 1f),
                 "exactly matching ration remains edible");
-        same(ration, BlastAutoFood.mostAbundantWithin(Collections.singletonList(ration), 100, 1f / 3f),
+        same(ration, BlastAutoFood.bestFitWithin(Collections.singletonList(ration), 100, 1f / 3f),
                 "diet challenge uses actual reduced food satiety");
-        same(null, BlastAutoFood.mostAbundantWithin(Collections.singletonList(rawMeat), 100, 0.67f),
+        same(null, BlastAutoFood.bestFitWithin(Collections.singletonList(rawMeat), 100, 0.67f),
                 "cursed horn satiety still must fit remaining hunger");
-        same(rawMeat, BlastAutoFood.mostAbundantWithin(Collections.singletonList(rawMeat), 101, 0.67f),
+        same(rawMeat, BlastAutoFood.bestFitWithin(Collections.singletonList(rawMeat), 101, 0.67f),
                 "cursed horn reduced food satiety may fit");
-        same(null, BlastAutoFood.mostAbundantWithin(Collections.singletonList(pie), 450, 1f),
+        same(null, BlastAutoFood.bestFitWithin(Collections.singletonList(pie), 450, 1f),
                 "do not waste a high-energy meat pie at normal satiety");
+        ration.quantity(1);
+        rawMeat.quantity(5);
+        same(ration, BlastAutoFood.bestFitWithin(Arrays.asList(rawMeat, ration), 450, 1f),
+                "larger fitting ration takes priority over a larger stack of meat");
         System.out.println("BlastAutoFoodTest passed");
     }
 }
