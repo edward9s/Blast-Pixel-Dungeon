@@ -18,6 +18,9 @@ def patch(root: Path) -> None:
         "actors/blobs/Blizzard.java",
         "actors/blobs/Inferno.java",
         "actors/blobs/StormCloud.java",
+        "actors/blobs/Foliage.java",
+        "items/potions/Potion.java",
+        "actors/buffs/Burning.java",
         "levels/rooms/special/MagicalFireRoom.java",
         "items/wands/WandOfFrost.java",
         "actors/hero/abilities/mage/ElementalBlast.java",
@@ -289,6 +292,45 @@ def patch(root: Path) -> None:
         "frost blast clears bomb fire",
     )
     updated["actors/hero/abilities/mage/ElementalBlast.java"] = elemental
+
+    elemental = updated["actors/blobs/Foliage.java"]
+    elemental = replace_once(
+        elemental, "Fire fire = (Fire)Dungeon.level.blobs.get( Fire.class );",
+        "Fire fire = (Fire)Dungeon.level.blobs.get( Fire.class );\n\t\tFire bombFire = (Fire)Dungeon.level.blobs.get(com.spd.blast.BombFire.class);",
+        "foliage bomb fire lookup",
+    )
+    elemental = replace_once(
+        elemental, "if (fire != null && fire.volume > 0) {",
+        "if ((fire != null && fire.volume > 0)\n\t\t\t\t\t\t\t|| (bombFire != null && bombFire.volume > 0)) {",
+        "foliage checks both fire types",
+    )
+    elemental = replace_once(
+        elemental, "if (fire.cur[cell + k] > 0){",
+        "if ((fire != null && fire.volume > 0 && fire.cur[cell + k] > 0)\n\t\t\t\t\t\t\t\t\t|| (bombFire != null && bombFire.volume > 0 && bombFire.cur[cell + k] > 0)){",
+        "foliage avoids bomb fire",
+    )
+    updated["actors/blobs/Foliage.java"] = elemental
+
+    elemental = updated["items/potions/Potion.java"]
+    elemental = replace_once(
+        elemental, "Fire fire = (Fire)Dungeon.level.blobs.get( Fire.class );",
+        "Fire fire = (Fire)Dungeon.level.blobs.get( Fire.class );\n\t\tFire bombFire = (Fire)Dungeon.level.blobs.get(com.spd.blast.BombFire.class);",
+        "potion splash bomb fire lookup",
+    )
+    elemental = replace_once(
+        elemental, "if (fire != null) {\n\t\t\tfire.clear(cell);\n\t\t}",
+        "if (fire != null) {\n\t\t\tfire.clear(cell);\n\t\t}\n\t\tif (bombFire != null) bombFire.clear(cell);",
+        "potion splash extinguishes bomb fire",
+    )
+    updated["items/potions/Potion.java"] = elemental
+
+    elemental = updated["actors/buffs/Burning.java"]
+    elemental = replace_once(
+        elemental, "if (Dungeon.level.flamable[target.pos] && Blob.volumeAt(target.pos, Fire.class) == 0) {",
+        "if (Dungeon.level.flamable[target.pos]\n\t\t\t\t&& Blob.volumeAt(target.pos, Fire.class) == 0\n\t\t\t\t&& Blob.volumeAt(target.pos, com.spd.blast.BombFire.class) == 0) {",
+        "burning avoids duplicating bomb fire",
+    )
+    updated["actors/buffs/Burning.java"] = elemental
 
     # All anchors must match before any upstream file changes.
     for path, source in updated.items():
