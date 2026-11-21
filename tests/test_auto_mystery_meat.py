@@ -76,6 +76,7 @@ class AutomaticMysteryMeatTests(unittest.TestCase):
         self.assertIn("if (!hunger.isStarving()) return false;", food)
         self.assertIn("feedingHero = hero;", food)
         self.assertIn("food.energy * foodMultiplier > remainingHunger", food)
+        self.assertIn("food.energy > mostSatiety", food)
 
     def test_horn_eating_precedes_inventory_food(self):
         food = FOOD.read_text(encoding="utf-8")
@@ -85,7 +86,7 @@ class AutomaticMysteryMeatTests(unittest.TestCase):
         self.assertIn("horn.actions(hero).contains(HornOfPlenty.AC_EAT)", method)
         self.assertIn("eatAutomatically(hero, horn, HornOfPlenty.AC_EAT)", method)
         self.assertLess(method.index("eatAutomatically(hero, horn"),
-                        method.index("Food food = mostAbundantWithin("))
+                        method.index("Food food = bestFitWithin("))
         self.assertIn("eatAutomatically(hero, food, Food.AC_EAT)", method)
         self.assertIn("if (remainingHunger >= satietyPerCharge)", method)
         self.assertIn("stopFeeding();", method)
