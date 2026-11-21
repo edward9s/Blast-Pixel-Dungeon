@@ -17,18 +17,26 @@ import com.watabou.utils.PathFinder;
 
 import java.util.ArrayList;
 
-/** Idle auto-play crafting at an adjacent native alchemy pot; never navigates to one. */
+/** Idle auto-play crafting within two walkable steps of an alchemy pot. */
 final class BlastAutoAlchemy {
 
     private static final MeatPie.Recipe PIE = new MeatPie.Recipe();
 
     private BlastAutoAlchemy() {}
 
-    static boolean besidePot(Level level, int position) {
+    /** An adjacent pot or a pot reached through one passable intermediate tile. */
+    static boolean potWithinTwoSteps(Level level, int position) {
         for (int offset : PathFinder.NEIGHBOURS8) {
             int cell = position + offset;
-            if (level.insideMap(cell) && level.distance(position, cell) <= 1
-                    && level.map[cell] == Terrain.ALCHEMY) return true;
+            if (!level.insideMap(cell) || level.distance(position, cell) != 1) continue;
+            if (level.map[cell] == Terrain.ALCHEMY) return true;
+            if (!level.passable[cell]) continue;
+
+            for (int next : PathFinder.NEIGHBOURS8) {
+                int pot = cell + next;
+                if (level.insideMap(pot) && level.distance(cell, pot) == 1
+                        && level.map[pot] == Terrain.ALCHEMY) return true;
+            }
         }
         return false;
     }
@@ -56,7 +64,7 @@ final class BlastAutoAlchemy {
     /** Craft one pie per actor turn, only after higher-priority actions are clear. */
     static boolean brewIfNearby(Hero hero, boolean safeHere) {
         if (!safeHere || BlastAutoPlay.hasVisibleEnemy(hero)
-                || !besidePot(Dungeon.level, hero.pos)) return false;
+                || !potWithinTwoSteps(Dungeon.level, hero.pos)) return false;
 
         ArrayList<Item> ingredients = pieIngredients(hero.belongings.getAllItems(Food.class));
         if (ingredients == null || !PIE.testIngredients(ingredients)) return false;
