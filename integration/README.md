@@ -45,6 +45,19 @@ cannot monopolize the actor loop. The next auto-play turn reevaluates all
 requirements. The existing Pasty/ration/meat eating reserves still apply
 away from a pot; manual crafting remains unchanged.
 
+### Bomb fire and frost interactions
+
+Blast creates dedicated `BombFire` and `BombFreezing` blobs so Bombproof
+can protect the hero without suppressing environmental effects. Native fire
+and frost interactions recognize both sources in magical fire walls, blizzards,
+infernos, storm clouds, frost wands, elemental blasts, potion splashes and
+foliage growth.
+
+`BlastSettings.ENABLE_BOMB_FUSE_EXTINGUISHING` remains **false** by default.
+Ordinary and bomb-origin freezing cannot extinguish armed remote or timed
+bomb fuses in this configuration. The patch regression check is
+`python scripts/test_bomb_safety_patch.py`.
+
 ### Regrowth bomb rooting and healing
 
 Regrowth bombs cure the Hero and allies and grant stationary Sungrass herbal
