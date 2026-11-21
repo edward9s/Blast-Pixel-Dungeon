@@ -58,14 +58,12 @@ final class BlastAutoCombat {
         ArrayList<Mob> targets = enemies(hero);
         if (targets.isEmpty()) return Action.NONE;
 
-        // Construct the bow's ordinary arrow once per decision, only if a bow is available.
-        SpiritBow bow = hero.belongings.lostInventory() ? null
-                : hero.belongings.getItem(SpiritBow.class);
-        SpiritBow.SpiritArrow arrow = bow == null ? null : bow.knockArrow();
+        // Reuse equipment candidates across targets; safety and damage stay target-dependent.
+        CombatEquipment equipment = new CombatEquipment(hero);
 
         // Preserve threat priority, but try another enemy before spending a turn moving.
         for (Mob target : targets) {
-            Action action = chooseAttack(hero, target, bow, arrow);
+            Action action = chooseAttack(hero, target, equipment);
             if (action != Action.NONE) return action;
         }
 
@@ -86,16 +84,15 @@ final class BlastAutoCombat {
         return Action.NONE;
     }
 
-    private static Action chooseAttack(Hero hero, Mob target, SpiritBow bow,
-                                       SpiritBow.SpiritArrow arrow) {
-        Choice wand = bestWand(hero, target);
+    private static Action chooseAttack(Hero hero, Mob target, CombatEquipment equipment) {
+        Choice wand = bestWand(hero, target, equipment);
         if (BlastAutoPlay.highEvasion(hero, target) && wand != null) {
             Action action = zap(hero, target, wand);
             if (action != Action.NONE) return action;
             wand = null;
         }
 
-        Choice missile = bestMissile(hero, target, bow, arrow);
+        Choice missile = bestMissile(hero, target, equipment);
         Choice remote = better(wand, missile);
         boolean canMelee = hero.canAttack(target) && meleeCollateralSafe(hero, target);
         float melee = canMelee ? meleeDamage(hero, target) : 0f;
@@ -142,6 +139,53 @@ final class BlastAutoCombat {
         return targets;
     }
 
+    /** Candidate inventory is reused across targets, but scanned only when needed. */
+    private static final class CombatEquipment {
+        final SpiritBow bow;
+        final SpiritBow.SpiritArrow arrow;
+        private ArrayList<Wand> wands;
+        private ArrayList<MissileWeapon> missiles;
+
+        CombatEquipment(Hero hero) {
+            bow = hero.belongings.lostInventory() ? null
+                    : hero.belongings.getItem(SpiritBow.class);
+            arrow = bow == null ? null : bow.knockArrow();
+        }
+
+        ArrayList<Wand> wands(Hero hero) {
+            if (wands == null) {
+                wands = new ArrayList<>();
+                // Keep the equipped staff first, ahead of inventory wands.
+                if (hero.belongings.weapon() instanceof MagesStaff) {
+                    Wand staffWand = ((MagesStaff) hero.belongings.weapon()).blastAutoPlayWand();
+                    if (staffWand != null) wands.add(staffWand);
+                }
+                if (!hero.belongings.lostInventory()) {
+                    for (Item item : hero.belongings) {
+                        if (item instanceof Wand) wands.add((Wand) item);
+                    }
+                }
+            }
+            return wands;
+        }
+
+        ArrayList<MissileWeapon> missiles(Hero hero) {
+            if (missiles == null) {
+                missiles = new ArrayList<>();
+                if (!hero.belongings.lostInventory()) {
+                    for (Item item : hero.belongings) {
+                        if (item instanceof MissileWeapon
+                                && hero.belongings.backpack.contains(item)
+                                && item.quantity() > 0) {
+                            missiles.add((MissileWeapon) item);
+                        }
+                    }
+                }
+            }
+            return missiles;
+        }
+    }
+
     private static final class Choice {
         final MissileWeapon missile;
         final Wand wand;
@@ -162,22 +206,19 @@ final class BlastAutoCombat {
         return a.damage >= b.damage ? a : b;
     }
 
-    private static Choice bestMissile(Hero hero, Mob target, SpiritBow bow,
-                                      SpiritBow.SpiritArrow arrow) {
+    private static Choice bestMissile(Hero hero, Mob target, CombatEquipment equipment) {
         if (hero.belongings.lostInventory() || hero.pos == target.pos) return null;
         Choice best = null;
-        if (arrow != null) {
-            float damage = weaponCollateralSafe(hero, target, arrow, true)
-                    ? physicalDamage(hero, target, arrow, bow) : 0f;
+        if (equipment.arrow != null) {
+            float damage = weaponCollateralSafe(hero, target, equipment.arrow, true)
+                    ? physicalDamage(hero, target, equipment.arrow, equipment.bow) : 0f;
             if (damage > 0f) {
-                int aim = QuickSlotButton.autoAim(target, arrow);
-                if (aim >= 0) best = new Choice(arrow, null, aim, damage);
+                int aim = QuickSlotButton.autoAim(target, equipment.arrow);
+                if (aim >= 0) best = new Choice(equipment.arrow, null, aim, damage);
             }
         }
-        for (Item item : hero.belongings) {
-            if (!(item instanceof MissileWeapon) || !hero.belongings.backpack.contains(item)
-                    || item.quantity() <= 0) continue;
-            MissileWeapon weapon = (MissileWeapon) item;
+        for (MissileWeapon weapon : equipment.missiles(hero)) {
+            if (!hero.belongings.backpack.contains(weapon) || weapon.quantity() <= 0) continue;
             float damage = weaponCollateralSafe(hero, target, weapon, true)
                     ? physicalDamage(hero, target, weapon, weapon) : 0f;
             if (damage > 0f && (best == null || damage > best.damage)) {
@@ -188,19 +229,11 @@ final class BlastAutoCombat {
         return best;
     }
 
-    private static Choice bestWand(Hero hero, Mob target) {
+    private static Choice bestWand(Hero hero, Mob target, CombatEquipment equipment) {
         if (hero.buff(MagicImmune.class) != null || hero.pos == target.pos) return null;
         Choice best = null;
-        if (hero.belongings.weapon() instanceof MagesStaff) {
-            Wand staffWand = ((MagesStaff) hero.belongings.weapon()).blastAutoPlayWand();
-            best = evaluateWand(hero, target, staffWand, best);
-        }
-        if (!hero.belongings.lostInventory()) {
-            for (Item item : hero.belongings) {
-                if (item instanceof Wand) {
-                    best = evaluateWand(hero, target, (Wand) item, best);
-                }
-            }
+        for (Wand wand : equipment.wands(hero)) {
+            best = evaluateWand(hero, target, wand, best);
         }
         return best;
     }

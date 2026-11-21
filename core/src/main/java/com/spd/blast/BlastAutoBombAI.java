@@ -46,7 +46,7 @@ public final class BlastAutoBombAI {
         if (bomb instanceof RegrowthBomb) return false;
 
         boolean remoteThrow = BlastSettings.testRemoteThrow();
-        boolean[] blastAtHero = remoteThrow ? null : bomb.blastWarningCells(hero.pos);
+        boolean[] blastAtHero = null;
         Mob chosen = null;
         int closest = Integer.MAX_VALUE;
 
@@ -64,6 +64,9 @@ public final class BlastAutoBombAI {
             int center = remoteThrow
                     ? BlastBombTrajectory.throwPos(hero.pos, mob.pos) : hero.pos;
             if (!Dungeon.level.insideMap(center)) continue;
+            if (!remoteThrow && blastAtHero == null) {
+                blastAtHero = bomb.blastWarningCells(hero.pos);
+            }
             boolean[] blast = remoteThrow ? bomb.blastWarningCells(center) : blastAtHero;
             if (!blastReachesTarget(blast, mob.pos)
                     || containsExcludedMob(blast)
@@ -89,8 +92,7 @@ public final class BlastAutoBombAI {
 
         boolean regrowth = bomb instanceof RegrowthBomb;
         boolean remoteThrow = BlastSettings.testRemoteThrow();
-        boolean[] blastAtHero = remoteThrow ? null : bomb.blastWarningCells(hero.pos);
-        Mob target = findTarget(hero, bomb, blastAtHero, remoteThrow, regrowth, rangedTargets);
+        Mob target = findTarget(hero, bomb, remoteThrow, regrowth, rangedTargets);
         return target != null && detonate(hero, maniac, remoteThrow, target);
     }
 
@@ -131,8 +133,9 @@ public final class BlastAutoBombAI {
                 || Blob.volumeAt(cell, Regrowth.class) > 0;
     }
 
-    private static Mob findTarget(Hero hero, Bomb bomb, boolean[] blastAtHero,
+    private static Mob findTarget(Hero hero, Bomb bomb,
                                   boolean remoteThrow, boolean regrowth, boolean rangedTargets) {
+        boolean[] blastAtHero = null;
         Mob chosen = null;
         int closest = Integer.MAX_VALUE;
         for (Mob mob : Dungeon.level.mobs) {
@@ -148,6 +151,9 @@ public final class BlastAutoBombAI {
             int center = remoteThrow
                     ? BlastBombTrajectory.throwPos(hero.pos, mob.pos) : hero.pos;
             if (!Dungeon.level.insideMap(center)) continue;
+            if (!remoteThrow && blastAtHero == null) {
+                blastAtHero = bomb.blastWarningCells(hero.pos);
+            }
             boolean[] blast = remoteThrow ? bomb.blastWarningCells(center) : blastAtHero;
             // A blocked first choice must not hide a second, safe ranged target.
             if (!blastReachesTarget(blast, mob.pos) || containsExcludedMob(blast)) continue;
