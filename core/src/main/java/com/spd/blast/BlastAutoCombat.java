@@ -58,7 +58,7 @@ final class BlastAutoCombat {
         ArrayList<Mob> targets = enemies(hero);
         if (targets.isEmpty()) return Action.NONE;
 
-        // Snapshot candidate equipment once; target-dependent safety and damage stay live.
+        // Reuse equipment candidates across targets; safety and damage stay target-dependent.
         CombatEquipment equipment = new CombatEquipment(hero);
 
         // Preserve threat priority, but try another enemy before spending a turn moving.
