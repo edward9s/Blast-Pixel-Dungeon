@@ -15,6 +15,12 @@ def patch(root: Path) -> None:
     files = [
         "actors/blobs/Fire.java",
         "actors/blobs/Freezing.java",
+        "actors/blobs/Blizzard.java",
+        "actors/blobs/Inferno.java",
+        "actors/blobs/StormCloud.java",
+        "levels/rooms/special/MagicalFireRoom.java",
+        "items/wands/WandOfFrost.java",
+        "actors/hero/abilities/mage/ElementalBlast.java",
         "items/bombs/Firebomb.java",
         "items/bombs/FrostBomb.java",
         "items/bombs/FlashBangBomb.java",
@@ -170,6 +176,119 @@ def patch(root: Path) -> None:
         "holy bomb: extra unholy damage",
     )
     updated["items/bombs/HolyBomb.java"] = holy
+
+
+    # Keep elemental interactions equivalent for ordinary and bomb-origin blobs.
+    elemental = updated["actors/blobs/Freezing.java"]
+    elemental = replace_once(
+        elemental, "Fire fire = (Fire) Dungeon.level.blobs.get(Fire.class);",
+        "Fire fire = (Fire) Dungeon.level.blobs.get(Fire.class);\n\t\tFire bombFire = (Fire) Dungeon.level.blobs.get(com.spd.blast.BombFire.class);",
+        "legacy freezing lookup",
+    )
+    elemental = replace_once(
+        elemental, "if (fire != null && fire.volume > 0) {\n\t\t\tfire.clear( cell );\n\t\t}",
+        "if (fire != null && fire.volume > 0) {\n\t\t\tfire.clear( cell );\n\t\t}\n\t\tif (bombFire != null && bombFire.volume > 0) {\n\t\t\tbombFire.clear(cell);\n\t\t}",
+        "legacy freezing clears bomb fire",
+    )
+    updated["actors/blobs/Freezing.java"] = elemental
+
+    elemental = updated["actors/blobs/Blizzard.java"]
+    elemental = replace_once(
+        elemental, "Fire fire = (Fire)Dungeon.level.blobs.get( Fire.class );\n\t\tFreezing freeze = (Freezing)Dungeon.level.blobs.get( Freezing.class );",
+        "Fire fire = (Fire)Dungeon.level.blobs.get( Fire.class );\n\t\tFire bombFire = (Fire)Dungeon.level.blobs.get(com.spd.blast.BombFire.class);\n\t\tFreezing freeze = (Freezing)Dungeon.level.blobs.get( Freezing.class );\n\t\tFreezing bombFreeze = (Freezing)Dungeon.level.blobs.get(com.spd.blast.BombFreezing.class);",
+        "blizzard bomb blob lookups",
+    )
+    elemental = replace_once(
+        elemental, "if (fire != null)   fire.clear(cell);\n\t\t\t\t\tif (freeze != null) freeze.clear(cell);",
+        "if (fire != null)   fire.clear(cell);\n\t\t\t\t\tif (bombFire != null) bombFire.clear(cell);\n\t\t\t\t\tif (freeze != null) freeze.clear(cell);\n\t\t\t\t\tif (bombFreeze != null) bombFreeze.clear(cell);",
+        "blizzard clears bomb blobs",
+    )
+    updated["actors/blobs/Blizzard.java"] = elemental
+
+    elemental = updated["actors/blobs/Inferno.java"]
+    elemental = replace_once(
+        elemental, "Fire fire = (Fire)Dungeon.level.blobs.get( Fire.class );\n\t\tFreezing freeze = (Freezing)Dungeon.level.blobs.get( Freezing.class );",
+        "Fire fire = (Fire)Dungeon.level.blobs.get( Fire.class );\n\t\tFire bombFire = (Fire)Dungeon.level.blobs.get(com.spd.blast.BombFire.class);\n\t\tFreezing freeze = (Freezing)Dungeon.level.blobs.get( Freezing.class );\n\t\tFreezing bombFreeze = (Freezing)Dungeon.level.blobs.get(com.spd.blast.BombFreezing.class);",
+        "inferno bomb blob lookups",
+    )
+    elemental = replace_once(
+        elemental, "if (fire != null)   fire.clear(cell);\n\t\t\t\t\tif (freeze != null) freeze.clear(cell);",
+        "if (fire != null)   fire.clear(cell);\n\t\t\t\t\tif (bombFire != null) bombFire.clear(cell);\n\t\t\t\t\tif (freeze != null) freeze.clear(cell);\n\t\t\t\t\tif (bombFreeze != null) bombFreeze.clear(cell);",
+        "inferno clears bomb blobs",
+    )
+    updated["actors/blobs/Inferno.java"] = elemental
+
+    elemental = updated["actors/blobs/StormCloud.java"]
+    elemental = replace_once(
+        elemental, "Fire fire = (Fire) Dungeon.level.blobs.get(Fire.class);",
+        "Fire fire = (Fire) Dungeon.level.blobs.get(Fire.class);\n\t\tFire bombFire = (Fire) Dungeon.level.blobs.get(com.spd.blast.BombFire.class);",
+        "storm cloud bomb fire lookup",
+    )
+    elemental = replace_once(
+        elemental, "if (fire != null){\n\t\t\t\t\t\tfire.clear(cell);\n\t\t\t\t\t}",
+        "if (fire != null){\n\t\t\t\t\t\tfire.clear(cell);\n\t\t\t\t\t}\n\t\t\t\t\tif (bombFire != null) bombFire.clear(cell);",
+        "storm cloud extinguishes bomb fire",
+    )
+    updated["actors/blobs/StormCloud.java"] = elemental
+
+    elemental = updated["levels/rooms/special/MagicalFireRoom.java"]
+    elemental = replace_once(
+        elemental, "Freezing freeze = (Freezing)Dungeon.level.blobs.get( Freezing.class );",
+        "Freezing freeze = (Freezing)Dungeon.level.blobs.get( Freezing.class );\n\t\t\tFreezing bombFreeze = (Freezing)Dungeon.level.blobs.get(com.spd.blast.BombFreezing.class);",
+        "eternal fire bomb frost lookup",
+    )
+    elemental = replace_once(
+        elemental, "Fire fire = (Fire)Dungeon.level.blobs.get( Fire.class );",
+        "Fire fire = (Fire)Dungeon.level.blobs.get( Fire.class );\n\t\t\tFire bombFire = (Fire)Dungeon.level.blobs.get(com.spd.blast.BombFire.class);",
+        "eternal fire bomb fire lookup",
+    )
+    elemental = replace_once(
+        elemental, "fire.clear(cell);\n\t\t\t\t\t\t}",
+        "fire.clear(cell);\n\t\t\t\t\t\t}\n\t\t\t\t\t\tif (bombFire != null && bombFire.volume > 0 && bombFire.cur[cell] > 0){\n\t\t\t\t\t\t\tbombFire.clear(cell);\n\t\t\t\t\t\t}",
+        "eternal fire replaces bomb fire",
+    )
+    elemental = replace_once(
+        elemental, "freeze.clear(cell);\n\t\t\t\t\t\t\t\tcur[cell] = 0;\n\t\t\t\t\t\t\t\tclearAll = true;\n\t\t\t\t\t\t\t}",
+        "freeze.clear(cell);\n\t\t\t\t\t\t\t\tcur[cell] = 0;\n\t\t\t\t\t\t\t\tclearAll = true;\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\tif (bombFreeze != null && bombFreeze.volume > 0 && bombFreeze.cur[cell+k] > 0) {\n\t\t\t\t\t\t\t\tbombFreeze.clear(cell);\n\t\t\t\t\t\t\t\tcur[cell] = 0;\n\t\t\t\t\t\t\t\tclearAll = true;\n\t\t\t\t\t\t\t}",
+        "eternal fire extinguished by bomb frost",
+    )
+    elemental = replace_once(
+        elemental, "if (Dungeon.level.flamable[cell] && (fire == null || fire.volume == 0 || fire.cur[cell] == 0)){",
+        "if (Dungeon.level.flamable[cell]\n\t\t\t\t\t\t\t&& (fire == null || fire.volume == 0 || fire.cur[cell] == 0)\n\t\t\t\t\t\t\t&& (bombFire == null || bombFire.volume == 0 || bombFire.cur[cell] == 0)){",
+        "eternal fire avoids duplicate bomb fire",
+    )
+    updated["levels/rooms/special/MagicalFireRoom.java"] = elemental
+
+    elemental = updated["items/wands/WandOfFrost.java"]
+    elemental = replace_once(
+        elemental, "Fire fire = (Fire) Dungeon.level.blobs.get(Fire.class);",
+        "Fire fire = (Fire) Dungeon.level.blobs.get(Fire.class);\n\t\tFire bombFire = (Fire) Dungeon.level.blobs.get(com.spd.blast.BombFire.class);",
+        "frost wand bomb fire lookup",
+    )
+    elemental = replace_once(
+        elemental, "if (fire != null && fire.volume > 0) {\n\t\t\tfire.clear( bolt.collisionPos );\n\t\t}",
+        "if (fire != null && fire.volume > 0) {\n\t\t\tfire.clear( bolt.collisionPos );\n\t\t}\n\t\tif (bombFire != null && bombFire.volume > 0) {\n\t\t\tbombFire.clear(bolt.collisionPos);\n\t\t}",
+        "frost wand extinguishes bomb fire",
+    )
+    updated["items/wands/WandOfFrost.java"] = elemental
+
+    elemental = updated["actors/hero/abilities/mage/ElementalBlast.java"]
+    elemental = replace_once(
+        elemental, "Freezing freeze = (Freezing)Dungeon.level.blobs.get( Freezing.class );\n\t\t\t\t\t\tFire fire = (Fire)Dungeon.level.blobs.get( Fire.class );",
+        "Freezing freeze = (Freezing)Dungeon.level.blobs.get( Freezing.class );\n\t\t\t\t\t\tFreezing bombFreeze = (Freezing)Dungeon.level.blobs.get(com.spd.blast.BombFreezing.class);\n\t\t\t\t\t\tFire fire = (Fire)Dungeon.level.blobs.get( Fire.class );\n\t\t\t\t\t\tFire bombFire = (Fire)Dungeon.level.blobs.get(com.spd.blast.BombFire.class);",
+        "elemental blast bomb blob lookups",
+    )
+    elemental = replace_once(
+        elemental, "if (freeze != null){\n\t\t\t\t\t\t\t\t\tfreeze.clear(cell);\n\t\t\t\t\t\t\t\t}",
+        "if (freeze != null){\n\t\t\t\t\t\t\t\t\tfreeze.clear(cell);\n\t\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\t\tif (bombFreeze != null) bombFreeze.clear(cell);",
+        "fire blast clears bomb frost",
+    )
+    elemental = replace_once(
+        elemental, "if (fire != null){\n\t\t\t\t\t\t\t\t\tfire.clear(cell);\n\t\t\t\t\t\t\t\t}",
+        "if (fire != null){\n\t\t\t\t\t\t\t\t\tfire.clear(cell);\n\t\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\t\tif (bombFire != null) bombFire.clear(cell);",
+        "frost blast clears bomb fire",
+    )
+    updated["actors/hero/abilities/mage/ElementalBlast.java"] = elemental
 
     # All anchors must match before any upstream file changes.
     for path, source in updated.items():
