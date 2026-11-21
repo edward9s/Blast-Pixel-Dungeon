@@ -76,6 +76,7 @@ class AutomaticMysteryMeatTests(unittest.TestCase):
         self.assertIn("if (!hunger.isStarving()) return false;", food)
         self.assertIn("feedingHero = hero;", food)
         self.assertIn("food.energy * foodMultiplier > remainingHunger", food)
+        self.assertNotIn("food == null && hunger.isStarving()", food)
         self.assertIn("food.energy > mostSatiety", food)
 
     def test_horn_eating_precedes_inventory_food(self):
