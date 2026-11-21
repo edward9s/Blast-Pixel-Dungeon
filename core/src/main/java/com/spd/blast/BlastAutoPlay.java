@@ -843,18 +843,20 @@ public final class BlastAutoPlay {
         }
 
         // Only planting new grass depends on the separate farming setting.
-        idleSafe = progress.safeFor(safe, hero.pos, BlastAutoProgressGuard.Intent.FARM);
-        idleDistances = navigationDistances(hero.pos, safe, distances, idleSafe);
         debugDecision = "farm";
-        BlastAutoFarming.Action farmingAction =
-                BlastAutoFarming.chooseAction(hero, idleSafe, idleDistances);
-        if (farmingAction != BlastAutoFarming.Action.NONE) {
-            // Farming takes priority and cancels the former wandering target.
-            roaming.clearDestination();
-            if (farmingAction == BlastAutoFarming.Action.MOVE) {
-                progress.intent(BlastAutoProgressGuard.Intent.FARM);
+        if (BlastSettings.autoFarming()) {
+            idleSafe = progress.safeFor(safe, hero.pos, BlastAutoProgressGuard.Intent.FARM);
+            idleDistances = navigationDistances(hero.pos, safe, distances, idleSafe);
+            BlastAutoFarming.Action farmingAction =
+                    BlastAutoFarming.chooseAction(hero, idleSafe, idleDistances);
+            if (farmingAction != BlastAutoFarming.Action.NONE) {
+                // Farming takes priority and cancels the former wandering target.
+                roaming.clearDestination();
+                if (farmingAction == BlastAutoFarming.Action.MOVE) {
+                    progress.intent(BlastAutoProgressGuard.Intent.FARM);
+                }
+                return farmingAction == BlastAutoFarming.Action.BOMB;
             }
-            return farmingAction == BlastAutoFarming.Action.BOMB;
         }
 
         idleSafe = progress.safeFor(safe, hero.pos, BlastAutoProgressGuard.Intent.ROAM);
