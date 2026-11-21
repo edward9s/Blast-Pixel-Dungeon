@@ -50,8 +50,8 @@ away from a pot; manual crafting remains unchanged.
 Blast creates dedicated `BombFire` and `BombFreezing` blobs so Bombproof
 can protect the hero without suppressing environmental effects. Native fire
 and frost interactions recognize both sources in magical fire walls, blizzards,
-infernos, storm clouds, frost wands, elemental blasts, potion splashes, foliage
-and burning-driven terrain fire.
+infernos, storm clouds, frost wands, elemental blasts, potion splashes and
+foliage growth.
 
 `BlastSettings.ENABLE_BOMB_FUSE_EXTINGUISHING` remains **false** by default.
 Ordinary and bomb-origin freezing cannot extinguish armed remote or timed
