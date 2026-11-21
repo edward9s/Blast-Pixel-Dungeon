@@ -26,13 +26,13 @@ On Desktop, **B** activates the upper Bomb Maniac Tag and **V** activates the lo
 mote **Noisemakers** start their alarm after 2 game-time units and repeat it every
 6 game-time units, attracting monsters to the bomb's location with the native
 alarm sound and particles. They remain remotely armed, even when a character
-stands on them. Remote detonation or another explosion blows them up. Freezing
-still extinguishes their remote fuse; a kicked Noisemaker uses its native timed
+stands on them. Remote detonation or another explosion blows them up. In the default build, freezing
+never extinguishes their remote fuse; a kicked Noisemaker uses its native timed
 alarm and contact-triggered explosion instead.
 
 t bombs normally block movement and cannot be picked up or manually disarmed. Free Movement lets you pass through walls and lit bombs, and lets thrown or kicked bombs fly past obstacles. Locked exits still block passage.
 
-If freezing extinguishes a Bomb Maniac bomb, pick it up and imbue it to recover its occupied deployment slot. Reviving with an unblessed Ankh preserves maximum bomb capacity and unlocked bomb types, but still removes the blast-radius upgrade.
+Freezing does not extinguish any armed bomb fuse in the default build. Reviving with an unblessed Ankh preserves maximum bomb capacity and unlocked bomb types, but still removes the blast-radius upgrade.
 
 The flame blast-radius and yellow speed-boot pickups activate immediately and cost **zero turns to pick up** (including duplicate blast-radius pickups); walking to a pickup still costs normal movement time. Both have a 1/12 conditional drop chance and summon up to 8 adrenaline-boosted enemies when destroyed by fire or explosions. Repeated blast-radius pickups grant 10 gold while boosted; speed boots instead add 20 turns to an already active Haste buff. Both pickups and lit bombs remain visible beyond the Hero's field of view. Unlit bombs follow normal visibility rules; other items, enemies, and terrain are not revealed.
 
