@@ -139,33 +139,50 @@ final class BlastAutoCombat {
         return targets;
     }
 
-    /** Reuse the same inventory scan across targets in a single combat decision. */
+    /** Candidate inventory is reused across targets, but scanned only when needed. */
     private static final class CombatEquipment {
         final SpiritBow bow;
         final SpiritBow.SpiritArrow arrow;
-        final ArrayList<Wand> wands = new ArrayList<>();
-        final ArrayList<MissileWeapon> missiles = new ArrayList<>();
+        private ArrayList<Wand> wands;
+        private ArrayList<MissileWeapon> missiles;
 
         CombatEquipment(Hero hero) {
-            boolean inventoryAvailable = !hero.belongings.lostInventory();
-            bow = inventoryAvailable ? hero.belongings.getItem(SpiritBow.class) : null;
+            bow = hero.belongings.lostInventory() ? null
+                    : hero.belongings.getItem(SpiritBow.class);
             arrow = bow == null ? null : bow.knockArrow();
+        }
 
-            // Keep the equipped staff first, ahead of inventory wands.
-            if (hero.belongings.weapon() instanceof MagesStaff) {
-                Wand staffWand = ((MagesStaff) hero.belongings.weapon()).blastAutoPlayWand();
-                if (staffWand != null) wands.add(staffWand);
-            }
-            if (inventoryAvailable) {
-                for (Item item : hero.belongings) {
-                    if (item instanceof Wand) wands.add((Wand) item);
-                    if (item instanceof MissileWeapon
-                            && hero.belongings.backpack.contains(item)
-                            && item.quantity() > 0) {
-                        missiles.add((MissileWeapon) item);
+        ArrayList<Wand> wands(Hero hero) {
+            if (wands == null) {
+                wands = new ArrayList<>();
+                // Keep the equipped staff first, ahead of inventory wands.
+                if (hero.belongings.weapon() instanceof MagesStaff) {
+                    Wand staffWand = ((MagesStaff) hero.belongings.weapon()).blastAutoPlayWand();
+                    if (staffWand != null) wands.add(staffWand);
+                }
+                if (!hero.belongings.lostInventory()) {
+                    for (Item item : hero.belongings) {
+                        if (item instanceof Wand) wands.add((Wand) item);
                     }
                 }
             }
+            return wands;
+        }
+
+        ArrayList<MissileWeapon> missiles(Hero hero) {
+            if (missiles == null) {
+                missiles = new ArrayList<>();
+                if (!hero.belongings.lostInventory()) {
+                    for (Item item : hero.belongings) {
+                        if (item instanceof MissileWeapon
+                                && hero.belongings.backpack.contains(item)
+                                && item.quantity() > 0) {
+                            missiles.add((MissileWeapon) item);
+                        }
+                    }
+                }
+            }
+            return missiles;
         }
     }
 
@@ -200,7 +217,7 @@ final class BlastAutoCombat {
                 if (aim >= 0) best = new Choice(equipment.arrow, null, aim, damage);
             }
         }
-        for (MissileWeapon weapon : equipment.missiles) {
+        for (MissileWeapon weapon : equipment.missiles(hero)) {
             if (!hero.belongings.backpack.contains(weapon) || weapon.quantity() <= 0) continue;
             float damage = weaponCollateralSafe(hero, target, weapon, true)
                     ? physicalDamage(hero, target, weapon, weapon) : 0f;
@@ -215,7 +232,7 @@ final class BlastAutoCombat {
     private static Choice bestWand(Hero hero, Mob target, CombatEquipment equipment) {
         if (hero.buff(MagicImmune.class) != null || hero.pos == target.pos) return null;
         Choice best = null;
-        for (Wand wand : equipment.wands) {
+        for (Wand wand : equipment.wands(hero)) {
             best = evaluateWand(hero, target, wand, best);
         }
         return best;
