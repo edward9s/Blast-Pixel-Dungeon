@@ -197,6 +197,7 @@ public final class BlastAutoPlay {
         clearFreeBombInputs();
         BlastAutoPickup.reset();
         BlastAutoSacrifice.reset();
+        BlastAutoFood.stopFeeding();
 
         Hero hero = Dungeon.hero;
         if (hero == null || Dungeon.level == null) return;
@@ -228,6 +229,7 @@ public final class BlastAutoPlay {
     public static void beginManualAction(Hero hero) {
         if (!BlastSettings.testAutoPlay()) return;
         resetForLevel(hero);
+        BlastAutoFood.stopFeeding();
         // Only a new movement order or explicit resume supersedes retained AI travel.
         // Native Hero.handle() keeps lastAction for attacks and interactions.
         if (hero.curAction instanceof HeroAction.Move
@@ -384,6 +386,7 @@ public final class BlastAutoPlay {
     public static void beginItemAction(Hero hero) {
         if (!BlastSettings.testAutoPlay() || BlastAutoFood.isEatingAutomatically()) return;
         resetForLevel(hero);
+        BlastAutoFood.stopFeeding();
         retainNativeManualTravel(hero);
         progress.reset();
         manualAction = false;
@@ -430,6 +433,7 @@ public final class BlastAutoPlay {
             pausedHero = null;
         } else {
             // Stop autonomous turns before exposing their destination to the UI.
+            BlastAutoFood.stopFeeding();
             pausedHero = hero;
             if (interruptedDestination >= 0) {
                 hero.lastAction = new HeroAction.Move(interruptedDestination);
@@ -778,7 +782,7 @@ public final class BlastAutoPlay {
         // Feed only during idle auto-play, after combat and interrupted manual travel.
         // Food.execute owns the animated eating turn and its native time cost.
         debugDecision = "food";
-        if (BlastAutoFood.eatIfStarving(hero)) return true;
+        if (BlastAutoFood.eatIfNeeded(hero)) return true;
 
         // Craft only while standing beside a pot; never seek one automatically.
         debugDecision = "alchemy";
@@ -938,6 +942,7 @@ public final class BlastAutoPlay {
         clearFreeBombInputs();
         BlastAutoPickup.reset();
         BlastAutoSacrifice.reset();
+        BlastAutoFood.stopFeeding();
     }
 
     /** Priority tiers are independent of distance; route length breaks ties. */
