@@ -54,15 +54,15 @@ FIXTURES = {
     ),
     "actors/blobs/Blizzard.java": (
         "Fire fire = (Fire)Dungeon.level.blobs.get( Fire.class );\n"
-        "Freezing freeze = (Freezing)Dungeon.level.blobs.get( Freezing.class );\n"
+        "\t\tFreezing freeze = (Freezing)Dungeon.level.blobs.get( Freezing.class );\n"
         "if (fire != null)   fire.clear(cell);\n"
-        "if (freeze != null) freeze.clear(cell);\n"
+        "\t\t\t\t\tif (freeze != null) freeze.clear(cell);\n"
     ),
     "actors/blobs/Inferno.java": (
         "Fire fire = (Fire)Dungeon.level.blobs.get( Fire.class );\n"
-        "Freezing freeze = (Freezing)Dungeon.level.blobs.get( Freezing.class );\n"
+        "\t\tFreezing freeze = (Freezing)Dungeon.level.blobs.get( Freezing.class );\n"
         "if (fire != null)   fire.clear(cell);\n"
-        "if (freeze != null) freeze.clear(cell);\n"
+        "\t\t\t\t\tif (freeze != null) freeze.clear(cell);\n"
     ),
     "actors/blobs/StormCloud.java": (
         "Fire fire = (Fire) Dungeon.level.blobs.get(Fire.class);\n"
@@ -83,7 +83,7 @@ FIXTURES = {
     ),
     "actors/hero/abilities/mage/ElementalBlast.java": (
         "Freezing freeze = (Freezing)Dungeon.level.blobs.get( Freezing.class );\n"
-        "Fire fire = (Fire)Dungeon.level.blobs.get( Fire.class );\n"
+        "\t\t\t\t\t\tFire fire = (Fire)Dungeon.level.blobs.get( Fire.class );\n"
         "if (freeze != null){\n\t\t\t\t\t\t\t\t\tfreeze.clear(cell);\n\t\t\t\t\t\t\t\t}\n"
         "if (fire != null){\n\t\t\t\t\t\t\t\t\tfire.clear(cell);\n\t\t\t\t\t\t\t\t}\n"
     ),
