@@ -20,7 +20,6 @@ def patch(root: Path) -> None:
         "actors/blobs/StormCloud.java",
         "actors/blobs/Foliage.java",
         "items/potions/Potion.java",
-        "actors/buffs/Burning.java",
         "levels/rooms/special/MagicalFireRoom.java",
         "items/wands/WandOfFrost.java",
         "actors/hero/abilities/mage/ElementalBlast.java",
@@ -255,11 +254,6 @@ def patch(root: Path) -> None:
         "freeze.clear(cell);\n\t\t\t\t\t\t\t\tcur[cell] = 0;\n\t\t\t\t\t\t\t\tclearAll = true;\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\tif (bombFreeze != null && bombFreeze.volume > 0 && bombFreeze.cur[cell+k] > 0) {\n\t\t\t\t\t\t\t\tbombFreeze.clear(cell);\n\t\t\t\t\t\t\t\tcur[cell] = 0;\n\t\t\t\t\t\t\t\tclearAll = true;\n\t\t\t\t\t\t\t}",
         "eternal fire extinguished by bomb frost",
     )
-    elemental = replace_once(
-        elemental, "if (Dungeon.level.flamable[cell] && (fire == null || fire.volume == 0 || fire.cur[cell] == 0)){",
-        "if (Dungeon.level.flamable[cell]\n\t\t\t\t\t\t\t&& (fire == null || fire.volume == 0 || fire.cur[cell] == 0)\n\t\t\t\t\t\t\t&& (bombFire == null || bombFire.volume == 0 || bombFire.cur[cell] == 0)){",
-        "eternal fire avoids duplicate bomb fire",
-    )
     updated["levels/rooms/special/MagicalFireRoom.java"] = elemental
 
     elemental = updated["items/wands/WandOfFrost.java"]
@@ -323,14 +317,6 @@ def patch(root: Path) -> None:
         "potion splash extinguishes bomb fire",
     )
     updated["items/potions/Potion.java"] = elemental
-
-    elemental = updated["actors/buffs/Burning.java"]
-    elemental = replace_once(
-        elemental, "if (Dungeon.level.flamable[target.pos] && Blob.volumeAt(target.pos, Fire.class) == 0) {",
-        "if (Dungeon.level.flamable[target.pos]\n\t\t\t\t&& Blob.volumeAt(target.pos, Fire.class) == 0\n\t\t\t\t&& Blob.volumeAt(target.pos, com.spd.blast.BombFire.class) == 0) {",
-        "burning avoids duplicating bomb fire",
-    )
-    updated["actors/buffs/Burning.java"] = elemental
 
     # All anchors must match before any upstream file changes.
     for path, source in updated.items():
