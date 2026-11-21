@@ -11,16 +11,14 @@ FOOD = (ROOT / "core/src/main/java/com/spd/blast/BlastAutoFood.java")
 
 
 class AutoAlchemyTests(unittest.TestCase):
-    def test_pot_within_two_walkable_steps_without_navigation(self):
+    def test_visible_visited_or_mapped_pot_without_navigation(self):
         source = ALCHEMY.read_text(encoding="utf-8")
-        self.assertIn("static boolean potWithinTwoSteps(Level level, int position)", source)
-        self.assertIn("level.distance(position, cell) != 1", source)
-        self.assertIn("level.map[cell] == Terrain.ALCHEMY", source)
-        self.assertIn("!level.passable[cell]", source)
-        self.assertIn("level.distance(cell, pot) == 1", source)
-        self.assertIn("level.map[pot] == Terrain.ALCHEMY", source)
-        self.assertIn("!potWithinTwoSteps(Dungeon.level, hero.pos)", source)
-        self.assertIn("PathFinder.NEIGHBOURS8", source)
+        self.assertIn("static boolean knownPot(Level level)", source)
+        self.assertIn("level.map, level.heroFOV, level.visited, level.mapped", source)
+        self.assertIn("terrain[cell] == Terrain.ALCHEMY", source)
+        self.assertIn("visible[cell] || visited[cell] || mapped[cell]", source)
+        self.assertIn("!knownPot(Dungeon.level)", source)
+        self.assertNotIn("PathFinder", source)
         self.assertNotIn("HeroAction.Move", source)
         self.assertNotIn("switchScene(", source)
         self.assertNotIn("buildDistanceMap", source)
