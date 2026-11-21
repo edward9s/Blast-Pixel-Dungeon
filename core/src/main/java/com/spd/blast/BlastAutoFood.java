@@ -137,6 +137,11 @@ public final class BlastAutoFood {
         if (hornBuff != null && hornBuff.isCursed()) foodMultiplier *= 0.67f;
         Food food = bestFitWithin(hero.belongings.getAllItems(Food.class),
                 remainingHunger, foodMultiplier);
+        // If starvation cannot be relieved without overflow, survival takes priority.
+        // Otherwise never consume a portion larger than the remaining hunger.
+        if (food == null && hunger.isStarving()) {
+            food = mostAbundant(hero.belongings.getAllItems(Food.class));
+        }
         if (food == null) {
             stopFeeding();
             return false;
