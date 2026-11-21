@@ -41,12 +41,18 @@ public final class BlastAutoFood {
 
     /** Preserve one ration and one meat per Pasty before comparing edible quantities. */
     static Food mostAbundant(Iterable<? extends Food> foods) {
-        return mostAbundantWithin(foods, Float.POSITIVE_INFINITY, 1f);
+        return chooseFood(foods, Float.POSITIVE_INFINITY, 1f, false);
     }
 
-    /** Choose an available food without discarding any of its satiety. */
-    static Food mostAbundantWithin(Iterable<? extends Food> foods,
-                                  float remainingHunger, float foodMultiplier) {
+    /** Prefer the largest usable portion; use stack size to break equal-satiety ties. */
+    static Food bestFitWithin(Iterable<? extends Food> foods,
+                              float remainingHunger, float foodMultiplier) {
+        return chooseFood(foods, remainingHunger, foodMultiplier, true);
+    }
+
+    private static Food chooseFood(Iterable<? extends Food> foods,
+                                   float remainingHunger, float foodMultiplier,
+                                   boolean preferSatiety) {
         int pasties = 0;
         int rations = 0;
         int meats = 0;
@@ -61,6 +67,7 @@ public final class BlastAutoFood {
         int availableMeats = Math.max(0, meats - pasties);
         Food selected = null;
         int mostAvailable = 0;
+        float mostSatiety = 0f;
         for (Food food : foods) {
             if (food.quantity() <= 0 || food instanceof Pasty
                     || (food instanceof Blandfruit
@@ -73,9 +80,13 @@ public final class BlastAutoFood {
             } else if (pieMeat(food)) {
                 available = Math.min(available, availableMeats);
             }
-            if (available > mostAvailable) {
+            if (available > 0 && (selected == null
+                    || (preferSatiety && food.energy > mostSatiety)
+                    || ((!preferSatiety || food.energy == mostSatiety)
+                        && available > mostAvailable))) {
                 selected = food;
                 mostAvailable = available;
+                mostSatiety = food.energy;
             }
         }
         return selected;
@@ -124,7 +135,7 @@ public final class BlastAutoFood {
         float foodMultiplier = Dungeon.isChallenged(Challenges.NO_FOOD) ? 1f / 3f : 1f;
         Artifact.ArtifactBuff hornBuff = hero.buff(HornOfPlenty.hornRecharge.class);
         if (hornBuff != null && hornBuff.isCursed()) foodMultiplier *= 0.67f;
-        Food food = mostAbundantWithin(hero.belongings.getAllItems(Food.class),
+        Food food = bestFitWithin(hero.belongings.getAllItems(Food.class),
                 remainingHunger, foodMultiplier);
         if (food == null) {
             stopFeeding();
