@@ -13,22 +13,27 @@ import com.shatteredpixel.shatteredpixeldungeon.items.food.Pasty;
 import com.shatteredpixel.shatteredpixeldungeon.journal.Catalog;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
-import com.watabou.utils.PathFinder;
 
 import java.util.ArrayList;
 
-/** Idle auto-play crafting at an adjacent native alchemy pot; never navigates to one. */
+/** Idle auto-play crafting after an alchemy pot becomes known on the current floor. */
 final class BlastAutoAlchemy {
 
     private static final MeatPie.Recipe PIE = new MeatPie.Recipe();
 
     private BlastAutoAlchemy() {}
 
-    static boolean besidePot(Level level, int position) {
-        for (int offset : PathFinder.NEIGHBOURS8) {
-            int cell = position + offset;
-            if (level.insideMap(cell) && level.distance(position, cell) <= 1
-                    && level.map[cell] == Terrain.ALCHEMY) return true;
+    /** Current sight, previously explored tiles, and mapped tiles all reveal a pot. */
+    static boolean knownPot(Level level) {
+        return knownPot(level.map, level.heroFOV, level.visited, level.mapped);
+    }
+
+    /** Isolated from Level so that discovery rules can be regression tested. */
+    static boolean knownPot(int[] terrain, boolean[] visible,
+                            boolean[] visited, boolean[] mapped) {
+        for (int cell = 0; cell < terrain.length; cell++) {
+            if (terrain[cell] == Terrain.ALCHEMY
+                    && (visible[cell] || visited[cell] || mapped[cell])) return true;
         }
         return false;
     }
@@ -56,7 +61,7 @@ final class BlastAutoAlchemy {
     /** Craft one pie per actor turn, only after higher-priority actions are clear. */
     static boolean brewIfNearby(Hero hero, boolean safeHere) {
         if (!safeHere || BlastAutoPlay.hasVisibleEnemy(hero)
-                || !besidePot(Dungeon.level, hero.pos)) return false;
+                || !knownPot(Dungeon.level)) return false;
 
         ArrayList<Item> ingredients = pieIngredients(hero.belongings.getAllItems(Food.class));
         if (ingredients == null || !PIE.testIngredients(ingredients)) return false;

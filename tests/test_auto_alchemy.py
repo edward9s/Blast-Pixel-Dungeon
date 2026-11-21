@@ -11,18 +11,22 @@ FOOD = (ROOT / "core/src/main/java/com/spd/blast/BlastAutoFood.java")
 
 
 class AutoAlchemyTests(unittest.TestCase):
-    def test_native_pot_only_and_no_pathfinding(self):
+    def test_visible_visited_or_mapped_pot_without_navigation(self):
         source = ALCHEMY.read_text(encoding="utf-8")
-        self.assertIn("level.map[cell] == Terrain.ALCHEMY", source)
-        self.assertIn("level.distance(position, cell) <= 1", source)
-        self.assertIn("PathFinder.NEIGHBOURS8", source)
+        self.assertIn("static boolean knownPot(Level level)", source)
+        self.assertIn("level.map, level.heroFOV, level.visited, level.mapped", source)
+        self.assertIn("terrain[cell] == Terrain.ALCHEMY", source)
+        self.assertIn("visible[cell] || visited[cell] || mapped[cell]", source)
+        self.assertIn("!knownPot(Dungeon.level)", source)
+        self.assertNotIn("PathFinder", source)
         self.assertNotIn("HeroAction.Move", source)
         self.assertNotIn("switchScene(", source)
+        self.assertNotIn("buildDistanceMap", source)
 
     def test_safe_idle_priority(self):
         source = AUTO.read_text(encoding="utf-8")
         self.assertEqual(source.count("BlastAutoAlchemy.brewIfNearby(hero, safe[hero.pos])"), 1)
-        self.assertLess(source.index("BlastAutoFood.eatIfStarving(hero)"),
+        self.assertLess(source.index("BlastAutoFood.eatIfNeeded(hero)"),
                         source.index("BlastAutoAlchemy.brewIfNearby("))
         self.assertLess(source.index("BlastAutoAlchemy.brewIfNearby("),
                         source.index("BlastAutoPickup.chooseAction("))

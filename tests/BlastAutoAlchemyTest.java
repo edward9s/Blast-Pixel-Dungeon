@@ -9,6 +9,7 @@ import com.shatteredpixel.shatteredpixeldungeon.items.food.MysteryMeat;
 import com.shatteredpixel.shatteredpixeldungeon.items.food.Pasty;
 import com.shatteredpixel.shatteredpixeldungeon.items.food.SmallRation;
 import com.shatteredpixel.shatteredpixeldungeon.items.food.StewedMeat;
+import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -33,7 +34,42 @@ public final class BlastAutoAlchemyTest {
         check(recipe.cost(inputs) == 6, "native energy cost");
     }
 
+    private static void knownPotDiscovery() {
+        int[] terrain = {Terrain.EMPTY, Terrain.ALCHEMY, Terrain.EMPTY};
+        boolean[] visible = new boolean[3];
+        boolean[] visited = new boolean[3];
+        boolean[] mapped = new boolean[3];
+
+        check(!BlastAutoAlchemy.knownPot(terrain, visible, visited, mapped),
+                "unknown pot cannot trigger automatic alchemy");
+
+        visible[1] = true;
+        check(BlastAutoAlchemy.knownPot(terrain, visible, visited, mapped),
+                "currently visible pot qualifies");
+        visible[1] = false;
+
+        visited[1] = true;
+        check(BlastAutoAlchemy.knownPot(terrain, visible, visited, mapped),
+                "previously seen pot qualifies after leaving sight");
+        visited[1] = false;
+
+        mapped[1] = true;
+        check(BlastAutoAlchemy.knownPot(terrain, visible, visited, mapped),
+                "magic-mapped pot qualifies");
+        mapped[1] = false;
+
+        visible[0] = true;
+        visited[2] = true;
+        check(!BlastAutoAlchemy.knownPot(terrain, visible, visited, mapped),
+                "knowledge of unrelated tiles must not reveal an unseen pot");
+
+        check(!BlastAutoAlchemy.knownPot(new int[] {Terrain.EMPTY},
+                new boolean[] {true}, new boolean[] {true}, new boolean[] {true}),
+                "mapped terrain without a pot must not trigger alchemy");
+    }
+
     public static void main(String[] args) {
+        knownPotDiscovery();
         Pasty pasty = new Pasty();
         Food ration = new Food();
         MysteryMeat meat = new MysteryMeat();
