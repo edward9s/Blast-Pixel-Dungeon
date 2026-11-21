@@ -68,23 +68,27 @@ class AutomaticMysteryMeatTests(unittest.TestCase):
         self.assertIn("public final class BlastAutoFood", food)
         self.assertIn("public static boolean isEatingAutomatically()", food)
         self.assertIn("automaticConsumption.set(true);", food)
-        self.assertIn("food.execute(hero, Food.AC_EAT);", food)
+        self.assertIn("item.execute(hero, action);", food)
         self.assertIn("automaticConsumption.remove();", food)
         self.assertIn("finally {", food)
-        self.assertNotIn("food instanceof MysteryMeat", food)
+        self.assertIn("food instanceof MysteryMeat", food)
         self.assertIn("food instanceof Blandfruit", food)
-        self.assertIn("hunger == null || !hunger.isStarving()", food)
+        self.assertIn("if (!hunger.isStarving()) return false;", food)
+        self.assertIn("feedingHero = hero;", food)
+        self.assertIn("food.energy * foodMultiplier > remainingHunger", food)
 
     def test_horn_eating_precedes_inventory_food(self):
         food = FOOD.read_text(encoding="utf-8")
-        method = food.split("static boolean eatIfStarving(Hero hero) {", 1)[1]
-        self.assertIn("hunger == null || !hunger.isStarving()", method)
+        method = food.split("static boolean eatIfNeeded(Hero hero) {", 1)[1]
+        self.assertIn("if (!hunger.isStarving()) return false;", method)
         self.assertIn("hero.belongings.getAllItems(HornOfPlenty.class)", method)
         self.assertIn("horn.actions(hero).contains(HornOfPlenty.AC_EAT)", method)
         self.assertIn("eatAutomatically(hero, horn, HornOfPlenty.AC_EAT)", method)
         self.assertLess(method.index("eatAutomatically(hero, horn"),
-                        method.index("Food food = mostAbundant("))
+                        method.index("Food food = mostAbundantWithin("))
         self.assertIn("eatAutomatically(hero, food, Food.AC_EAT)", method)
+        self.assertIn("if (remainingHunger >= satietyPerCharge)", method)
+        self.assertIn("stopFeeding();", method)
 
     def test_pasty_and_native_meat_pie_ingredients_are_reserved(self):
         food = FOOD.read_text(encoding="utf-8")
