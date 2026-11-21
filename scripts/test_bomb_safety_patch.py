@@ -31,6 +31,10 @@ FIXTURES = {
         "Freezing.freeze(cell);\n"
         "\tpublic static void freeze( int cell ){\n"
         "if (ch != null && !ch.isImmune(Freezing.class)) {\n"
+        "Fire fire = (Fire) Dungeon.level.blobs.get(Fire.class);\n"
+        "if (fire != null && fire.volume > 0) {\n"
+        "\t\t\tfire.clear( cell );\n"
+        "\t\t}\n"
     ),
     "items/bombs/Firebomb.java": (
         "Blob.seed(i, 2, Fire.class)\n"
@@ -47,6 +51,41 @@ FIXTURES = {
     ),
     "items/bombs/HolyBomb.java": (
         "if (ch.properties().contains(Char.Property.UNDEAD) || ch.properties().contains(Char.Property.DEMONIC)){\n"
+    ),
+    "actors/blobs/Blizzard.java": (
+        "Fire fire = (Fire)Dungeon.level.blobs.get( Fire.class );\n"
+        "Freezing freeze = (Freezing)Dungeon.level.blobs.get( Freezing.class );\n"
+        "if (fire != null)   fire.clear(cell);\n"
+        "if (freeze != null) freeze.clear(cell);\n"
+    ),
+    "actors/blobs/Inferno.java": (
+        "Fire fire = (Fire)Dungeon.level.blobs.get( Fire.class );\n"
+        "Freezing freeze = (Freezing)Dungeon.level.blobs.get( Freezing.class );\n"
+        "if (fire != null)   fire.clear(cell);\n"
+        "if (freeze != null) freeze.clear(cell);\n"
+    ),
+    "actors/blobs/StormCloud.java": (
+        "Fire fire = (Fire) Dungeon.level.blobs.get(Fire.class);\n"
+        "if (fire != null){\n\t\t\t\t\t\tfire.clear(cell);\n\t\t\t\t\t}\n"
+    ),
+    "levels/rooms/special/MagicalFireRoom.java": (
+        "Freezing freeze = (Freezing)Dungeon.level.blobs.get( Freezing.class );\n"
+        "Fire fire = (Fire)Dungeon.level.blobs.get( Fire.class );\n"
+        "if (fire != null && fire.volume > 0 && fire.cur[cell] > 0){\n"
+        "fire.clear(cell);\n\t\t\t\t\t\t}\n"
+        "if (freeze != null && freeze.volume > 0 && freeze.cur[cell+k] > 0) {\n"
+        "freeze.clear(cell);\n\t\t\t\t\t\t\t\tcur[cell] = 0;\n\t\t\t\t\t\t\t\tclearAll = true;\n\t\t\t\t\t\t\t}\n"
+        "if (Dungeon.level.flamable[cell] && (fire == null || fire.volume == 0 || fire.cur[cell] == 0)){\n"
+    ),
+    "items/wands/WandOfFrost.java": (
+        "Fire fire = (Fire) Dungeon.level.blobs.get(Fire.class);\n"
+        "if (fire != null && fire.volume > 0) {\n\t\t\tfire.clear( bolt.collisionPos );\n\t\t}\n"
+    ),
+    "actors/hero/abilities/mage/ElementalBlast.java": (
+        "Freezing freeze = (Freezing)Dungeon.level.blobs.get( Freezing.class );\n"
+        "Fire fire = (Fire)Dungeon.level.blobs.get( Fire.class );\n"
+        "if (freeze != null){\n\t\t\t\t\t\t\t\t\tfreeze.clear(cell);\n\t\t\t\t\t\t\t\t}\n"
+        "if (fire != null){\n\t\t\t\t\t\t\t\t\tfire.clear(cell);\n\t\t\t\t\t\t\t\t}\n"
     ),
 }
 
@@ -74,6 +113,15 @@ def main() -> None:
     assert "!BlastBombSafety.protects(target)" in BOMB_FIRE.read_text(encoding="utf-8")
     assert "!BlastBombSafety.protects(target)" in BOMB_FREEZING.read_text(encoding="utf-8")
 
+
+    # Environmental frost may clear flames, but cannot extinguish bomb fuses.
+    settings = (ROOT / "core/src/main/java/com/spd/blast/BlastSettings.java").read_text(
+        encoding="utf-8")
+    assert "ENABLE_BOMB_FUSE_EXTINGUISHING = false;" in settings
+    bomb_patch = (ROOT / "integration/shattered/patches/patch_bomb.py").read_text(
+        encoding="utf-8")
+    assert "if (!com.spd.blast.BlastSettings.ENABLE_BOMB_FUSE_EXTINGUISHING) return false;" in bomb_patch
+
     with tempfile.TemporaryDirectory() as temporary:
         root = Path(temporary)
         write_fixtures(root)
@@ -100,6 +148,27 @@ def main() -> None:
             root / "items/bombs/FlashBangBomb.java").read_text(encoding="utf-8")
         assert "&& !com.spd.blast.BlastBombSafety.protects(ch)" in (
             root / "items/bombs/HolyBomb.java").read_text(encoding="utf-8")
+
+
+        # Environmental reactions must recognize the bomb-specific blobs.
+        expected = {
+            "actors/blobs/Freezing.java": ("bombFire.clear(cell);",),
+            "actors/blobs/Blizzard.java": ("bombFire.clear(cell);", "bombFreeze.clear(cell);"),
+            "actors/blobs/Inferno.java": ("bombFire.clear(cell);", "bombFreeze.clear(cell);"),
+            "actors/blobs/StormCloud.java": ("bombFire.clear(cell);",),
+            "levels/rooms/special/MagicalFireRoom.java": (
+                "bombFreeze.cur[cell+k] > 0", "bombFreeze.clear(cell);",
+                "cur[cell] = 0;", "clearAll = true;", "bombFire.clear(cell);",
+            ),
+            "items/wands/WandOfFrost.java": ("bombFire.clear(bolt.collisionPos);",),
+            "actors/hero/abilities/mage/ElementalBlast.java": (
+                "bombFreeze.clear(cell);", "bombFire.clear(cell);",
+            ),
+        }
+        for name, tokens in expected.items():
+            patched = (root / name).read_text(encoding="utf-8")
+            for token in tokens:
+                assert token in patched, f"{name} is missing {token}"
 
         snapshot = {name: (root / name).read_text(encoding="utf-8")
                     for name in FIXTURES}
