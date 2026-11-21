@@ -1,6 +1,9 @@
 package com.spd.blast;
 
+import com.shatteredpixel.shatteredpixeldungeon.Challenges;
+import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Hunger;
+import com.shatteredpixel.shatteredpixeldungeon.items.artifacts.Artifact;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.artifacts.HornOfPlenty;
@@ -12,12 +15,18 @@ import com.shatteredpixel.shatteredpixeldungeon.items.food.MysteryMeat;
 import com.shatteredpixel.shatteredpixeldungeon.items.food.Pasty;
 import com.shatteredpixel.shatteredpixeldungeon.items.food.StewedMeat;
 
-/** Native Starving-time eating, preserving ingredients for meat pies. */
+/** Native automatic meals, preserving ingredients for meat pies. */
 public final class BlastAutoFood {
 
     private static final ThreadLocal<Boolean> automaticConsumption = new ThreadLocal<>();
+    private static Hero feedingHero;
 
     private BlastAutoFood() {}
+
+    /** A manual action, pause, or level change ends the current meal. */
+    static void stopFeeding() {
+        feedingHero = null;
+    }
 
     /** Mark native item use as automatic, including raw meat's effect suppression. */
     public static boolean isEatingAutomatically() {
@@ -32,6 +41,12 @@ public final class BlastAutoFood {
 
     /** Preserve one ration and one meat per Pasty before comparing edible quantities. */
     static Food mostAbundant(Iterable<? extends Food> foods) {
+        return mostAbundantWithin(foods, Float.POSITIVE_INFINITY, 1f);
+    }
+
+    /** Choose an available food without discarding any of its satiety. */
+    static Food mostAbundantWithin(Iterable<? extends Food> foods,
+                                  float remainingHunger, float foodMultiplier) {
         int pasties = 0;
         int rations = 0;
         int meats = 0;
@@ -49,7 +64,8 @@ public final class BlastAutoFood {
         for (Food food : foods) {
             if (food.quantity() <= 0 || food instanceof Pasty
                     || (food instanceof Blandfruit
-                        && ((Blandfruit) food).potionAttrib == null)) continue;
+                        && ((Blandfruit) food).potionAttrib == null)
+                    || food.energy <= 0 || food.energy * foodMultiplier > remainingHunger) continue;
 
             int available = food.quantity();
             if (food.getClass() == Food.class) {
@@ -75,21 +91,45 @@ public final class BlastAutoFood {
         }
     }
 
-    /** Returns true when native eating has started its own animated turn. */
-    static boolean eatIfStarving(Hero hero) {
+    /** Complete one meal across native eating turns; do not restart until Starving. */
+    static boolean eatIfNeeded(Hero hero) {
         Hunger hunger = hero.buff(Hunger.class);
-        if (hunger == null || !hunger.isStarving()) return false;
+        if (hunger == null) {
+            stopFeeding();
+            return false;
+        }
+        if (feedingHero != hero) {
+            if (!hunger.isStarving()) return false;
+            feedingHero = hero;
+        }
 
-        // Native actions encode equipped status, available charges, and magic immunity.
-        for (HornOfPlenty horn : hero.belongings.getAllItems(HornOfPlenty.class)) {
-            if (horn.actions(hero).contains(HornOfPlenty.AC_EAT)) {
-                eatAutomatically(hero, horn, HornOfPlenty.AC_EAT);
-                return true;
+        int remainingHunger = hunger.hunger();
+        if (remainingHunger <= 0) {
+            stopFeeding();
+            return false;
+        }
+
+        // Native horn EAT uses whole charges without exceeding the hunger level.
+        int satietyPerCharge = (int) (Hunger.STARVING / 5f);
+        if (Dungeon.isChallenged(Challenges.NO_FOOD)) satietyPerCharge /= 3;
+        if (remainingHunger >= satietyPerCharge) {
+            for (HornOfPlenty horn : hero.belongings.getAllItems(HornOfPlenty.class)) {
+                if (horn.actions(hero).contains(HornOfPlenty.AC_EAT)) {
+                    eatAutomatically(hero, horn, HornOfPlenty.AC_EAT);
+                    return true;
+                }
             }
         }
 
-        Food food = mostAbundant(hero.belongings.getAllItems(Food.class));
-        if (food == null) return false;
+        float foodMultiplier = Dungeon.isChallenged(Challenges.NO_FOOD) ? 1f / 3f : 1f;
+        Artifact.ArtifactBuff hornBuff = hero.buff(HornOfPlenty.hornRecharge.class);
+        if (hornBuff != null && hornBuff.isCursed()) foodMultiplier *= 0.67f;
+        Food food = mostAbundantWithin(hero.belongings.getAllItems(Food.class),
+                remainingHunger, foodMultiplier);
+        if (food == null) {
+            stopFeeding();
+            return false;
+        }
         eatAutomatically(hero, food, Food.AC_EAT);
         return true;
     }
