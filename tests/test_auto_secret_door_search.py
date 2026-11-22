@@ -26,7 +26,7 @@ class SecretDoorSearchTests(unittest.TestCase):
 
     def test_only_adjacent_visible_hidden_doors(self):
         search = self.search
-        self.assertIn("SPDSettings.intro()", search)
+        self.assertNotIn("SPDSettings.intro()", search)
         self.assertIn("PathFinder.NEIGHBOURS8", search)
         self.assertIn("level.insideMap(cell)", search)
         self.assertIn("hero.fieldOfView[cell]", search)
