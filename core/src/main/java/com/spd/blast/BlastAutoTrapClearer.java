@@ -209,6 +209,17 @@ final class BlastAutoTrapClearer {
         return -1;
     }
 
+    private static boolean toxicGasNear(Level level, ToxicGas gas, int cell) {
+        if (gas.cur == null || gas.cur.length != level.length()) {
+            throw new IllegalStateException("Invalid toxic gas state");
+        }
+        for (int offset : PathFinder.NEIGHBOURS9) {
+            int adjacent = cell + offset;
+            if (level.insideMap(adjacent) && gas.cur[adjacent] > 0) return true;
+        }
+        return false;
+    }
+
     /** Retreat before a newly triggered gas plume can enter the hero's position. */
     static int toxicRetreatStep(Hero hero, boolean[] safe) {
         if (toxicOrigin < 0) return -1;
@@ -219,7 +230,8 @@ final class BlastAutoTrapClearer {
             return -1;
         }
         int currentDistance = level.distance(hero.pos, toxicOrigin);
-        if (currentDistance >= MAX_THROW_DISTANCE) return -1;
+        if (currentDistance >= MAX_THROW_DISTANCE
+                && !toxicGasNear(level, gas, hero.pos)) return -1;
         int best = -1;
         int farthest = currentDistance;
         for (int offset : PathFinder.NEIGHBOURS8) {
@@ -291,7 +303,7 @@ final class BlastAutoTrapClearer {
                         if (stand >= 0) target = closedDoor(level, cell, side);
                     }
                     if (stand < 0) reason = "no-safe-stand";
-                    else if (hero.rooted && stand != hero.pos) reason = "rooted";
+                    else if (hero.rooted && (stand != hero.pos || toxic)) reason = "rooted";
                     else if (distances[stand] < shortest) {
                         chosen = trap;
                         bestStand = stand;
