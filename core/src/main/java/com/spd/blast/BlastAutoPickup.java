@@ -77,7 +77,7 @@ public final class BlastAutoPickup {
             if (heap.type != Heap.Type.HEAP || heap.isEmpty()) continue;
 
             int cell = heap.pos;
-            if (!level.insideMap(cell)
+            if (!level.insideMap(cell) || BlastAutoTrapClearer.holdingDoorOpen(cell)
                     || !knownLoot(heap.seen, hero.fieldOfView[cell])
                     || !safe[cell] || distances[cell] == Integer.MAX_VALUE) continue;
 
@@ -147,7 +147,8 @@ public final class BlastAutoPickup {
         int cell = selected.pos;
         Item item = selectedItem;
         String status;
-        if (!isPickupType(item, instantPickup)) status = "type";
+        if (BlastAutoTrapClearer.holdingDoorOpen(cell)) status = "door-held";
+        else if (!isPickupType(item, instantPickup)) status = "type";
         else if (!canCollect(hero, item, instantPickup)) {
             if (item instanceof DriedRose.Petal) status = "rose-unavailable";
             else if (item instanceof Dewdrop) status = "dew-full";
