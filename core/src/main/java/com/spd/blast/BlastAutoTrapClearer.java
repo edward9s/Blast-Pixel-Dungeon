@@ -31,6 +31,8 @@ final class BlastAutoTrapClearer {
     private static String lastRejection;
     private static int repeatedRejections;
     private static int toxicOrigin = -1;
+    private static int heldDoor = -1;
+    private static int heldDoorTrap = -1;
 
     enum Action { NONE, MOVE, THROW }
 
@@ -40,6 +42,22 @@ final class BlastAutoTrapClearer {
         lastRejection = null;
         repeatedRejections = 0;
         toxicOrigin = -1;
+        heldDoor = -1;
+        heldDoorTrap = -1;
+    }
+
+    /** Prevent automatic pickup from undoing a door-opening throw mid-clearance. */
+    static boolean holdingDoorOpen(int cell) {
+        if (cell != heldDoor) return false;
+        Level level = Dungeon.level;
+        Trap trap = level.insideMap(heldDoorTrap) ? level.traps.get(heldDoorTrap) : null;
+        if (trap == null || !trap.active || level.map[cell] != Terrain.OPEN_DOOR
+                || level.heaps.get(cell) == null) {
+            heldDoor = -1;
+            heldDoorTrap = -1;
+            return false;
+        }
+        return true;
     }
 
     /** A rejected trap is logged only when near the hero; suppress repeated reasons. */
@@ -349,7 +367,12 @@ final class BlastAutoTrapClearer {
         BlastLog.debug("auto-trap pos=" + hero.pos + " trap=" + chosen.getClass().getSimpleName()
                 + "@" + chosen.pos + " item=" + item.getClass().getSimpleName()
                 + " target=" + bestTarget + " action=" + (openDoor ? "open-door" : "throw"));
-        if (!openDoor && chosen.getClass() == ToxicTrap.class) toxicOrigin = chosen.pos;
+        if (openDoor) {
+            heldDoor = bestTarget;
+            heldDoorTrap = chosen.pos;
+        } else if (chosen.getClass() == ToxicTrap.class) {
+            toxicOrigin = chosen.pos;
+        }
         item.setCurrent(hero);
         item.cast(hero, bestTarget);
         return Action.THROW;
