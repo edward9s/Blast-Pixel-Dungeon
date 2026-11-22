@@ -3,6 +3,8 @@ package com.spd.blast;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.Blob;
+import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.ConfusionGas;
+import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.CorrosiveGas;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.ToxicGas;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroAction;
@@ -23,6 +25,14 @@ import com.shatteredpixel.shatteredpixeldungeon.levels.traps.GrippingTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.OozeTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.ToxicTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.Trap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.ConfusionTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.CorrosionTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.DisarmingTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.FlockTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.GeyserTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.ShockingTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.TeleportationTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.WarpingTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.WeakeningTrap;
 import com.shatteredpixel.shatteredpixeldungeon.mechanics.Ballistica;
 import com.watabou.utils.PathFinder;
@@ -30,15 +40,16 @@ import com.watabou.utils.PathFinder;
 import java.util.Arrays;
 import java.util.function.Predicate;
 
-/** Clear a blocked one-tile corridor trap using an ordinary inventory throw. */
+/** Safely trigger supported traps using ordinary inventory throws. */
 final class BlastAutoTrapClearer {
     private static final int MAX_THROW_DISTANCE = 8;
-    private static final int TOXIC_MIN_DISTANCE = 2;
-    private static final int TOXIC_ESCAPE_DISTANCE = 4;
+    private static final int GAS_MIN_DISTANCE = 2;
+    private static final int GAS_ESCAPE_DISTANCE = 4;
     private static final int LOG_REPEAT_INTERVAL = 10;
     private static String lastRejection;
     private static int repeatedRejections;
-    private static int toxicOrigin = -1;
+    private static int gasOrigin = -1;
+    private static Class<? extends Blob> gasType;
     private static int heldDoor = -1;
     private static int heldDoorTrap = -1;
 
@@ -49,7 +60,8 @@ final class BlastAutoTrapClearer {
     static void reset() {
         lastRejection = null;
         repeatedRejections = 0;
-        toxicOrigin = -1;
+        gasOrigin = -1;
+        gasType = null;
         heldDoor = -1;
         heldDoorTrap = -1;
     }
@@ -85,11 +97,15 @@ final class BlastAutoTrapClearer {
                 + " hidden=" + !trap.visible + " status=" + reason);
     }
 
-    /** Effect-specific stand-off distance, with a retreat for spreading toxic gas. */
+    /** Minimum throwing distances based on each trap's effect. */
     static int minimumThrowDistance(Trap trap) {
         Class<?> type = trap.getClass();
-        if (type == CursingTrap.class || type == FlashingTrap.class || type == GrippingTrap.class
-                || type == WeakeningTrap.class) return 1;
+        if (type == CursingTrap.class || type == WeakeningTrap.class
+                || type == DisarmingTrap.class) return 1;
+        // Flashing and Gripping traps remain armed after activation.
+        if (type == TeleportationTrap.class || type == WarpingTrap.class
+                || type == GeyserTrap.class) return 2;
+        if (type == ShockingTrap.class || type == FlockTrap.class) return 3;
         // Ooze is applied to the trap and eight adjoining cells, without a lingering blob.
         if (type == OozeTrap.class || type == ChillingTrap.class) return 2;
         // Frost seeds freezing blobs as far as two connected floor cells from the trap.
@@ -98,8 +114,32 @@ final class BlastAutoTrapClearer {
         // Flames cover one neighboring cell or two reachable path steps.
         if (type == BurningTrap.class) return 2;
         if (type == BlazingTrap.class) return 3;
-        if (type == ToxicTrap.class) return TOXIC_MIN_DISTANCE;
+        if (type == ToxicTrap.class || type == ConfusionTrap.class) return GAS_MIN_DISTANCE;
+        if (type == CorrosionTrap.class) return 3;
         return -1;
+    }
+
+    private static Class<? extends Blob> spreadingGas(Trap trap) {
+        Class<?> type = trap.getClass();
+        if (type == ToxicTrap.class) return ToxicGas.class;
+        if (type == ConfusionTrap.class) return ConfusionGas.class;
+        if (type == CorrosionTrap.class) return CorrosiveGas.class;
+        return null;
+    }
+
+    /** Sheep may press other traps within their two-tile spawning radius. */
+    private static boolean safeToActivate(Level level, Trap trap) {
+        if (trap.getClass() != FlockTrap.class) return true;
+        for (Trap nearby : level.traps.valueList()) {
+            if (nearby != trap && nearby.active && level.distance(nearby.pos, trap.pos) <= 2) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean standSafeForEffect(Level level, Trap trap, int stand) {
+        return trap == null || trap.getClass() != ShockingTrap.class || !level.water[stand];
     }
 
     private static boolean fireTrap(Trap trap) {
@@ -113,7 +153,7 @@ final class BlastAutoTrapClearer {
                 && (terrain == Terrain.TRAP || terrain == Terrain.SECRET_TRAP);
     }
 
-    /** Return the accessible corridor-side offset only when the trap separates its two ends. */
+    /** Return a preferred corridor approach; zero allows an off-axis stand. */
     static int reachableSide(int cell, int width, boolean[] solid, boolean[] passable,
                              boolean[] pit, boolean[] safe, boolean[] visited,
                              boolean[] mapped, boolean[] visible, int[] distances) {
@@ -182,14 +222,14 @@ final class BlastAutoTrapClearer {
         return spareGear != null ? spareGear : largestFood;
     }
 
-    /** Find a route around corners without stepping closer to the source of the gas. */
-    static int toxicEscapeStep(int trapCell, int origin, int width,
+    /** Find a route around corners without stepping closer to the gas. */
+    static int gasEscapeStep(int trapCell, int origin, int width,
                                boolean[] safe, int minimumDistance) {
         if (width < 3 || safe == null || safe.length % width != 0
                 || trapCell < 0 || trapCell >= safe.length
                 || origin < 0 || origin >= safe.length || !safe[origin]
                 || minimumDistance < 1) {
-            throw new IllegalArgumentException("Invalid toxic escape map");
+            throw new IllegalArgumentException("Invalid gas escape map");
         }
         int originDistance = gridDistance(origin, trapCell, width);
         int[] firstSteps = new int[safe.length];
@@ -234,12 +274,12 @@ final class BlastAutoTrapClearer {
                 Math.abs(a / width - b / width));
     }
 
-    private static boolean hasToxicRetreat(Level level, int trapCell, int stand,
+    private static boolean hasGasRetreat(Level level, int trapCell, int stand,
                                            boolean[] safe) {
         int distance = level.distance(stand, trapCell);
         return distance >= MAX_THROW_DISTANCE
-                || toxicEscapeStep(trapCell, stand, level.width(), safe,
-                        Math.max(TOXIC_ESCAPE_DISTANCE, distance + 1)) >= 0;
+                || gasEscapeStep(trapCell, stand, level.width(), safe,
+                        Math.max(GAS_ESCAPE_DISTANCE, distance + 1)) >= 0;
     }
 
     /** Find a reachable throwing cell with a true line of fire, even around a bend. */
@@ -262,7 +302,7 @@ final class BlastAutoTrapClearer {
                         || distances[stand] == Integer.MAX_VALUE || distances[stand] >= shortest
                         || (target != trapCell && stand == target)) continue;
                 if (new Ballistica(stand, target, Ballistica.PROJECTILE).collisionPos != target
-                        || (toxic && !hasToxicRetreat(level, trapCell, stand, safe))) {
+                        || (toxic && !hasGasRetreat(level, trapCell, stand, safe))) {
                     continue;
                 }
                 best = stand;
@@ -281,7 +321,7 @@ final class BlastAutoTrapClearer {
             if (!level.insideMap(stand) || !level.passable[stand] || !safe[stand]) break;
             if (steps < minimum || distances[stand] == Integer.MAX_VALUE
                     || distances[stand] >= shortest
-                    || (toxic && !hasToxicRetreat(level, trapCell, stand, safe))) continue;
+                    || (toxic && !hasGasRetreat(level, trapCell, stand, safe))) continue;
             // Terrain and characters may stop an item before it presses the trap.
             if (new Ballistica(stand, trapCell, Ballistica.PROJECTILE).collisionPos != trapCell) {
                 continue;
@@ -333,7 +373,7 @@ final class BlastAutoTrapClearer {
         return -1;
     }
 
-    private static boolean toxicGasNear(Level level, Blob gas, int cell) {
+    private static boolean gasNear(Level level, Blob gas, int cell) {
         if (gas.cur == null || gas.cur.length != level.length()) {
             throw new IllegalStateException("Invalid toxic gas state");
         }
@@ -345,34 +385,34 @@ final class BlastAutoTrapClearer {
     }
 
     /** Retreat before a newly triggered gas plume can enter the hero's position. */
-    static int toxicRetreatStep(Hero hero, boolean[] safe) {
-        if (toxicOrigin < 0) return -1;
+    static int gasRetreatStep(Hero hero, boolean[] safe) {
+        if (gasOrigin < 0) return -1;
         Level level = Dungeon.level;
         Blob gas = level.blobs.get(ToxicGas.class);
         if (gas == null || gas.volume <= 0) {
-            toxicOrigin = -1;
+            gasOrigin = -1;
             return -1;
         }
         if (hero.rooted) return -1;
-        int currentDistance = level.distance(hero.pos, toxicOrigin);
+        int currentDistance = level.distance(hero.pos, gasOrigin);
         if (currentDistance >= MAX_THROW_DISTANCE
-                && !toxicGasNear(level, gas, hero.pos)) return -1;
-        return toxicEscapeStep(toxicOrigin, hero.pos, level.width(), safe,
+                && !gasNear(level, gas, hero.pos)) return -1;
+        return gasEscapeStep(gasOrigin, hero.pos, level.width(), safe,
                 currentDistance + 1);
     }
 
     /** After retreat, keep roaming away from the active toxic trap's plume. */
-    static void avoidToxicReturn(Hero hero, boolean[] safe) {
-        if (toxicOrigin < 0) return;
+    static void avoidGasReturn(Hero hero, boolean[] safe) {
+        if (gasOrigin < 0) return;
         Blob gas = Dungeon.level.blobs.get(ToxicGas.class);
         if (gas == null || gas.volume <= 0) {
-            toxicOrigin = -1;
+            gasOrigin = -1;
             return;
         }
         int minimumDistance = Math.min(MAX_THROW_DISTANCE,
-                Dungeon.level.distance(hero.pos, toxicOrigin));
+                Dungeon.level.distance(hero.pos, gasOrigin));
         for (int cell = 0; cell < safe.length; cell++) {
-            if (cell != hero.pos && Dungeon.level.distance(cell, toxicOrigin) < minimumDistance) {
+            if (cell != hero.pos && Dungeon.level.distance(cell, gasOrigin) < minimumDistance) {
                 safe[cell] = false;
             }
         }
@@ -494,7 +534,7 @@ final class BlastAutoTrapClearer {
             heldDoor = bestTarget;
             heldDoorTrap = chosen.pos;
         } else if (chosen.getClass() == ToxicTrap.class) {
-            toxicOrigin = chosen.pos;
+            gasOrigin = chosen.pos;
         }
         item.setCurrent(hero);
         item.cast(hero, bestTarget);
