@@ -32,8 +32,21 @@ an unobstructed throwing position around a corner or in a room. The former
 choke-point analysis still supplies a preferred approach when applicable.
 
 Activation must disarm the trap and the target must be unoccupied and free of
-plants. Non-disarming Flashing and Gripping traps, targeting dart traps,
-explosions, falls, death rays, and other unreviewed effects remain excluded.
+plants. Non-disarming Flashing and Gripping traps, explosions, falls,
+Tengu's specialized dart trap, and other unreviewed effects remain excluded.
+Four nearest-target traps (Worn Dart, Poison Dart, Disintegration and Grim)
+are eligible only when their native projectile line and true-distance targeting
+unambiguously select permitted hostile mobs. The predictor also respects the
+native minimum six-tile view range, invisibility distance treatment and current
+character occupancy. A tie involving the hero or any protected character
+vetoes firing. Sleeping or invisible mobs, allies, neutrals, quest/service NPCs,
+demon spawners and invulnerable/avoided/charmed targets are never deliberately
+attacked. Target eligibility is checked again from the actual throwing position
+before casting because characters may move during approach. The early
+opportunistic check runs after bomb tactics but before ordinary attacks,
+and only fires if the hero can throw without walking or opening a door.
+These traps still use the idle clearance flow when an approach is needed.
+
 A Flock trap is excluded if any other active trap is within the two-tile sheep
 spawn radius, preventing automatic chained activations.
 The throwing position for a Shocking trap must be dry as an additional
