@@ -27,12 +27,14 @@ import com.shatteredpixel.shatteredpixeldungeon.levels.traps.WeakeningTrap;
 import com.shatteredpixel.shatteredpixeldungeon.mechanics.Ballistica;
 import com.watabou.utils.PathFinder;
 
+import java.util.Arrays;
 import java.util.function.Predicate;
 
 /** Clear a blocked one-tile corridor trap using an ordinary inventory throw. */
 final class BlastAutoTrapClearer {
     private static final int MAX_THROW_DISTANCE = 8;
-    private static final int TOXIC_MIN_DISTANCE = 4;
+    private static final int TOXIC_MIN_DISTANCE = 2;
+    private static final int TOXIC_ESCAPE_DISTANCE = 4;
     private static final int LOG_REPEAT_INTERVAL = 10;
     private static String lastRejection;
     private static int repeatedRejections;
@@ -180,19 +182,69 @@ final class BlastAutoTrapClearer {
         return spareGear != null ? spareGear : largestFood;
     }
 
-    private static boolean hasToxicRetreat(Level level, int trapCell, int stand,
-                                           int side, boolean[] safe) {
-        for (int step = 1; step <= MAX_THROW_DISTANCE; step++) {
-            int cell = stand + side * step;
-            if (!level.insideMap(cell) || !safe[cell]) return false;
-            if (level.distance(cell, trapCell) >= MAX_THROW_DISTANCE) return true;
+    /** Find a route around corners without stepping closer to the source of the gas. */
+    static int toxicEscapeStep(int trapCell, int origin, int width,
+                               boolean[] safe, int minimumDistance) {
+        if (width < 3 || safe == null || safe.length % width != 0
+                || trapCell < 0 || trapCell >= safe.length
+                || origin < 0 || origin >= safe.length || !safe[origin]
+                || minimumDistance < 1) {
+            throw new IllegalArgumentException("Invalid toxic escape map");
         }
-        return false;
+        int originDistance = gridDistance(origin, trapCell, width);
+        int[] firstSteps = new int[safe.length];
+        Arrays.fill(firstSteps, -1);
+        int[] queue = new int[safe.length];
+        int head = 0;
+        int tail = 1;
+        queue[0] = origin;
+        firstSteps[origin] = origin;
+        int farthest = originDistance;
+        int bestStep = -1;
+        while (head < tail) {
+            int cell = queue[head++];
+            int distance = gridDistance(cell, trapCell, width);
+            if (distance >= minimumDistance && distance > farthest) {
+                farthest = distance;
+                bestStep = firstSteps[cell];
+            }
+            int x = cell % width;
+            int y = cell / width;
+            for (int dy = -1; dy <= 1; dy++) {
+                int nextY = y + dy;
+                if (nextY < 0 || nextY >= safe.length / width) continue;
+                for (int dx = -1; dx <= 1; dx++) {
+                    int nextX = x + dx;
+                    if ((dx == 0 && dy == 0) || nextX < 0 || nextX >= width) continue;
+                    int next = nextX + nextY * width;
+                    if (!safe[next] || firstSteps[next] >= 0
+                            || gridDistance(next, trapCell, width) < originDistance
+                            || (dx != 0 && dy != 0 && !safe[cell + dx]
+                                    && !safe[cell + dy * width])) continue;
+                    firstSteps[next] = cell == origin ? next : firstSteps[cell];
+                    queue[tail++] = next;
+                }
+            }
+        }
+        return bestStep;
+    }
+
+    private static int gridDistance(int a, int b, int width) {
+        return Math.max(Math.abs(a % width - b % width),
+                Math.abs(a / width - b / width));
+    }
+
+    private static boolean hasToxicRetreat(Level level, int trapCell, int stand,
+                                           boolean[] safe) {
+        int distance = level.distance(stand, trapCell);
+        return distance >= MAX_THROW_DISTANCE
+                || toxicEscapeStep(trapCell, stand, level.width(), safe,
+                        Math.max(TOXIC_ESCAPE_DISTANCE, distance + 1)) >= 0;
     }
 
     /** Find a reachable throwing cell with a true line of fire, even around a bend. */
     private static int nearbyStand(Level level, int trapCell, int target, int minimum,
-                                   boolean[] safe, int[] distances) {
+                                   boolean toxic, boolean[] safe, int[] distances) {
         int width = level.width();
         int centerX = trapCell % width;
         int centerY = trapCell / width;
@@ -209,7 +261,8 @@ final class BlastAutoTrapClearer {
                         || !level.passable[stand] || !safe[stand]
                         || distances[stand] == Integer.MAX_VALUE || distances[stand] >= shortest
                         || (target != trapCell && stand == target)) continue;
-                if (new Ballistica(stand, target, Ballistica.PROJECTILE).collisionPos != target) {
+                if (new Ballistica(stand, target, Ballistica.PROJECTILE).collisionPos != target
+                        || (toxic && !hasToxicRetreat(level, trapCell, stand, safe))) {
                     continue;
                 }
                 best = stand;
@@ -228,7 +281,7 @@ final class BlastAutoTrapClearer {
             if (!level.insideMap(stand) || !level.passable[stand] || !safe[stand]) break;
             if (steps < minimum || distances[stand] == Integer.MAX_VALUE
                     || distances[stand] >= shortest
-                    || (toxic && !hasToxicRetreat(level, trapCell, stand, side, safe))) continue;
+                    || (toxic && !hasToxicRetreat(level, trapCell, stand, safe))) continue;
             // Terrain and characters may stop an item before it presses the trap.
             if (new Ballistica(stand, trapCell, Ballistica.PROJECTILE).collisionPos != trapCell) {
                 continue;
@@ -236,14 +289,13 @@ final class BlastAutoTrapClearer {
             best = stand;
             shortest = distances[stand];
         }
-        // Only toxic gas requires the original straight-line retreat corridor.
-        return best >= 0 || toxic ? best
-                : nearbyStand(level, trapCell, trapCell, minimum, safe, distances);
+        return best >= 0 ? best
+                : nearbyStand(level, trapCell, trapCell, minimum, toxic, safe, distances);
     }
 
     /** A thrown item lands on the closed door and keeps it open as a floor heap. */
     private static int doorStand(Level level, int trapCell, int side, int minimum,
-                                 boolean toxic, boolean[] safe, int[] distances) {
+                                 boolean[] safe, int[] distances) {
         int door = -1;
         for (int steps = 1; steps <= MAX_THROW_DISTANCE; steps++) {
             int cell = trapCell + side * steps;
@@ -261,16 +313,15 @@ final class BlastAutoTrapClearer {
             int stand = trapCell + side * steps;
             if (!level.insideMap(stand) || !level.passable[stand] || !safe[stand]) break;
             if (stand == door || level.map[stand] == Terrain.DOOR
-                    || distances[stand] == Integer.MAX_VALUE || distances[stand] >= shortest
-                    || (toxic && !hasToxicRetreat(level, trapCell, stand, side, safe))) continue;
+                    || distances[stand] == Integer.MAX_VALUE || distances[stand] >= shortest) continue;
             if (new Ballistica(stand, door, Ballistica.PROJECTILE).collisionPos != door) {
                 continue;
             }
             best = stand;
             shortest = distances[stand];
         }
-        return best >= 0 || toxic ? best
-                : nearbyStand(level, trapCell, door, minimum, safe, distances);
+        return best >= 0 ? best
+                : nearbyStand(level, trapCell, door, minimum, false, safe, distances);
     }
 
     private static int closedDoor(Level level, int trapCell, int side) {
@@ -302,21 +353,12 @@ final class BlastAutoTrapClearer {
             toxicOrigin = -1;
             return -1;
         }
+        if (hero.rooted) return -1;
         int currentDistance = level.distance(hero.pos, toxicOrigin);
         if (currentDistance >= MAX_THROW_DISTANCE
                 && !toxicGasNear(level, gas, hero.pos)) return -1;
-        int best = -1;
-        int farthest = currentDistance;
-        for (int offset : PathFinder.NEIGHBOURS8) {
-            int cell = hero.pos + offset;
-            if (!level.insideMap(cell) || !safe[cell]) continue;
-            int distance = level.distance(cell, toxicOrigin);
-            if (distance > farthest) {
-                best = cell;
-                farthest = distance;
-            }
-        }
-        return best;
+        return toxicEscapeStep(toxicOrigin, hero.pos, level.width(), safe,
+                currentDistance + 1);
     }
 
     /** After retreat, keep roaming away from the active toxic trap's plume. */
@@ -327,9 +369,10 @@ final class BlastAutoTrapClearer {
             toxicOrigin = -1;
             return;
         }
-        if (Dungeon.level.distance(hero.pos, toxicOrigin) < MAX_THROW_DISTANCE) return;
+        int minimumDistance = Math.min(MAX_THROW_DISTANCE,
+                Dungeon.level.distance(hero.pos, toxicOrigin));
         for (int cell = 0; cell < safe.length; cell++) {
-            if (cell != hero.pos && Dungeon.level.distance(cell, toxicOrigin) < MAX_THROW_DISTANCE) {
+            if (cell != hero.pos && Dungeon.level.distance(cell, toxicOrigin) < minimumDistance) {
                 safe[cell] = false;
             }
         }
@@ -383,9 +426,8 @@ final class BlastAutoTrapClearer {
                         }
                     }
                     if (stand < 0) {
-                        // A spare item on a closed door holds it open for the next cast.
-                        stand = doorStand(level, cell, side, toxic ? minimum : 1,
-                                toxic, safe, distances);
+                        // Opening the door cannot trigger gas; validate retreat before the later trap throw.
+                        stand = doorStand(level, cell, side, 1, safe, distances);
                         if (stand >= 0) target = closedDoor(level, cell, side);
                     }
                     if (stand < 0) reason = "no-safe-stand";
