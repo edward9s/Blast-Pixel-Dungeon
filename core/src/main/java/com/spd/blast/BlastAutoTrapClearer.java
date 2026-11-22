@@ -412,6 +412,11 @@ final class BlastAutoTrapClearer {
                     boolean toxic = trap.getClass() == ToxicTrap.class;
                     int stand = throwingStand(level, cell, side,
                             minimum, toxic, safe, distances);
+                    // At a tight elbow, a one-cell throw is the last resort.
+                    // Only allow it when a safe path away from the gas already exists.
+                    if (stand < 0 && toxic) {
+                        stand = throwingStand(level, cell, side, 1, true, safe, distances);
+                    }
                     int target = cell;
                     boolean frost = false;
                     if (stand < 0) {
