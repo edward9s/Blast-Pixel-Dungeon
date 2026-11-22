@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Source checks for conservative corridor-trap clearing by automatic play."""
+"""Source checks for safe trap clearing across corridors and open layouts."""
 from pathlib import Path
 import unittest
 
@@ -87,7 +87,7 @@ class AutoTrapClearanceTest(unittest.TestCase):
         self.assertIn("level.map[cell] == Terrain.DOOR", CLEAR)
         self.assertIn("stand = doorStand(", CLEAR)
         self.assertIn("target = closedDoor(", CLEAR)
-        self.assertIn('openDoor ? "open-door" : "throw"', CLEAR)
+        self.assertIn('openDoor ? "open-door" : item instanceof PotionOfFrost ? "frost" : "throw"', CLEAR)
         self.assertIn("gasEscapeStep(trapCell, stand, level.width(), safe", CLEAR)
         self.assertIn("Math.max(GAS_ESCAPE_DISTANCE, distance + 1)", CLEAR)
         self.assertIn("nearbyStand(level, trapCell, trapCell, minimum, gas, trap, safe, distances)", CLEAR)
