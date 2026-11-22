@@ -116,8 +116,22 @@ public final class BlastAutoFoodTest {
                 "cursed horn satiety still must fit remaining hunger");
         same(rawMeat, BlastAutoFood.bestFitWithin(Collections.singletonList(rawMeat), 101, 0.67f),
                 "cursed horn reduced food satiety may fit");
+        same(pie, BlastAutoFood.pieAtStarving(Collections.singletonList(pie), 450, false),
+                "meat pie becomes eligible at full starvation");
+        same(null, BlastAutoFood.pieAtStarving(Collections.singletonList(pie), 449, false),
+                "do not eat meat pie after earlier food has reduced hunger");
+        same(null, BlastAutoFood.pieAtStarving(Collections.singletonList(pie), 450, true),
+                "do not replace an active WellFed buff");
+        same(null, BlastAutoFood.pieAtStarving(Collections.emptyList(), 450, false),
+                "do not select a missing pie");
+        pie.quantity(0);
+        same(null, BlastAutoFood.pieAtStarving(Collections.singletonList(pie), 450, false),
+                "do not select an empty pie stack");
+        pie.quantity(1);
         same(null, BlastAutoFood.bestFitWithin(Collections.singletonList(pie), 450, 1f),
-                "do not waste a high-energy meat pie at normal satiety");
+                "normal food selector leaves meat pies to the starvation-specific rule");
+        same(null, BlastAutoFood.bestFitWithin(Collections.singletonList(pie), 450, 1f / 3f),
+                "diet challenge cannot bypass the meat-pie starvation rule");
         ration.quantity(1);
         rawMeat.quantity(5);
         same(ration, BlastAutoFood.bestFitWithin(Arrays.asList(rawMeat, ration), 450, 1f),

@@ -76,6 +76,11 @@ class AutomaticMysteryMeatTests(unittest.TestCase):
         self.assertIn("if (!hunger.isStarving()) return false;", food)
         self.assertIn("feedingHero = hero;", food)
         self.assertIn("food.energy * foodMultiplier > remainingHunger", food)
+        self.assertIn("preferSatiety && food instanceof MeatPie", food)
+        self.assertIn("remainingHunger < Hunger.STARVING || wellFed", food)
+        self.assertIn("hero.buff(WellFed.class) != null", food)
+        self.assertIn("pieAtStarving(foods, remainingHunger", food)
+        self.assertIn("eatAutomatically(hero, pie, Food.AC_EAT)", food)
         self.assertNotIn("food == null && hunger.isStarving()", food)
         self.assertIn("food.energy > mostSatiety", food)
 
@@ -87,6 +92,8 @@ class AutomaticMysteryMeatTests(unittest.TestCase):
         self.assertIn("horn.actions(hero).contains(HornOfPlenty.AC_EAT)", method)
         self.assertIn("eatAutomatically(hero, horn, HornOfPlenty.AC_EAT)", method)
         self.assertLess(method.index("eatAutomatically(hero, horn"),
+                        method.index("Food pie = pieAtStarving("))
+        self.assertLess(method.index("Food pie = pieAtStarving("),
                         method.index("Food food = bestFitWithin("))
         self.assertIn("eatAutomatically(hero, food, Food.AC_EAT)", method)
         self.assertIn("if (remainingHunger >= satietyPerCharge)", method)

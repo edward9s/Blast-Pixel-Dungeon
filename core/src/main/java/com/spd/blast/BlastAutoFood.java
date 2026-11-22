@@ -3,6 +3,7 @@ package com.spd.blast;
 import com.shatteredpixel.shatteredpixeldungeon.Challenges;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Hunger;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.WellFed;
 import com.shatteredpixel.shatteredpixeldungeon.items.artifacts.Artifact;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
@@ -11,9 +12,12 @@ import com.shatteredpixel.shatteredpixeldungeon.items.food.Blandfruit;
 import com.shatteredpixel.shatteredpixeldungeon.items.food.ChargrilledMeat;
 import com.shatteredpixel.shatteredpixeldungeon.items.food.Food;
 import com.shatteredpixel.shatteredpixeldungeon.items.food.FrozenCarpaccio;
+import com.shatteredpixel.shatteredpixeldungeon.items.food.MeatPie;
 import com.shatteredpixel.shatteredpixeldungeon.items.food.MysteryMeat;
 import com.shatteredpixel.shatteredpixeldungeon.items.food.Pasty;
 import com.shatteredpixel.shatteredpixeldungeon.items.food.StewedMeat;
+
+import java.util.ArrayList;
 
 /** Native automatic meals, preserving ingredients for meat pies. */
 public final class BlastAutoFood {
@@ -44,6 +48,17 @@ public final class BlastAutoFood {
         return chooseFood(foods, Float.POSITIVE_INFINITY, 1f, false);
     }
 
+    /** Meat Pie's WellFed buff freezes hunger for 450 turns (150 on diet).
+     *  Reserve it for the maximum hunger deficit without an existing WellFed buff. */
+    static Food pieAtStarving(Iterable<? extends Food> foods,
+                              int remainingHunger, boolean wellFed) {
+        if (remainingHunger < Hunger.STARVING || wellFed) return null;
+        for (Food food : foods) {
+            if (food instanceof MeatPie && food.quantity() > 0) return food;
+        }
+        return null;
+    }
+
     /** Prefer the largest usable portion; use stack size to break equal-satiety ties. */
     static Food bestFitWithin(Iterable<? extends Food> foods,
                               float remainingHunger, float foodMultiplier) {
@@ -70,6 +85,7 @@ public final class BlastAutoFood {
         float mostSatiety = 0f;
         for (Food food : foods) {
             if (food.quantity() <= 0 || food instanceof Pasty
+                    || (preferSatiety && food instanceof MeatPie)
                     || (food instanceof Blandfruit
                         && ((Blandfruit) food).potionAttrib == null)
                     || food.energy <= 0 || food.energy * foodMultiplier > remainingHunger) continue;
@@ -135,8 +151,14 @@ public final class BlastAutoFood {
         float foodMultiplier = Dungeon.isChallenged(Challenges.NO_FOOD) ? 1f / 3f : 1f;
         Artifact.ArtifactBuff hornBuff = hero.buff(HornOfPlenty.hornRecharge.class);
         if (hornBuff != null && hornBuff.isCursed()) foodMultiplier *= 0.67f;
-        Food food = bestFitWithin(hero.belongings.getAllItems(Food.class),
-                remainingHunger, foodMultiplier);
+        ArrayList<Food> foods = hero.belongings.getAllItems(Food.class);
+        Food pie = pieAtStarving(foods, remainingHunger, hero.buff(WellFed.class) != null);
+        if (pie != null) {
+            eatAutomatically(hero, pie, Food.AC_EAT);
+            return true;
+        }
+
+        Food food = bestFitWithin(foods, remainingHunger, foodMultiplier);
         if (food == null) {
             stopFeeding();
             return false;
