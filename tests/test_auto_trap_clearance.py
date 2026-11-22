@@ -62,7 +62,8 @@ class AutoTrapClearanceTest(unittest.TestCase):
         self.assertIn("hero.belongings.getItem(PotionOfFrost.class)", CLEAR)
         self.assertIn("potion.quantity() > 0 && potion.isKnown()", CLEAR)
         self.assertIn("throwingStand(level, cell, side, 1, false, safe, distances)", CLEAR)
-        self.assertIn('bestFrost ? "frost" : "throw"', CLEAR)
+        self.assertIn('item instanceof PotionOfFrost ? "frost" : "throw"', CLEAR)
+        self.assertIn("item == null && bestTarget == chosen.pos && fireTrap(chosen)", CLEAR)
         self.assertIn("item.throwPos(hero, bestTarget) != bestTarget", CLEAR)
         self.assertIn("item.cast(hero, bestTarget)", CLEAR)
 
