@@ -242,18 +242,6 @@ final class BlastAutoTrapClearer {
         return trap.active && (terrain == Terrain.TRAP || terrain == Terrain.SECRET_TRAP);
     }
 
-    /** Aqua Brew's geyser pushes actors within one tile of the landing cell. */
-    private static boolean douseSafeForCharacters(Level level, int cell, Hero hero) {
-        for (Char character : Actor.chars()) {
-            if (!character.isAlive() || character == hero
-                    || level.distance(cell, character.pos) > 1) continue;
-            if (!(character instanceof Mob)
-                    || character.alignment != Char.Alignment.ENEMY
-                    || BlastAutoPlay.isAutoAttackExcluded((Mob) character)) return false;
-        }
-        return true;
-    }
-
     /** Shared landing planner also covers ordinary non-special-room traps. */
     private static Action douseWithAqua(Hero hero, boolean[] safe, int[] distances) {
         Level level = Dungeon.level;
