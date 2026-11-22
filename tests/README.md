@@ -41,8 +41,11 @@ eight cells of separation, then avoids returning while the gas persists.
 An obstructing closed door is first opened with a normal item throw, which
 leaves the item on the door to hold it open. Automatic pickup temporarily skips
 this door item until the trap has been disarmed. Local-effect traps retain their
-minimum standoff distance (two tiles for the adjacent ooze trap). Automatic
-movement continues to avoid active hazards. When Debug Log is
+minimum standoff distance: two tiles for ooze and ChillingTrap, three tiles
+for FrostTrap (whose freezing area reaches two path steps). Both freezing
+traps work on revealed or hidden corridor cells, and the existing active
+Freezing blob exclusion keeps normal automatic movement out of the frost
+after activation. Automatic movement continues to avoid active hazards. When Debug Log is
 enabled, nearby rejected traps produce `[Blast] auto-trap` entries with their
 class, cell, hidden flag and rejection status (such as `unsupported`,
 `not-chokepoint`, `no-safe-stand`, `no-throwable-item` or
