@@ -63,13 +63,13 @@ final class BlastAutoAqua {
     }
 
     /** GeyserTrap uses the same native distance map: 0-1 certain, 2 is 2/3 chance. */
-    static int countTargets(int[] sprayDistance, boolean[] targetTraps, boolean certain) {
-        if (sprayDistance.length != targetTraps.length)
-            throw new IllegalArgumentException("Invalid Aqua Brew target map");
+    static int countTargets(int[] sprayDistance, Iterable<Integer> trapCells, boolean certain) {
+        if (trapCells == null) throw new IllegalArgumentException("Missing Aqua Brew traps");
         int count = 0;
-        for (int i = 0; i < targetTraps.length; i++) {
-            if (targetTraps[i] && (certain ? sprayDistance[i] < 2
-                    : sprayDistance[i] == 2)) count++;
+        for (int cell : trapCells) {
+            if (cell < 0 || cell >= sprayDistance.length)
+                throw new IllegalArgumentException("Invalid Aqua Brew target cell");
+            if (certain ? sprayDistance[cell] < 2 : sprayDistance[cell] == 2) count++;
         }
         return count;
     }
@@ -134,16 +134,16 @@ final class BlastAutoAqua {
 
     /** Score newly reachable terrain after a guaranteed removal, without random assumptions. */
     private static Score score(Hero hero, Level level, int[] sprayDistance,
-                               boolean[] traps, boolean[] safe, int[] distances,
+                               ArrayList<Integer> trapCells, boolean[] safe, int[] distances,
                                int goal, int beforeGoalDistance, int stand,
                                Blob[] hazards, boolean[] specialBarriers) {
-        int certain = countTargets(sprayDistance, traps, true);
-        int possible = countTargets(sprayDistance, traps, false);
+        int certain = countTargets(sprayDistance, trapCells, true);
+        int possible = countTargets(sprayDistance, trapCells, false);
         if (certain == 0) return null;
 
         boolean[] opened = safe.clone();
-        for (int cell = 0; cell < traps.length; cell++) {
-            if (traps[cell] && sprayDistance[cell] < 2
+        for (int cell : trapCells) {
+            if (sprayDistance[cell] < 2
                     && !BlastAutoEnvironment.hazardousAt(cell, hazards)
                     && !specialBarriers[cell] && Actor.findChar(cell) == null
                     && !AutoPlayPlantSafety.isHarmful(level.plants.get(cell))) {
@@ -180,7 +180,6 @@ final class BlastAutoAqua {
         AquaBrew aqua = hero.belongings.getItem(AquaBrew.class);
         if (aqua == null || aqua.quantity() <= 0) return Action.NONE;
 
-        boolean[] targets = new boolean[level.length()];
         ArrayList<Integer> trapCells = new ArrayList<>();
         boolean[] centers = new boolean[level.length()];
         int width = level.width();
@@ -192,7 +191,6 @@ final class BlastAutoAqua {
                     || !BlastAutoTrapClearer.canDouse(trap, level.map[cell])
                     || level.plants.get(cell) != null || Actor.findChar(cell) != null
                     || !canFlood(level, cell)) continue;
-            targets[cell] = true;
             trapCells.add(cell);
             int x = cell % width, y = cell / width;
             for (int dy = -SPLASH_RANGE; dy <= SPLASH_RANGE; dy++) {
@@ -233,8 +231,8 @@ final class BlastAutoAqua {
             // with all eight neighboring directions and a maximum of two steps.
             PathFinder.buildDistanceMap(center, sprayPassable, SPLASH_RANGE);
             int[] coverage = PathFinder.distance.clone();
-            if (countTargets(coverage, targets, true) == 0) continue;
-            Score candidate = score(hero, level, coverage, targets, safe, distances,
+            if (countTargets(coverage, trapCells, true) == 0) continue;
+            Score candidate = score(hero, level, coverage, trapCells, safe, distances,
                     goal, beforeGoalDistance, stand, hazards, specialBarriers);
             if (better(candidate, best)) {
                 best = candidate;
