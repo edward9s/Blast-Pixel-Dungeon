@@ -44,8 +44,9 @@ Disarming, Flock, Teleportation, and Warping traps. Toxic, Confusion, and
 Corrosion gas share a route-aware retreat mechanism that supports L-bends
 and sideways first steps, while rejecting closed corners and dead ends
 without adequate escape. Toxic and Confusion throws normally start at two
-cells, Corrosion at three, with a one-cell fallback *only* if an escape route
-is known. Following activation, the hero prioritizes leaving the active gas
+cells, Corrosion at three. A shorter throw is a last resort *only* if an
+escape route is known: one cell for Toxic/Confusion and two for Corrosion.
+Escape searching is bounded to eight moves. Following activation, the hero prioritizes leaving the active gas
 and avoids turning back toward its source. Other effects retain specific
 stand-off ranges based on their native action.
 
