@@ -12,6 +12,7 @@ PICKUP = (ROOT / "core/src/main/java/com/spd/blast/BlastAutoPickup.java").read_t
 class AutoTrapClearanceTest(unittest.TestCase):
     def test_only_after_combat_loot_and_idle_tasks(self):
         self.assertLess(PLAY.index('debugDecision = "pickup";'), PLAY.index('debugDecision = "trap";'))
+        self.assertLess(PLAY.index('debugDecision = "trap";'), PLAY.index('debugDecision = "farm";'))
         self.assertLess(PLAY.index('debugDecision = "trap";'), PLAY.index('debugDecision = "roam";'))
         self.assertIn("BlastAutoTrapClearer.chooseAction(hero, idleSafe, idleDistances)", PLAY)
         self.assertIn("trapAction == BlastAutoTrapClearer.Action.THROW", PLAY)
@@ -36,9 +37,14 @@ class AutoTrapClearanceTest(unittest.TestCase):
         allowed = CLEAR.split("static int minimumThrowDistance(", 1)[1].split(
             "static int reachableSide(", 1
         )[0]
-        for name in ("CursingTrap", "FlashingTrap", "GrippingTrap", "WeakeningTrap", "OozeTrap", "ChillingTrap", "FrostTrap", "BurningTrap", "BlazingTrap", "ToxicTrap"):
+        for name in ("CursingTrap", "WeakeningTrap", "DisarmingTrap",
+                     "OozeTrap", "ChillingTrap", "FrostTrap", "BurningTrap",
+                     "BlazingTrap", "ToxicTrap", "ConfusionTrap", "CorrosionTrap",
+                     "GeyserTrap", "ShockingTrap", "FlockTrap",
+                     "TeleportationTrap", "WarpingTrap"):
             self.assertIn("type == " + name + ".class", allowed)
-        for name in ("ExplosiveTrap", "DisintegrationTrap", "PoisonDartTrap"):
+        for name in ("ExplosiveTrap", "DisintegrationTrap", "PoisonDartTrap",
+                     "FlashingTrap", "GrippingTrap"):
             self.assertNotIn("type == " + name + ".class", allowed)
         self.assertIn("return -1;", allowed)
         self.assertIn("item.throwPos(hero, bestTarget) != bestTarget", CLEAR)
@@ -55,13 +61,13 @@ class AutoTrapClearanceTest(unittest.TestCase):
     def test_corner_fire_and_frost_potion(self):
         self.assertIn("Exactly two walkable cardinal openings also includes L-shaped corridors", CLEAR)
         self.assertIn("return second < 0 ? 0 : separatedSide(first, second, cell", CLEAR)
-        self.assertIn("nearbyStand(level, trapCell, trapCell, minimum, safe, distances)", CLEAR)
-        self.assertIn("nearbyStand(level, trapCell, door, minimum, safe, distances)", CLEAR)
+        self.assertIn("nearbyStand(level, trapCell, trapCell, minimum, gas, trap, safe, distances)", CLEAR)
+        self.assertIn("nearbyStand(level, trapCell, door, minimum, false, null, safe, distances)", CLEAR)
         self.assertIn("type == BurningTrap.class) return 2", CLEAR)
         self.assertIn("type == BlazingTrap.class) return 3", CLEAR)
         self.assertIn("hero.belongings.getItem(PotionOfFrost.class)", CLEAR)
         self.assertIn("potion.quantity() > 0 && potion.isKnown()", CLEAR)
-        self.assertIn("throwingStand(level, cell, side, 1, false, safe, distances)", CLEAR)
+        self.assertIn("throwingStand(level, cell, side, 1, false, trap, safe, distances)", CLEAR)
         self.assertIn('item instanceof PotionOfFrost ? "frost" : "throw"', CLEAR)
         self.assertIn("item == null && bestTarget == chosen.pos && fireTrap(chosen)", CLEAR)
         self.assertIn("item.throwPos(hero, bestTarget) != bestTarget", CLEAR)
@@ -70,7 +76,7 @@ class AutoTrapClearanceTest(unittest.TestCase):
     def test_rejection_diagnostic_is_bounded_and_specific(self):
         self.assertIn('status=" + reason', CLEAR)
         self.assertIn('" hidden=" + !trap.visible', CLEAR)
-        for reason in ("unsupported", "not-chokepoint", "no-safe-stand",
+        for reason in ("unsupported", "chain-reaction", "no-safe-stand",
                        "lost-inventory", "no-throwable-item", "blocked-trajectory"):
             self.assertIn('"' + reason + '"', CLEAR)
         self.assertIn("LOG_REPEAT_INTERVAL = 10", CLEAR)
@@ -82,18 +88,25 @@ class AutoTrapClearanceTest(unittest.TestCase):
         self.assertIn("stand = doorStand(", CLEAR)
         self.assertIn("target = closedDoor(", CLEAR)
         self.assertIn('openDoor ? "open-door" : "throw"', CLEAR)
-        self.assertIn("toxicEscapeStep(trapCell, stand, level.width(), safe", CLEAR)
-        self.assertIn("Math.max(TOXIC_ESCAPE_DISTANCE, distance + 1)", CLEAR)
-        self.assertIn("nearbyStand(level, trapCell, trapCell, minimum, toxic, safe, distances)", CLEAR)
-        self.assertIn("toxicEscapeStep(toxicOrigin, hero.pos, level.width(), safe", CLEAR)
-        self.assertIn("if (stand < 0 && toxic)", CLEAR)
-        self.assertIn("throwingStand(level, cell, side, 1, true, safe, distances)", CLEAR)
+        self.assertIn("gasEscapeStep(trapCell, stand, level.width(), safe", CLEAR)
+        self.assertIn("Math.max(GAS_ESCAPE_DISTANCE, distance + 1)", CLEAR)
+        self.assertIn("nearbyStand(level, trapCell, trapCell, minimum, gas, trap, safe, distances)", CLEAR)
+        self.assertIn("gasEscapeStep(gasOrigin, hero.pos, level.width(), safe", CLEAR)
+        self.assertIn("if (stand < 0 && gas)", CLEAR)
+        self.assertIn("throwingStand(level, cell, side, 1, true, trap, safe, distances)", CLEAR)
         self.assertIn("hero.rooted", CLEAR)
-        self.assertNotIn("hasToxicRetreat(level, trapCell, stand, side, safe)", CLEAR)
-        self.assertIn("toxicOrigin = chosen.pos", CLEAR)
-        self.assertIn("BlastAutoTrapClearer.toxicRetreatStep(hero, safe)", PLAY)
-        self.assertIn("BlastAutoTrapClearer.avoidToxicReturn(hero, safe)", PLAY)
-        self.assertLess(PLAY.index("BlastAutoTrapClearer.toxicRetreatStep(hero, safe)"),
+        self.assertNotIn("hasGasRetreat(level, trapCell, stand, side, safe)", CLEAR)
+        self.assertIn("gasOrigin = chosen.pos", CLEAR)
+        self.assertIn("gasType = spreadingGas(chosen)", CLEAR)
+        self.assertIn("level.blobs.get(gasType)", CLEAR)
+        self.assertIn("spreadingGas(trap)", CLEAR)
+        self.assertIn("standSafeForEffect(level, trap, stand)", CLEAR)
+        self.assertIn("safeToActivate(level, trap)", CLEAR)
+        self.assertIn("side == 0", CLEAR)
+        self.assertNotIn('reason = "not-chokepoint"', CLEAR)
+        self.assertIn("BlastAutoTrapClearer.gasRetreatStep(hero, safe)", PLAY)
+        self.assertIn("BlastAutoTrapClearer.avoidGasReturn(hero, safe)", PLAY)
+        self.assertLess(PLAY.index("BlastAutoTrapClearer.gasRetreatStep(hero, safe)"),
                         PLAY.index('debugDecision = "combat";'))
         self.assertIn("gas.cur[adjacent] > 0", CLEAR)
         self.assertIn("heldDoor = bestTarget", CLEAR)
