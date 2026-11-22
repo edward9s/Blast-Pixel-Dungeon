@@ -2,6 +2,7 @@ package com.spd.blast;
 
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Barrier;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.LostInventory;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroAction;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Talent;
@@ -147,7 +148,13 @@ public final class BlastAutoPickup {
         Item item = selectedItem;
         String status;
         if (!isPickupType(item, instantPickup)) status = "type";
-        else if (!canCollect(hero, item, instantPickup)) status = "capacity";
+        else if (!canCollect(hero, item, instantPickup)) {
+            if (item instanceof DriedRose.Petal) status = "rose-unavailable";
+            else if (item instanceof Dewdrop) status = "dew-full";
+            else if (hero.buff(LostInventory.class) != null
+                    && !item.keptThroughLostInventory()) status = "lost-inventory";
+            else status = "full";
+        }
         else if (!safe[cell]) status = "unsafe";
         else if (!pickupSafe[cell]) status = "blocked";
         else if (distances[cell] == Integer.MAX_VALUE) status = "unreachable";
@@ -155,7 +162,26 @@ public final class BlastAutoPickup {
             status = "cooldown";
         } else status = "ready";
         String type = item instanceof Gold ? "Gold" : item.getClass().getSimpleName();
-        return type + "@" + cell + " status=" + status;
+        String result = type + "@" + cell + " status=" + status;
+        if ("full".equals(status) || "lost-inventory".equals(status)) {
+            return result + " " + inventoryCapacity(hero);
+        }
+        return result;
+    }
+
+    /** Inspect capacity only for a rejected pickup while Debug Log is enabled. */
+    private static String inventoryCapacity(Hero hero) {
+        Bag backpack = hero.belongings.backpack;
+        StringBuilder result = new StringBuilder("backpack=")
+                .append(backpack.items.size()).append('/').append(backpack.capacity());
+        for (Item item : backpack) {
+            if (item instanceof Bag) {
+                Bag bag = (Bag) item;
+                result.append(' ').append(item.getClass().getSimpleName())
+                        .append('=').append(bag.items.size()).append('/').append(bag.capacity());
+            }
+        }
+        return result.toString();
     }
 
     /** Pick the first eligible item, even when an ineligible item covers it. */
