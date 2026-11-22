@@ -88,6 +88,10 @@ final class BlastAutoSpecialRooms {
         return null;
     }
 
+    static boolean finishFlight(boolean atEntrance, boolean chestClosed, boolean retreat) {
+        return atEntrance && (!chestClosed || retreat);
+    }
+
     /** An active crossing has priority over optional looting or roaming. */
     static Action continueFlight(Hero hero, boolean[] safe, int[] distances) {
         Level level = Dungeon.level;
@@ -107,16 +111,17 @@ final class BlastAutoSpecialRooms {
             Heap chest = knownChest(level, room, hero);
             flightTreasure = chest == null ? -1 : chest.pos;
         }
-        if (hero.pos == exit) {
-            activeFlightRoom = null;
-            flightTreasure = -1;
-            return Action.NONE;
-        }
-
         float timePerStep = Math.max(1f, 1f / hero.speed());
         int returnSteps = distances[exit];
         boolean retreat = floating.detachesWithinDelay((returnSteps + 3) * timePerStep);
         Heap chest = flightTreasure < 0 ? null : level.heaps.get(flightTreasure);
+        // Drinking happens at the entrance: do not cancel a new crossing there.
+        if (finishFlight(hero.pos == exit,
+                chest != null && chest.type == Heap.Type.CHEST, retreat)) {
+            activeFlightRoom = null;
+            flightTreasure = -1;
+            return Action.NONE;
+        }
         if (!retreat && chest != null && chest.type == Heap.Type.CHEST
                 && safe[flightTreasure] && distances[flightTreasure] != Integer.MAX_VALUE) {
             PathFinder.buildDistanceMap(flightTreasure, safe);
