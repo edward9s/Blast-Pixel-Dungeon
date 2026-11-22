@@ -36,7 +36,7 @@ public final class BlastAutoTrapClearerTest {
                 "one-cell freezing aura");
         equal(3, BlastAutoTrapClearer.minimumThrowDistance(new FrostTrap()),
                 "two-cell freezing aura");
-        equal(4, BlastAutoTrapClearer.minimumThrowDistance(new ToxicTrap()), "spreading toxic gas");
+        equal(2, BlastAutoTrapClearer.minimumThrowDistance(new ToxicTrap()), "escape-capable toxic gas");
         equal(2, BlastAutoTrapClearer.minimumThrowDistance(new BurningTrap()), "adjacent fire");
         equal(3, BlastAutoTrapClearer.minimumThrowDistance(new BlazingTrap()), "two-step fire");
         equal(-1, BlastAutoTrapClearer.minimumThrowDistance(new ExplosiveTrap()), "blast");
@@ -180,6 +180,28 @@ public final class BlastAutoTrapClearerTest {
         equal(0, BlastAutoTrapClearer.reachableSide(trap, width, elbowSolid,
                 elbowPassable, elbowPit, elbowSafe, elbowVisited, elbowMapped,
                 elbowVisible, elbowDistance), "three-way junction is not a choke point");
+
+        // A bend after the throwing cell must still allow a sideways first escape step.
+        int gasWidth = 11;
+        int gasTrap = 5 + 5 * gasWidth;
+        int gasStand = 5 + 7 * gasWidth;
+        boolean[] gasSafe = new boolean[gasWidth * gasWidth];
+        gasSafe[gasStand] = true;
+        gasSafe[6 + 7 * gasWidth] = true;
+        gasSafe[7 + 7 * gasWidth] = true;
+        gasSafe[8 + 7 * gasWidth] = true;
+        equal(-1, BlastAutoTrapClearer.toxicEscapeStep(gasTrap, gasStand,
+                gasWidth, gasSafe, 4), "short dead-end cannot outrun gas");
+        gasSafe[9 + 7 * gasWidth] = true;
+        equal(6 + 7 * gasWidth, BlastAutoTrapClearer.toxicEscapeStep(gasTrap, gasStand,
+                gasWidth, gasSafe, 4), "retreat may begin sideways around an elbow");
+        // No diagonal escape through two impassable orthogonal neighbors.
+        boolean[] blockedCorner = new boolean[gasWidth * gasWidth];
+        blockedCorner[gasStand] = true;
+        blockedCorner[6 + 8 * gasWidth] = true;
+        blockedCorner[7 + 9 * gasWidth] = true;
+        equal(-1, BlastAutoTrapClearer.toxicEscapeStep(gasTrap, gasStand,
+                gasWidth, blockedCorner, 4), "blocked diagonal corner is not an exit");
 
         ClothArmor armor = new ClothArmor();
         WornShortsword sword = new WornShortsword();
