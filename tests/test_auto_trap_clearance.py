@@ -124,7 +124,8 @@ class AutoTrapClearanceTest(unittest.TestCase):
     def test_inventory_and_native_throw(self):
         self.assertIn("item instanceof Weapon || item instanceof Armor", CLEAR)
         self.assertIn("item instanceof Food", CLEAR)
-        self.assertIn("item.quantity() > largestFood.quantity()", CLEAR)
+        self.assertIn("BlastAutoFood.mostAbundant(foods)", CLEAR)
+        self.assertIn("!(item instanceof MeatPie)", CLEAR)
         self.assertIn("candidate.isEquipped(hero)", CLEAR)
         self.assertIn("item.setCurrent(hero);", CLEAR)
         self.assertIn("item.cast(hero, bestTarget);", CLEAR)
