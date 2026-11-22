@@ -4,6 +4,7 @@ import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.armor.ClothArmor;
 import com.shatteredpixel.shatteredpixeldungeon.items.food.Food;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.WornShortsword;
+import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.BurningTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.CursingTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.ExplosiveTrap;
@@ -30,12 +31,27 @@ public final class BlastAutoTrapClearerTest {
         equal(-1, BlastAutoTrapClearer.minimumThrowDistance(new BurningTrap()), "spreading fire");
         equal(-1, BlastAutoTrapClearer.minimumThrowDistance(new ExplosiveTrap()), "blast");
         equal(-1, BlastAutoTrapClearer.minimumThrowDistance(new PoisonDartTrap()), "remote dart");
+        FlashingTrap hidden = new FlashingTrap();
+        hidden.visible = false;
+        equal(1, BlastAutoTrapClearer.canTrigger(hidden, Terrain.SECRET_TRAP) ? 1 : 0,
+                "hidden active trap is eligible");
+        equal(1, BlastAutoTrapClearer.canTrigger(hidden, Terrain.TRAP) ? 1 : 0,
+                "revealed active trap is eligible");
+        equal(0, BlastAutoTrapClearer.canTrigger(hidden, Terrain.EMPTY) ? 1 : 0,
+                "non-trap terrain cannot be triggered");
+        hidden.active = false;
+        equal(0, BlastAutoTrapClearer.canTrigger(hidden, Terrain.SECRET_TRAP) ? 1 : 0,
+                "disarmed hidden trap");
+        equal(0, BlastAutoTrapClearer.canTrigger(new ExplosiveTrap(), Terrain.SECRET_TRAP) ? 1 : 0,
+                "dangerous hidden trap remains excluded");
 
         int width = 7;
         int trap = 3 + 3 * width;
         boolean[] solid = new boolean[width * width];
         boolean[] safe = new boolean[width * width];
         boolean[] visible = new boolean[width * width];
+        boolean[] visited = new boolean[width * width];
+        boolean[] mapped = new boolean[width * width];
         int[] distances = new int[width * width];
         Arrays.fill(solid, true);
         Arrays.fill(distances, Integer.MAX_VALUE);
@@ -48,22 +64,28 @@ public final class BlastAutoTrapClearerTest {
         safe[trap] = false;
         distances[trap - width] = 1;
         equal(-width, BlastAutoTrapClearer.reachableSide(trap, width, solid, safe,
-                visible, distances), "blocking corridor");
+                visited, mapped, visible, distances), "blocking corridor");
         distances[trap + width] = 3;
         equal(0, BlastAutoTrapClearer.reachableSide(trap, width, solid, safe,
-                visible, distances), "alternate access");
+                visited, mapped, visible, distances), "alternate access");
         distances[trap + width] = Integer.MAX_VALUE;
         safe[trap + width] = false;
         equal(0, BlastAutoTrapClearer.reachableSide(trap, width, solid, safe,
-                visible, distances), "hazard on far side");
+                visited, mapped, visible, distances), "hazard on far side");
         safe[trap + width] = true;
         visible[trap + width] = false;
         equal(0, BlastAutoTrapClearer.reachableSide(trap, width, solid, safe,
-                visible, distances), "unknown far side");
+                visited, mapped, visible, distances), "unknown far side");
+        // A mapped or previously visited corridor is eligible even without current sight.
+        mapped[trap + width] = true;
+        visited[trap - width] = true;
+        visible[trap - width] = false;
+        equal(-width, BlastAutoTrapClearer.reachableSide(trap, width, solid, safe,
+                visited, mapped, visible, distances), "remembered corridor sides");
         visible[trap + width] = true;
         solid[trap - 1] = false;
         equal(0, BlastAutoTrapClearer.reachableSide(trap, width, solid, safe,
-                visible, distances), "room instead of corridor");
+                visited, mapped, visible, distances), "room instead of corridor");
 
         ClothArmor armor = new ClothArmor();
         WornShortsword sword = new WornShortsword();
