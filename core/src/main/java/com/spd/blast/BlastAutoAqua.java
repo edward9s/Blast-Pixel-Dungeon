@@ -186,12 +186,13 @@ final class BlastAutoAqua {
         int width = level.width();
         for (Trap trap : level.traps.valueList()) {
             int cell = trap.pos;
-            if (!level.insideMap(cell) || safe[cell]
+            if (!level.insideMap(cell)) continue;
+            boolean vent = room instanceof ToxicGasRoom
+                    && BlastAutoToxicRoom.activeVent(level, trap);
+            if ((safe[cell] && !vent)
                     || !(level.visited[cell] || level.mapped[cell] || hero.fieldOfView[cell])
                     || (room != null && !room.inside(level.cellToPoint(cell)))
-                    || (!BlastAutoTrapClearer.canDouse(trap, level.map[cell])
-                        && !(room instanceof ToxicGasRoom
-                             && BlastAutoToxicRoom.activeVent(level, trap)))
+                    || (!BlastAutoTrapClearer.canDouse(trap, level.map[cell]) && !vent)
                     || level.plants.get(cell) != null || Actor.findChar(cell) != null
                     || !canFlood(level, cell)) continue;
             trapCells.add(cell);
