@@ -48,6 +48,8 @@ public final class BlastAutoTrapClearerTest {
         int width = 7;
         int trap = 3 + 3 * width;
         boolean[] solid = new boolean[width * width];
+        boolean[] passable = new boolean[width * width];
+        boolean[] pit = new boolean[width * width];
         boolean[] safe = new boolean[width * width];
         boolean[] visible = new boolean[width * width];
         boolean[] visited = new boolean[width * width];
@@ -58,33 +60,45 @@ public final class BlastAutoTrapClearerTest {
         for (int y = 1; y < width - 1; y++) {
             int cell = 3 + y * width;
             solid[cell] = false;
+            passable[cell] = true;
             safe[cell] = true;
             visible[cell] = true;
         }
         safe[trap] = false;
         distances[trap - width] = 1;
-        equal(-width, BlastAutoTrapClearer.reachableSide(trap, width, solid, safe,
+        equal(-width, BlastAutoTrapClearer.reachableSide(trap, width, solid, passable, pit, safe,
                 visited, mapped, visible, distances), "blocking corridor");
         distances[trap + width] = 3;
-        equal(0, BlastAutoTrapClearer.reachableSide(trap, width, solid, safe,
+        equal(0, BlastAutoTrapClearer.reachableSide(trap, width, solid, passable, pit, safe,
                 visited, mapped, visible, distances), "alternate access");
         distances[trap + width] = Integer.MAX_VALUE;
         safe[trap + width] = false;
-        equal(0, BlastAutoTrapClearer.reachableSide(trap, width, solid, safe,
+        equal(0, BlastAutoTrapClearer.reachableSide(trap, width, solid, passable, pit, safe,
                 visited, mapped, visible, distances), "hazard on far side");
         safe[trap + width] = true;
         visible[trap + width] = false;
-        equal(0, BlastAutoTrapClearer.reachableSide(trap, width, solid, safe,
-                visited, mapped, visible, distances), "unknown far side");
-        // A mapped or previously visited corridor is eligible even without current sight.
+        equal(-width, BlastAutoTrapClearer.reachableSide(trap, width, solid, passable, pit, safe,
+                visited, mapped, visible, distances), "unexplored exit allows trap clearance");
+        passable[trap + width] = false;
+        equal(0, BlastAutoTrapClearer.reachableSide(trap, width, solid, passable, pit, safe,
+                visited, mapped, visible, distances), "exit wall cannot be cleared");
+        passable[trap + width] = true;
+        pit[trap + width] = true;
+        equal(0, BlastAutoTrapClearer.reachableSide(trap, width, solid, passable, pit, safe,
+                visited, mapped, visible, distances), "unexplored chasm is not an exit");
+        pit[trap + width] = false;
+        // A known dangerous exit remains excluded.
         mapped[trap + width] = true;
+        equal(0, BlastAutoTrapClearer.reachableSide(trap, width, solid, passable, pit, safe,
+                visited, mapped, visible, distances), "known hazardous exit");
+        safe[trap + width] = true;
         visited[trap - width] = true;
         visible[trap - width] = false;
-        equal(-width, BlastAutoTrapClearer.reachableSide(trap, width, solid, safe,
+        equal(-width, BlastAutoTrapClearer.reachableSide(trap, width, solid, passable, pit, safe,
                 visited, mapped, visible, distances), "remembered corridor sides");
         visible[trap + width] = true;
         solid[trap - 1] = false;
-        equal(0, BlastAutoTrapClearer.reachableSide(trap, width, solid, safe,
+        equal(0, BlastAutoTrapClearer.reachableSide(trap, width, solid, passable, pit, safe,
                 visited, mapped, visible, distances), "room instead of corridor");
 
         ClothArmor armor = new ClothArmor();
