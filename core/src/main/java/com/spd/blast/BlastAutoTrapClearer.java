@@ -20,7 +20,7 @@ import com.shatteredpixel.shatteredpixeldungeon.mechanics.Ballistica;
 
 import java.util.function.Predicate;
 
-/** Clear an observed one-tile corridor trap using an ordinary inventory throw. */
+/** Clear a blocked one-tile corridor trap using an ordinary inventory throw. */
 final class BlastAutoTrapClearer {
     private static final int MAX_THROW_DISTANCE = 6;
 
@@ -38,27 +38,41 @@ final class BlastAutoTrapClearer {
         return -1;
     }
 
+    /** Both revealed and secret terrain can activate a trap when an item lands. */
+    static boolean canTrigger(Trap trap, int terrain) {
+        return trap.active && trap.disarmedByActivation
+                && minimumThrowDistance(trap) >= 0
+                && (terrain == Terrain.TRAP || terrain == Terrain.SECRET_TRAP);
+    }
+
     /** Return the accessible corridor-side offset only when the trap separates its two ends. */
     static int reachableSide(int cell, int width, boolean[] solid, boolean[] safe,
-                             boolean[] visible, int[] distances) {
-        if (width < 3 || solid.length != safe.length || safe.length != visible.length
+                             boolean[] visited, boolean[] mapped, boolean[] visible,
+                             int[] distances) {
+        if (width < 3 || solid.length != safe.length || safe.length != visited.length
+                || visited.length != mapped.length || mapped.length != visible.length
                 || visible.length != distances.length || solid.length % width != 0
                 || cell <= width || cell >= solid.length - width
                 || cell % width == 0 || cell % width == width - 1) {
             throw new IllegalArgumentException("Invalid trap corridor map");
         }
         if (solid[cell - width] && solid[cell + width]) {
-            return separatedSide(cell - 1, cell + 1, cell, safe, visible, distances);
+            return separatedSide(cell - 1, cell + 1, cell, safe,
+                    visited, mapped, visible, distances);
         }
         if (solid[cell - 1] && solid[cell + 1]) {
-            return separatedSide(cell - width, cell + width, cell, safe, visible, distances);
+            return separatedSide(cell - width, cell + width, cell, safe,
+                    visited, mapped, visible, distances);
         }
         return 0;
     }
 
     private static int separatedSide(int first, int second, int trap, boolean[] safe,
-                                     boolean[] visible, int[] distances) {
-        if (!visible[first] || !visible[second] || !safe[first] || !safe[second]) return 0;
+                                     boolean[] visited, boolean[] mapped, boolean[] visible,
+                                     int[] distances) {
+        if (!(visited[first] || mapped[first] || visible[first])
+                || !(visited[second] || mapped[second] || visible[second])
+                || !safe[first] || !safe[second]) return 0;
         boolean firstReached = distances[first] != Integer.MAX_VALUE;
         boolean secondReached = distances[second] != Integer.MAX_VALUE;
         if (firstReached == secondReached) return 0;
@@ -115,13 +129,13 @@ final class BlastAutoTrapClearer {
         int shortest = Integer.MAX_VALUE;
         for (Trap trap : level.traps.valueList()) {
             int cell = trap.pos;
+            if (!level.insideMap(cell) || !canTrigger(trap, level.map[cell])
+                    || !(level.visited[cell] || level.mapped[cell] || hero.fieldOfView[cell])
+                    || safe[cell] || Actor.findChar(cell) != null
+                    || level.plants.get(cell) != null) continue;
             int minimum = minimumThrowDistance(trap);
-            if (minimum < 0 || !trap.active || !trap.visible || !trap.disarmedByActivation
-                    || !level.insideMap(cell) || level.map[cell] != Terrain.TRAP
-                    || !hero.fieldOfView[cell] || safe[cell]
-                    || Actor.findChar(cell) != null || level.plants.get(cell) != null) continue;
             int side = reachableSide(cell, level.width(), level.solid, safe,
-                    hero.fieldOfView, distances);
+                    level.visited, level.mapped, hero.fieldOfView, distances);
             if (side == 0) continue;
             int stand = throwingStand(level, cell, side, minimum, safe, distances);
             if (stand < 0 || (hero.rooted && stand != hero.pos)
