@@ -244,6 +244,9 @@ final class BlastAutoTrapClearer {
 
     /** Shared landing planner also covers ordinary non-special-room traps. */
     private static Action douseWithAqua(Hero hero, boolean[] safe, int[] distances) {
+        if (hero.belongings.lostInventory()) return Action.NONE;
+        AquaBrew aqua = hero.belongings.getItem(AquaBrew.class);
+        if (aqua == null || aqua.quantity() <= 0) return Action.NONE;
         Level level = Dungeon.level;
         BlastAutoAqua.Action action = BlastAutoAqua.chooseAction(
                 hero, safe, distances, null, -1,
