@@ -2,12 +2,14 @@ package com.spd.blast;
 
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
+import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.Blob;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.ConfusionGas;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.CorrosiveGas;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.ToxicGas;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroAction;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.armor.Armor;
 import com.shatteredpixel.shatteredpixeldungeon.items.food.Food;
@@ -23,16 +25,20 @@ import com.shatteredpixel.shatteredpixeldungeon.levels.traps.ConfusionTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.CorrosionTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.CursingTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.DisarmingTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.DisintegrationTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.FlockTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.FrostTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.GeyserTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.GrimTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.OozeTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.PoisonDartTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.ShockingTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.TeleportationTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.ToxicTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.Trap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.WarpingTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.WeakeningTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.WornDartTrap;
 import com.shatteredpixel.shatteredpixeldungeon.mechanics.Ballistica;
 import com.watabou.utils.PathFinder;
 
@@ -117,7 +123,83 @@ final class BlastAutoTrapClearer {
         if (type == BlazingTrap.class) return 3;
         if (type == ToxicTrap.class || type == ConfusionTrap.class) return GAS_MIN_DISTANCE;
         if (type == CorrosionTrap.class) return 3;
+        // These native traps select the closest line-of-fire character.
+        if (aimedTrap(trap)) return 2;
         return -1;
+    }
+
+    private static boolean aimedTrap(Trap trap) {
+        Class<?> type = trap.getClass();
+        return type == WornDartTrap.class || type == PoisonDartTrap.class
+                || type == DisintegrationTrap.class || type == GrimTrap.class;
+    }
+
+    /**
+     * Closest-character prediction. An equally close hero or protected character
+     * always vetoes the throw, independent of Actor.chars() iteration order.
+     */
+    static final class AimedTargets {
+        private float closest = Float.POSITIVE_INFINITY;
+        private boolean allClosestHostile;
+
+        void consider(float distance, boolean hostile) {
+            if (Float.isNaN(distance) || distance < 0) {
+                throw new IllegalArgumentException("Invalid aimed trap target distance");
+            }
+            if (distance < closest) {
+                closest = distance;
+                allClosestHostile = hostile;
+            } else if (distance == closest && !hostile) {
+                allClosestHostile = false;
+            }
+        }
+
+        boolean safeToFire(float range, float heroDistance) {
+            if (Float.isNaN(range) || range <= 0 || Float.isNaN(heroDistance)
+                    || heroDistance < 0) {
+                throw new IllegalArgumentException("Invalid aimed trap range");
+            }
+            return allClosestHostile && closest <= range && heroDistance > closest;
+        }
+    }
+
+    /** Predict targets from native trueDistance, invisibility and projectile rules. */
+    private static AimedTargets predictAimedTargets(Hero hero, Level level, int trapCell) {
+        float range = Math.max(6, level.viewDistance) + 0.5f;
+        AimedTargets targets = new AimedTargets();
+        for (Char character : Actor.chars()) {
+            if (character == hero || !character.isAlive()
+                    || !level.insideMap(character.pos)) continue;
+            if (new Ballistica(trapCell, character.pos, Ballistica.PROJECTILE).collisionPos
+                    != character.pos) continue;
+            float distance = level.trueDistance(trapCell, character.pos);
+            if (character.invisible > 0) distance = Math.max(distance, range);
+            boolean hostile = character instanceof Mob
+                    && character.alignment == Char.Alignment.ENEMY;
+            if (hostile) {
+                Mob mob = (Mob) character;
+                hostile = hero.fieldOfView[mob.pos] && mob.invisible == 0
+                        && BlastAutoPlay.isAwake(mob)
+                        && !BlastAutoPlay.isAutoAttackExcluded(mob)
+                        && !BlastAutoPlay.ignored(mob)
+                        && !hero.isCharmedBy(mob)
+                        && !mob.isInvulnerable(Hero.class);
+            }
+            targets.consider(distance, hostile);
+        }
+        return targets;
+    }
+
+    private static boolean safeAimedStand(Hero hero, Level level, int trapCell,
+                                          int stand, AimedTargets targets) {
+        if (targets == null) return true;
+        float range = Math.max(6, level.viewDistance) + 0.5f;
+        float heroDistance = Float.POSITIVE_INFINITY;
+        if (new Ballistica(trapCell, stand, Ballistica.PROJECTILE).collisionPos == stand) {
+            heroDistance = level.trueDistance(trapCell, stand);
+            if (hero.invisible > 0) heroDistance = Math.max(heroDistance, range);
+        }
+        return targets.safeToFire(range, heroDistance);
     }
 
     private static Class<? extends Blob> spreadingGas(Trap trap) {
