@@ -1,6 +1,7 @@
 package com.spd.blast;
 
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.SPDSettings;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.Blob;
@@ -15,6 +16,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Wraith;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.NPC;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.Sheep;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
+import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.Trap;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
 import com.watabou.utils.PathFinder;
@@ -765,6 +767,10 @@ public final class BlastAutoPlay {
             return false;
         }
 
+        // Native intentional search reveals a visible adjacent secret door in one turn.
+        debugDecision = "secret-search";
+        if (searchNearbySecretDoor(hero)) return true;
+
         // Keep pursuing the last observed position before switching to floor loot.
         debugDecision = "pursuit";
         if (pursueLastSeenTarget(hero, safe, distances)) return false;
@@ -888,6 +894,23 @@ public final class BlastAutoPlay {
             hero.curAction = new HeroAction.Move(step);
         } else {
             debugDecision = "idle";
+        }
+        return false;
+    }
+
+    /** Long-press magnifier behavior, only when an adjacent secret door is in view. */
+    private static boolean searchNearbySecretDoor(Hero hero) {
+        // Native intentional searches cannot reveal secrets during the introduction.
+        if (SPDSettings.intro()) return false;
+        Level level = Dungeon.level;
+        for (int offset : PathFinder.NEIGHBOURS8) {
+            int cell = hero.pos + offset;
+            if (level.insideMap(cell) && hero.fieldOfView[cell]
+                    && level.map[cell] == Terrain.SECRET_DOOR) {
+                // search() reports discovery, not whether it consumed a turn.
+                hero.search(true);
+                return true;
+            }
         }
         return false;
     }
