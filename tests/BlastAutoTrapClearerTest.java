@@ -11,6 +11,7 @@ import com.shatteredpixel.shatteredpixeldungeon.levels.traps.ExplosiveTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.FlashingTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.OozeTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.PoisonDartTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.ToxicTrap;
 
 import java.util.Arrays;
 
@@ -28,10 +29,11 @@ public final class BlastAutoTrapClearerTest {
         equal(1, BlastAutoTrapClearer.minimumThrowDistance(new FlashingTrap()), "local trap");
         equal(1, BlastAutoTrapClearer.minimumThrowDistance(new CursingTrap()), "item curse");
         equal(2, BlastAutoTrapClearer.minimumThrowDistance(new OozeTrap()), "adjacent ooze");
+        equal(4, BlastAutoTrapClearer.minimumThrowDistance(new ToxicTrap()), "spreading toxic gas");
         equal(-1, BlastAutoTrapClearer.minimumThrowDistance(new BurningTrap()), "spreading fire");
         equal(-1, BlastAutoTrapClearer.minimumThrowDistance(new ExplosiveTrap()), "blast");
         equal(-1, BlastAutoTrapClearer.minimumThrowDistance(new PoisonDartTrap()), "remote dart");
-        FlashingTrap hidden = new FlashingTrap();
+        CursingTrap hidden = new CursingTrap();
         hidden.visible = false;
         equal(1, BlastAutoTrapClearer.canTrigger(hidden, Terrain.SECRET_TRAP) ? 1 : 0,
                 "hidden active trap is eligible");
@@ -44,6 +46,13 @@ public final class BlastAutoTrapClearerTest {
                 "disarmed hidden trap");
         equal(0, BlastAutoTrapClearer.canTrigger(new ExplosiveTrap(), Terrain.SECRET_TRAP) ? 1 : 0,
                 "dangerous hidden trap remains excluded");
+        ToxicTrap hiddenGas = new ToxicTrap();
+        hiddenGas.visible = false;
+        equal(1, BlastAutoTrapClearer.canTrigger(hiddenGas, Terrain.SECRET_TRAP) ? 1 : 0,
+                "hidden gas trap eligible with a safe retreat");
+        hiddenGas.active = false;
+        equal(0, BlastAutoTrapClearer.canTrigger(hiddenGas, Terrain.SECRET_TRAP) ? 1 : 0,
+                "inactive gas trap remains excluded");
 
         int width = 7;
         int trap = 3 + 3 * width;
