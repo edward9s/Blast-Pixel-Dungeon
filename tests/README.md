@@ -34,15 +34,27 @@ The trap must disarm on activation,
 be unoccupied, and have a verified unobstructed projectile path. Only
 unequipped weapons/armor or one item from the largest food stack may be
 thrown. Unrecognized trap effects, remote-targeting traps, explosive traps,
-chain-reacting traps, spreading fire and teleporting effects are excluded.
+chain-reacting traps and teleporting effects are excluded.
+BurningTrap and BlazingTrap are accepted at distances of at least two and
+three tiles respectively. At shorter range, an identified PotionOfFrost can
+be thrown directly onto the trap; native potion impact presses it before
+spreading freezing, which cancels the fire on subsequent blob updates.
+An adjacent splash does not press the trap. The throw still requires an
+unblocked projectile line, so corners are handled by approaching a reachable
+position with an unobstructed throw. Exactly two cardinal corridor openings
+may form a straight or L-shaped choke point; three-way intersections are
+excluded. Potions are not sacrificed on closed doors.
 Toxic gas traps are permitted only when a straight, safe retreat route exists:
 the hero throws from at least four cells away and immediately retreats toward
 eight cells of separation, then avoids returning while the gas persists.
 An obstructing closed door is first opened with a normal item throw, which
 leaves the item on the door to hold it open. Automatic pickup temporarily skips
 this door item until the trap has been disarmed. Local-effect traps retain their
-minimum standoff distance (two tiles for the adjacent ooze trap). Automatic
-movement continues to avoid active hazards. When Debug Log is
+minimum standoff distance: two tiles for ooze and ChillingTrap, three tiles
+for FrostTrap (whose freezing area reaches two path steps). Both freezing
+traps work on revealed or hidden corridor cells, and the existing active
+Freezing blob exclusion keeps normal automatic movement out of the frost
+after activation. Automatic movement continues to avoid active hazards. When Debug Log is
 enabled, nearby rejected traps produce `[Blast] auto-trap` entries with their
 class, cell, hidden flag and rejection status (such as `unsupported`,
 `not-chokepoint`, `no-safe-stand`, `no-throwable-item` or

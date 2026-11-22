@@ -36,13 +36,36 @@ class AutoTrapClearanceTest(unittest.TestCase):
         allowed = CLEAR.split("static int minimumThrowDistance(", 1)[1].split(
             "static int reachableSide(", 1
         )[0]
-        for name in ("CursingTrap", "FlashingTrap", "GrippingTrap", "WeakeningTrap", "OozeTrap", "ToxicTrap"):
+        for name in ("CursingTrap", "FlashingTrap", "GrippingTrap", "WeakeningTrap", "OozeTrap", "ChillingTrap", "FrostTrap", "BurningTrap", "BlazingTrap", "ToxicTrap"):
             self.assertIn("type == " + name + ".class", allowed)
-        for name in ("ExplosiveTrap", "DisintegrationTrap", "BurningTrap", "PoisonDartTrap"):
+        for name in ("ExplosiveTrap", "DisintegrationTrap", "PoisonDartTrap"):
             self.assertNotIn("type == " + name + ".class", allowed)
         self.assertIn("return -1;", allowed)
         self.assertIn("item.throwPos(hero, bestTarget) != bestTarget", CLEAR)
         self.assertIn("Ballistica.PROJECTILE", CLEAR)
+
+    def test_freezing_trap_standoff(self):
+        # Chilling seeds adjacent cells; Frost reaches two path steps.
+        self.assertIn("type == OozeTrap.class || type == ChillingTrap.class) return 2", CLEAR)
+        self.assertIn("type == FrostTrap.class) return 3", CLEAR)
+        self.assertIn("terrain == Terrain.TRAP || terrain == Terrain.SECRET_TRAP", CLEAR)
+        self.assertIn("new Ballistica(stand, trapCell, Ballistica.PROJECTILE)", CLEAR)
+        self.assertIn("int minimum = minimumThrowDistance(trap);", CLEAR)
+
+    def test_corner_fire_and_frost_potion(self):
+        self.assertIn("Exactly two walkable cardinal openings also includes L-shaped corridors", CLEAR)
+        self.assertIn("return second < 0 ? 0 : separatedSide(first, second, cell", CLEAR)
+        self.assertIn("nearbyStand(level, trapCell, trapCell, minimum, safe, distances)", CLEAR)
+        self.assertIn("nearbyStand(level, trapCell, door, minimum, safe, distances)", CLEAR)
+        self.assertIn("type == BurningTrap.class) return 2", CLEAR)
+        self.assertIn("type == BlazingTrap.class) return 3", CLEAR)
+        self.assertIn("hero.belongings.getItem(PotionOfFrost.class)", CLEAR)
+        self.assertIn("potion.quantity() > 0 && potion.isKnown()", CLEAR)
+        self.assertIn("throwingStand(level, cell, side, 1, false, safe, distances)", CLEAR)
+        self.assertIn('item instanceof PotionOfFrost ? "frost" : "throw"', CLEAR)
+        self.assertIn("item == null && bestTarget == chosen.pos && fireTrap(chosen)", CLEAR)
+        self.assertIn("item.throwPos(hero, bestTarget) != bestTarget", CLEAR)
+        self.assertIn("item.cast(hero, bestTarget)", CLEAR)
 
     def test_rejection_diagnostic_is_bounded_and_specific(self):
         self.assertIn('status=" + reason', CLEAR)

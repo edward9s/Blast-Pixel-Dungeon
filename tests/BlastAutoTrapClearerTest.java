@@ -5,10 +5,13 @@ import com.shatteredpixel.shatteredpixeldungeon.items.armor.ClothArmor;
 import com.shatteredpixel.shatteredpixeldungeon.items.food.Food;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.WornShortsword;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.BlazingTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.BurningTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.ChillingTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.CursingTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.ExplosiveTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.FlashingTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.FrostTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.OozeTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.PoisonDartTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.ToxicTrap;
@@ -29,8 +32,13 @@ public final class BlastAutoTrapClearerTest {
         equal(1, BlastAutoTrapClearer.minimumThrowDistance(new FlashingTrap()), "local trap");
         equal(1, BlastAutoTrapClearer.minimumThrowDistance(new CursingTrap()), "item curse");
         equal(2, BlastAutoTrapClearer.minimumThrowDistance(new OozeTrap()), "adjacent ooze");
+        equal(2, BlastAutoTrapClearer.minimumThrowDistance(new ChillingTrap()),
+                "one-cell freezing aura");
+        equal(3, BlastAutoTrapClearer.minimumThrowDistance(new FrostTrap()),
+                "two-cell freezing aura");
         equal(4, BlastAutoTrapClearer.minimumThrowDistance(new ToxicTrap()), "spreading toxic gas");
-        equal(-1, BlastAutoTrapClearer.minimumThrowDistance(new BurningTrap()), "spreading fire");
+        equal(2, BlastAutoTrapClearer.minimumThrowDistance(new BurningTrap()), "adjacent fire");
+        equal(3, BlastAutoTrapClearer.minimumThrowDistance(new BlazingTrap()), "two-step fire");
         equal(-1, BlastAutoTrapClearer.minimumThrowDistance(new ExplosiveTrap()), "blast");
         equal(-1, BlastAutoTrapClearer.minimumThrowDistance(new PoisonDartTrap()), "remote dart");
         CursingTrap hidden = new CursingTrap();
@@ -46,6 +54,19 @@ public final class BlastAutoTrapClearerTest {
                 "disarmed hidden trap");
         equal(0, BlastAutoTrapClearer.canTrigger(new ExplosiveTrap(), Terrain.SECRET_TRAP) ? 1 : 0,
                 "dangerous hidden trap remains excluded");
+        BurningTrap hiddenFire = new BurningTrap();
+        hiddenFire.visible = false;
+        equal(1, BlastAutoTrapClearer.canTrigger(hiddenFire, Terrain.SECRET_TRAP) ? 1 : 0,
+                "hidden burning trap eligible");
+        equal(1, BlastAutoTrapClearer.canTrigger(hiddenFire, Terrain.TRAP) ? 1 : 0,
+                "revealed burning trap eligible");
+        BlazingTrap hiddenBlaze = new BlazingTrap();
+        hiddenBlaze.visible = false;
+        equal(1, BlastAutoTrapClearer.canTrigger(hiddenBlaze, Terrain.SECRET_TRAP) ? 1 : 0,
+                "hidden blazing trap eligible");
+        hiddenBlaze.active = false;
+        equal(0, BlastAutoTrapClearer.canTrigger(hiddenBlaze, Terrain.SECRET_TRAP) ? 1 : 0,
+                "inactive blazing trap remains excluded");
         ToxicTrap hiddenGas = new ToxicTrap();
         hiddenGas.visible = false;
         equal(1, BlastAutoTrapClearer.canTrigger(hiddenGas, Terrain.SECRET_TRAP) ? 1 : 0,
@@ -53,6 +74,25 @@ public final class BlastAutoTrapClearerTest {
         hiddenGas.active = false;
         equal(0, BlastAutoTrapClearer.canTrigger(hiddenGas, Terrain.SECRET_TRAP) ? 1 : 0,
                 "inactive gas trap remains excluded");
+
+        ChillingTrap hiddenChill = new ChillingTrap();
+        hiddenChill.visible = false;
+        equal(1, BlastAutoTrapClearer.canTrigger(hiddenChill, Terrain.SECRET_TRAP) ? 1 : 0,
+                "hidden chilling trap eligible");
+        equal(1, BlastAutoTrapClearer.canTrigger(hiddenChill, Terrain.TRAP) ? 1 : 0,
+                "revealed chilling trap eligible");
+        hiddenChill.active = false;
+        equal(0, BlastAutoTrapClearer.canTrigger(hiddenChill, Terrain.SECRET_TRAP) ? 1 : 0,
+                "inactive chilling trap excluded");
+        FrostTrap hiddenFrost = new FrostTrap();
+        hiddenFrost.visible = false;
+        equal(1, BlastAutoTrapClearer.canTrigger(hiddenFrost, Terrain.SECRET_TRAP) ? 1 : 0,
+                "hidden frost trap eligible");
+        equal(1, BlastAutoTrapClearer.canTrigger(hiddenFrost, Terrain.TRAP) ? 1 : 0,
+                "revealed frost trap eligible");
+        hiddenFrost.active = false;
+        equal(0, BlastAutoTrapClearer.canTrigger(hiddenFrost, Terrain.SECRET_TRAP) ? 1 : 0,
+                "inactive frost trap excluded");
 
         int width = 7;
         int trap = 3 + 3 * width;
@@ -109,6 +149,37 @@ public final class BlastAutoTrapClearerTest {
         solid[trap - 1] = false;
         equal(0, BlastAutoTrapClearer.reachableSide(trap, width, solid, passable, pit, safe,
                 visited, mapped, visible, distances), "room instead of corridor");
+
+        // A true elbow has two perpendicular open sides and two blocking walls.
+        boolean[] elbowSolid = new boolean[width * width];
+        boolean[] elbowPassable = new boolean[width * width];
+        boolean[] elbowPit = new boolean[width * width];
+        boolean[] elbowSafe = new boolean[width * width];
+        boolean[] elbowVisited = new boolean[width * width];
+        boolean[] elbowMapped = new boolean[width * width];
+        boolean[] elbowVisible = new boolean[width * width];
+        int[] elbowDistance = new int[width * width];
+        Arrays.fill(elbowSolid, true);
+        Arrays.fill(elbowDistance, Integer.MAX_VALUE);
+        int approach = trap - width;
+        int exit = trap + 1;
+        elbowSolid[approach] = elbowSolid[trap] = elbowSolid[exit] = false;
+        elbowPassable[approach] = elbowPassable[exit] = true;
+        elbowSafe[approach] = elbowVisible[approach] = true;
+        elbowDistance[approach] = 1;
+        equal(-width, BlastAutoTrapClearer.reachableSide(trap, width, elbowSolid,
+                elbowPassable, elbowPit, elbowSafe, elbowVisited, elbowMapped,
+                elbowVisible, elbowDistance), "unknown exit after right-angle bend");
+        elbowDistance[exit] = 3;
+        equal(0, BlastAutoTrapClearer.reachableSide(trap, width, elbowSolid,
+                elbowPassable, elbowPit, elbowSafe, elbowVisited, elbowMapped,
+                elbowVisible, elbowDistance), "elbow with alternate route");
+        elbowDistance[exit] = Integer.MAX_VALUE;
+        elbowPassable[trap - 1] = true;
+        elbowSolid[trap - 1] = false;
+        equal(0, BlastAutoTrapClearer.reachableSide(trap, width, elbowSolid,
+                elbowPassable, elbowPit, elbowSafe, elbowVisited, elbowMapped,
+                elbowVisible, elbowDistance), "three-way junction is not a choke point");
 
         ClothArmor armor = new ClothArmor();
         WornShortsword sword = new WornShortsword();

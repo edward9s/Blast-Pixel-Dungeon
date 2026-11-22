@@ -9,11 +9,16 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroAction;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.armor.Armor;
 import com.shatteredpixel.shatteredpixeldungeon.items.food.Food;
+import com.shatteredpixel.shatteredpixeldungeon.items.potions.PotionOfFrost;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.Weapon;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.BlazingTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.BurningTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.ChillingTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.CursingTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.FlashingTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.FrostTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.GrippingTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.OozeTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.ToxicTrap;
@@ -84,9 +89,19 @@ final class BlastAutoTrapClearer {
         if (type == CursingTrap.class || type == FlashingTrap.class || type == GrippingTrap.class
                 || type == WeakeningTrap.class) return 1;
         // Ooze is applied to the trap and eight adjoining cells, without a lingering blob.
-        if (type == OozeTrap.class) return 2;
+        if (type == OozeTrap.class || type == ChillingTrap.class) return 2;
+        // Frost seeds freezing blobs as far as two connected floor cells from the trap.
+        // A three-cell stand-off keeps the hero outside the initial frost area.
+        if (type == FrostTrap.class) return 3;
+        // Flames cover one neighboring cell or two reachable path steps.
+        if (type == BurningTrap.class) return 2;
+        if (type == BlazingTrap.class) return 3;
         if (type == ToxicTrap.class) return TOXIC_MIN_DISTANCE;
         return -1;
+    }
+
+    private static boolean fireTrap(Trap trap) {
+        return trap.getClass() == BurningTrap.class || trap.getClass() == BlazingTrap.class;
     }
 
     /** Both revealed and secret terrain can activate a trap when an item lands. */
@@ -108,15 +123,22 @@ final class BlastAutoTrapClearer {
                 || cell % width == 0 || cell % width == width - 1) {
             throw new IllegalArgumentException("Invalid trap corridor map");
         }
-        if (solid[cell - width] && solid[cell + width]) {
-            return separatedSide(cell - 1, cell + 1, cell, passable, pit,
-                    safe, visited, mapped, visible, distances);
+        // Exactly two walkable cardinal openings also includes L-shaped corridors.
+        // The other two sides must be walls, not unseen pits or other hazards.
+        int first = -1;
+        int second = -1;
+        for (int offset : new int[] {-width, 1, width, -1}) {
+            int adjacent = cell + offset;
+            if (passable[adjacent] && !pit[adjacent]) {
+                if (first < 0) first = adjacent;
+                else if (second < 0) second = adjacent;
+                else return 0;
+            } else if (!solid[adjacent]) {
+                return 0;
+            }
         }
-        if (solid[cell - 1] && solid[cell + 1]) {
-            return separatedSide(cell - width, cell + width, cell, passable, pit,
-                    safe, visited, mapped, visible, distances);
-        }
-        return 0;
+        return second < 0 ? 0 : separatedSide(first, second, cell, passable, pit,
+                safe, visited, mapped, visible, distances);
     }
 
     private static int separatedSide(int first, int second, int trap,
@@ -168,6 +190,35 @@ final class BlastAutoTrapClearer {
         return false;
     }
 
+    /** Find a reachable throwing cell with a true line of fire, even around a bend. */
+    private static int nearbyStand(Level level, int trapCell, int target, int minimum,
+                                   boolean[] safe, int[] distances) {
+        int width = level.width();
+        int centerX = trapCell % width;
+        int centerY = trapCell / width;
+        int best = -1;
+        int shortest = Integer.MAX_VALUE;
+        for (int dy = -MAX_THROW_DISTANCE; dy <= MAX_THROW_DISTANCE; dy++) {
+            int y = centerY + dy;
+            if (y < 1 || y >= level.length() / width - 1) continue;
+            for (int dx = -MAX_THROW_DISTANCE; dx <= MAX_THROW_DISTANCE; dx++) {
+                int x = centerX + dx;
+                if (x < 1 || x >= width - 1) continue;
+                int stand = x + y * width;
+                if (level.distance(stand, trapCell) < minimum
+                        || !level.passable[stand] || !safe[stand]
+                        || distances[stand] == Integer.MAX_VALUE || distances[stand] >= shortest
+                        || (target != trapCell && stand == target)) continue;
+                if (new Ballistica(stand, target, Ballistica.PROJECTILE).collisionPos != target) {
+                    continue;
+                }
+                best = stand;
+                shortest = distances[stand];
+            }
+        }
+        return best;
+    }
+
     private static int throwingStand(Level level, int trapCell, int side, int minimum,
                                      boolean toxic, boolean[] safe, int[] distances) {
         int best = -1;
@@ -185,7 +236,9 @@ final class BlastAutoTrapClearer {
             best = stand;
             shortest = distances[stand];
         }
-        return best;
+        // Only toxic gas requires the original straight-line retreat corridor.
+        return best >= 0 || toxic ? best
+                : nearbyStand(level, trapCell, trapCell, minimum, safe, distances);
     }
 
     /** A thrown item lands on the closed door and keeps it open as a floor heap. */
@@ -216,7 +269,8 @@ final class BlastAutoTrapClearer {
             best = stand;
             shortest = distances[stand];
         }
-        return best;
+        return best >= 0 || toxic ? best
+                : nearbyStand(level, trapCell, door, minimum, safe, distances);
     }
 
     private static int closedDoor(Level level, int trapCell, int side) {
@@ -289,6 +343,7 @@ final class BlastAutoTrapClearer {
         Trap chosen = null;
         int bestStand = -1;
         int bestTarget = -1;
+        boolean bestFrost = false;
         int shortest = Integer.MAX_VALUE;
         Trap rejectedTrap = null;
         String rejectedReason = null;
@@ -315,10 +370,22 @@ final class BlastAutoTrapClearer {
                     int stand = throwingStand(level, cell, side,
                             minimum, toxic, safe, distances);
                     int target = cell;
+                    boolean frost = false;
                     if (stand < 0) {
-                        // Closed doors stop projectiles and reclose after the hero leaves.
-                        // A spare item on the door opens it without approaching the trap.
-                        stand = doorStand(level, cell, side, minimum, toxic, safe, distances);
+                        // A near throw of an identified frost potion triggers the fire
+                        // trap first, then seeds freezing to cancel its fire.
+                        if (fireTrap(trap)) {
+                            PotionOfFrost potion = hero.belongings.getItem(PotionOfFrost.class);
+                            if (potion != null && potion.quantity() > 0 && potion.isKnown()) {
+                                stand = throwingStand(level, cell, side, 1, false, safe, distances);
+                                frost = stand >= 0;
+                            }
+                        }
+                    }
+                    if (stand < 0) {
+                        // A spare item on a closed door holds it open for the next cast.
+                        stand = doorStand(level, cell, side, toxic ? minimum : 1,
+                                toxic, safe, distances);
                         if (stand >= 0) target = closedDoor(level, cell, side);
                     }
                     if (stand < 0) reason = "no-safe-stand";
@@ -327,6 +394,7 @@ final class BlastAutoTrapClearer {
                         chosen = trap;
                         bestStand = stand;
                         bestTarget = target;
+                        bestFrost = frost;
                         shortest = distances[stand];
                     }
                 }
@@ -348,8 +416,14 @@ final class BlastAutoTrapClearer {
             logRejection(hero, chosen, "lost-inventory");
             return Action.NONE;
         }
-        Item item = chooseThrowItem(hero.belongings.backpack, candidate -> candidate.isEquipped(hero));
-        if (item == null) {
+        Item item = bestFrost ? hero.belongings.getItem(PotionOfFrost.class)
+                : chooseThrowItem(hero.belongings.backpack, candidate -> candidate.isEquipped(hero));
+        // If no spare item exists, a known frost potion can still clear a fire trap.
+        if (item == null && bestTarget == chosen.pos && fireTrap(chosen)) {
+            item = hero.belongings.getItem(PotionOfFrost.class);
+        }
+        if (item == null || (item instanceof PotionOfFrost
+                && (!((PotionOfFrost) item).isKnown() || item.quantity() <= 0))) {
             logRejection(hero, chosen, "no-throwable-item");
             return Action.NONE;
         }
@@ -367,7 +441,8 @@ final class BlastAutoTrapClearer {
         boolean openDoor = bestTarget != chosen.pos;
         BlastLog.debug("auto-trap pos=" + hero.pos + " trap=" + chosen.getClass().getSimpleName()
                 + "@" + chosen.pos + " item=" + item.getClass().getSimpleName()
-                + " target=" + bestTarget + " action=" + (openDoor ? "open-door" : "throw"));
+                + " target=" + bestTarget + " action="
+                + (openDoor ? "open-door" : item instanceof PotionOfFrost ? "frost" : "throw"));
         if (openDoor) {
             heldDoor = bestTarget;
             heldDoorTrap = chosen.pos;
