@@ -26,6 +26,9 @@ class AutoTrapClearanceTest(unittest.TestCase):
         self.assertIn("Actor.findChar(cell) != null", CLEAR)
         self.assertIn("separatedSide(", CLEAR)
         self.assertIn("firstReached == secondReached", CLEAR)
+        self.assertIn("passable[exit]", CLEAR)
+        self.assertIn("pit[exit]", CLEAR)
+        self.assertIn("exitKnown && !safe[exit]", CLEAR)
         self.assertIn("distances[stand] == Integer.MAX_VALUE", CLEAR)
 
     def test_only_safe_known_effects(self):
@@ -39,6 +42,16 @@ class AutoTrapClearanceTest(unittest.TestCase):
         self.assertIn("return -1;", allowed)
         self.assertIn("item.throwPos(hero, chosen.pos) != chosen.pos", CLEAR)
         self.assertIn("Ballistica.PROJECTILE", CLEAR)
+
+    def test_rejection_diagnostic_is_bounded_and_specific(self):
+        self.assertIn('status=" + reason', CLEAR)
+        self.assertIn('" hidden=" + !trap.visible', CLEAR)
+        for reason in ("unsupported", "not-chokepoint", "no-safe-stand",
+                       "lost-inventory", "no-throwable-item", "blocked-trajectory"):
+            self.assertIn('"' + reason + '"', CLEAR)
+        self.assertIn("LOG_REPEAT_INTERVAL = 10", CLEAR)
+        self.assertIn("Dungeon.level.distance(hero.pos, trap.pos) > MAX_THROW_DISTANCE", CLEAR)
+        self.assertIn("BlastAutoTrapClearer.reset();", PLAY)
 
     def test_inventory_and_native_throw(self):
         self.assertIn("item instanceof Weapon || item instanceof Armor", CLEAR)

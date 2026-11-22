@@ -25,17 +25,24 @@ python -m unittest discover -s tests -p test_auto_alchemy.py
 ## Automatic trap clearance
 
 After combat, food, pickup, interaction and farming, idle auto-play may use a
-native inventory throw to clear an armed trap that separates two
-known safe ends of a one-tile corridor. Revealed and secret traps are both
+native inventory throw to clear an armed trap that blocks a reachable
+approach to the other end of a one-tile corridor. Revealed and secret traps are both
 eligible, including mapped or previously visited terrain outside the current
-field of view. The trap must disarm on activation,
+field of view. The corridor's far side may also be unexplored, provided its
+actual floor cell is passable, is not a chasm, and no known hazard blocks it.
+The trap must disarm on activation,
 be unoccupied, and have a verified unobstructed projectile path. Only
 unequipped weapons/armor or one item from the largest food stack may be
 thrown. Unrecognized trap effects, remote-targeting traps, explosive traps,
 spreading fire/gas and teleporting effects are excluded. Trap types with
 strictly local effects are handled at a safe stand-off distance (two tiles
 for the adjoining-cell ooze trap). Automatic movement still avoids the
-active trap and any hazardous terrain after activation.
+active trap and any hazardous terrain after activation. When Debug Log is
+enabled, nearby rejected traps produce `[Blast] auto-trap` entries with their
+class, cell, hidden flag and rejection status (such as `unsupported`,
+`not-chokepoint`, `no-safe-stand`, `no-throwable-item` or
+`blocked-trajectory`). Identical rejections are suppressed for nine decisions
+then repeated, limiting diagnostic log growth.
 
 `BlastAutoTrapClearerTest.java` tests trap safety categories, choke-point
 reachability and sacrifice selection against the patched SPD core:
