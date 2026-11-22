@@ -1,6 +1,7 @@
 package com.spd.blast;
 
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.SPDSettings;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.Blob;
@@ -899,6 +900,8 @@ public final class BlastAutoPlay {
 
     /** Long-press magnifier behavior, only when an adjacent secret door is in view. */
     private static boolean searchNearbySecretDoor(Hero hero) {
+        // Native intentional searches cannot reveal secrets during the introduction.
+        if (SPDSettings.intro()) return false;
         Level level = Dungeon.level;
         for (int offset : PathFinder.NEIGHBOURS8) {
             int cell = hero.pos + offset;
