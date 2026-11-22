@@ -25,8 +25,8 @@ python -m unittest discover -s tests -p test_auto_alchemy.py
 ## Automatic trap clearance
 
 After combat, food, pickup, interaction and farming, idle auto-play may use a
-native inventory throw to clear an armed trap that separates two
-known safe ends of a one-tile corridor. Revealed and secret traps are both
+native inventory throw to clear an armed trap that blocks a reachable
+approach to the other end of a one-tile corridor. Revealed and secret traps are both
 eligible, including mapped or previously visited terrain outside the current
 field of view. The corridor's far side may also be unexplored, provided its
 actual floor cell is passable, is not a chasm, and no known hazard blocks it.
