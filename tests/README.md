@@ -25,8 +25,10 @@ python -m unittest discover -s tests -p test_auto_alchemy.py
 ## Automatic trap clearance
 
 After combat, food, pickup, interaction and farming, idle auto-play may use a
-native inventory throw to clear an observed armed trap that separates two
-known safe ends of a one-tile corridor. The trap must disarm on activation,
+native inventory throw to clear an armed trap that separates two
+known safe ends of a one-tile corridor. Revealed and secret traps are both
+eligible, including mapped or previously visited terrain outside the current
+field of view. The trap must disarm on activation,
 be unoccupied, and have a verified unobstructed projectile path. Only
 unequipped weapons/armor or one item from the largest food stack may be
 thrown. Unrecognized trap effects, remote-targeting traps, explosive traps,
