@@ -895,6 +895,19 @@ public final class BlastAutoPlay {
             return trapAction == BlastAutoTrapClearer.Action.THROW;
         }
 
+        // Barricades block navigation but can be destroyed by ordinary bombs.
+        // Keep trap clearance and manual travel above optional demolition.
+        debugDecision = "barricade";
+        BlastAutoBarricade.Action barricadeAction =
+                BlastAutoBarricade.chooseAction(hero, idleSafe, idleDistances);
+        if (barricadeAction != BlastAutoBarricade.Action.NONE) {
+            roaming.clearDestination();
+            if (barricadeAction == BlastAutoBarricade.Action.MOVE) {
+                progress.intent(BlastAutoProgressGuard.Intent.ROAM);
+            }
+            return barricadeAction == BlastAutoBarricade.Action.DETONATE;
+        }
+
         // Only planting new grass depends on the separate farming setting.
         debugDecision = "farm";
         if (BlastSettings.autoFarming()) {

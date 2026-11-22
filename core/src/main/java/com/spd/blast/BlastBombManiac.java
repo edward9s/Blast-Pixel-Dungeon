@@ -268,11 +268,20 @@ public final class BlastBombManiac extends Buff {
 
     /** The AI waits for the throw animation before detonating this exact bomb. */
     public boolean blastAutoThrowAndDetonate(int destination) {
+        return autoThrowAndDetonate(destination, selected);
+    }
+
+    /** Clear terrain with a basic bomb without changing the player's selected type. */
+    public boolean blastAutoThrowOrdinaryAndDetonate(int destination) {
+        return autoThrowAndDetonate(destination, 0);
+    }
+
+    private boolean autoThrowAndDetonate(int destination, int bombIndex) {
         if (!BlastSettings.testAutoPlay() || !BlastSettings.testRemoteThrow()
                 || BlastRemoteBomb.isTimedMode()) {
             throw new IllegalStateException("Automatic throw-and-detonate requires remote throw mode");
         }
-        return throwAt(destination, true);
+        return throwAt(destination, true, bombIndex);
     }
 
     private boolean throwAt(int destination) {
@@ -280,6 +289,10 @@ public final class BlastBombManiac extends Buff {
     }
 
     private boolean throwAt(int destination, boolean autoDetonate) {
+        return throwAt(destination, autoDetonate, selected);
+    }
+
+    private boolean throwAt(int destination, boolean autoDetonate, int bombIndex) {
         final Hero hero = Dungeon.hero;
         final boolean timed = BlastRemoteBomb.isTimedMode();
         if (!aimedThrowEnabled() || hero == null
@@ -290,7 +303,7 @@ public final class BlastBombManiac extends Buff {
             GLog.w(BlastMessages.get("remote_bomb.capacity_required"));
             return false;
         }
-        final Bomb bomb = selectedBomb();
+        final Bomb bomb = bombAt(bombIndex);
         bomb.blastSetManiacCharge(true);
         final int cell = bomb.throwPos(hero, destination);
         if (!Dungeon.level.insideMap(cell)) return false;
@@ -346,11 +359,20 @@ public final class BlastBombManiac extends Buff {
 
     /** Place and immediately detonate one bomb during the AI's actor turn. */
     public boolean blastAutoPlaceAndDetonate() {
+        return autoPlaceAndDetonate(selected);
+    }
+
+    /** Clear terrain with a basic bomb without changing the player's selected type. */
+    public boolean blastAutoPlaceOrdinaryAndDetonate() {
+        return autoPlaceAndDetonate(0);
+    }
+
+    private boolean autoPlaceAndDetonate(int bombIndex) {
         if (!BlastSettings.testAutoPlay() || BlastSettings.testRemoteThrow()
                 || BlastRemoteBomb.isTimedMode()) {
             throw new IllegalStateException("Automatic place-and-detonate requires remote mode");
         }
-        Bomb bomb = placeBomb(true);
+        Bomb bomb = placeBomb(true, bombIndex);
         if (bomb == null) return false;
         detonateAutoBomb(bomb);
         return true;
@@ -362,6 +384,10 @@ public final class BlastBombManiac extends Buff {
     }
 
     private Bomb placeBomb(boolean automatic) {
+        return placeBomb(automatic, selected);
+    }
+
+    private Bomb placeBomb(boolean automatic, int bombIndex) {
         Hero hero = Dungeon.hero;
         if ((!automatic && aimedThrowEnabled()) || target != hero || hero == null
                 || (!hero.ready && !BlastSettings.testAutoPlay())
@@ -378,7 +404,7 @@ public final class BlastBombManiac extends Buff {
         if (activeBombs == Integer.MAX_VALUE) {
             throw new IllegalStateException("Active bomb overflow");
         }
-        Bomb bomb = selectedBomb();
+        Bomb bomb = bombAt(bombIndex);
         bomb.blastSetManiacCharge(true);
         activeBombs++;
         bomb.blastThrowLit(cell);
