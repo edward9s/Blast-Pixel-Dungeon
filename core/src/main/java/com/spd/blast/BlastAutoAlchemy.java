@@ -7,6 +7,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.items.EnergyCrystal;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
+import com.shatteredpixel.shatteredpixeldungeon.items.artifacts.AlchemistsToolkit;
 import com.shatteredpixel.shatteredpixeldungeon.items.food.Food;
 import com.shatteredpixel.shatteredpixeldungeon.items.food.MeatPie;
 import com.shatteredpixel.shatteredpixeldungeon.items.food.Pasty;
@@ -16,7 +17,7 @@ import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
 
 import java.util.ArrayList;
 
-/** Idle auto-play crafting after an alchemy pot becomes known on the current floor. */
+/** Idle auto-play Meat Pie crafting using a known pot or a ready equipped toolkit. */
 final class BlastAutoAlchemy {
 
     private static final MeatPie.Recipe PIE = new MeatPie.Recipe();
@@ -58,16 +59,38 @@ final class BlastAutoAlchemy {
         return ingredients;
     }
 
+    private static AlchemistsToolkit readyToolkit(Hero hero) {
+        AlchemistsToolkit toolkit = null;
+        if (hero.belongings.artifact() instanceof AlchemistsToolkit) {
+            toolkit = (AlchemistsToolkit) hero.belongings.artifact();
+        } else if (hero.belongings.misc() instanceof AlchemistsToolkit) {
+            toolkit = (AlchemistsToolkit) hero.belongings.misc();
+        }
+        return toolkit != null && toolkit.canBrewNow(hero) ? toolkit : null;
+    }
+
+    /** Prefer the known pot when global energy suffices; otherwise use portable alchemy. */
+    static boolean shouldUseToolkit(boolean potKnown, int globalEnergy,
+                                    int toolkitEnergy, int cost) {
+        return (!potKnown || globalEnergy < cost)
+                && globalEnergy + toolkitEnergy >= cost;
+    }
+
     /** Craft one pie per actor turn, only after higher-priority actions are clear. */
-    static boolean brewIfNearby(Hero hero, boolean safeHere) {
-        if (!safeHere || BlastAutoPlay.hasVisibleEnemy(hero)
-                || !knownPot(Dungeon.level)) return false;
+    static boolean brewIfPossible(Hero hero, boolean safeHere) {
+        if (!safeHere || BlastAutoPlay.hasVisibleEnemy(hero)) return false;
+
+        boolean potKnown = knownPot(Dungeon.level);
+        AlchemistsToolkit toolkit = readyToolkit(hero);
+        if (!potKnown && toolkit == null) return false;
 
         ArrayList<Item> ingredients = pieIngredients(hero.belongings.getAllItems(Food.class));
         if (ingredients == null || !PIE.testIngredients(ingredients)) return false;
 
         int cost = PIE.cost(ingredients);
-        if (Dungeon.energy < cost) return false;
+        boolean useToolkit = toolkit != null
+                && shouldUseToolkit(potKnown, Dungeon.energy, toolkit.availableEnergy(), cost);
+        if (!useToolkit && (!potKnown || Dungeon.energy < cost)) return false;
 
         Item result = PIE.brew(ingredients);
         if (!(result instanceof MeatPie)) {
@@ -79,6 +102,7 @@ final class BlastAutoAlchemy {
         for (Item ingredient : ingredients) {
             if (ingredient.quantity() == 0) ingredient.detachAll(hero.belongings.backpack);
         }
+        if (useToolkit) cost = toolkit.consumeEnergy(cost);
         Dungeon.energy -= cost;
         Catalog.countUses(EnergyCrystal.class, cost);
         if (!result.collect()) Dungeon.level.drop(result, hero.pos);

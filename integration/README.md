@@ -30,20 +30,25 @@ time, food talents, and manual eating remain native. The scope is cleared in
 ### Automatic meat-pie alchemy
 
 During unpaused auto-play, after combat, interrupted manual travel, and
-Starving-time eating, the hero can craft one Meat Pie when already adjacent
-to an alchemy pot. No navigation or scene switch is attempted; the current
-tile must be safe, no visible awake hostile may be present, and the backpack
-must contain a Pasty, an ordinary Ration (exact `Food` class), and one meat
-accepted by `MeatPie.Recipe`. The hero also needs at least six global alchemy
-energy. No portable toolkit use or energy conversion is attempted.
+automatic eating, the hero can craft one Meat Pie when either an alchemy pot
+is visible, visited, or mapped on the current floor, or an equipped Alchemist's
+Toolkit has completed warm-up. No navigation or scene switch is attempted;
+the current tile must be safe, no visible awake hostile may be present, and the
+backpack must contain a Pasty, an ordinary Ration (exact `Food` class), and one
+meat accepted by `MeatPie.Recipe`. A cursed, warming, or magic-blocked toolkit
+cannot provide portable alchemy.
 
-The real `MeatPie.Recipe` consumes one of each ingredient. Empty source stacks
-are removed, the six energy is deducted, crafting statistics and badges are
-updated, and the result is collected or dropped on the current tile when
-inventory is full. One craft spends one game tick so long ingredient stacks
-cannot monopolize the actor loop. The next auto-play turn reevaluates all
-requirements. The existing Pasty/ration/meat eating reserves still apply
-away from a pot; manual crafting remains unchanged.
+A known pot continues to spend six global energy when available. Otherwise,
+a ready equipped toolkit allows portable brewing with its stored energy plus
+global energy, just as in native `AlchemyScene`: toolkit energy is spent first,
+and any remainder is deducted from `Dungeon.energy`. The native toolkit
+`consumeEnergy` also fires its artifact-use talent hook. No energy conversion
+is attempted. The real `MeatPie.Recipe` consumes one of each ingredient.
+Empty source stacks are removed, crafting statistics and badges are updated,
+and the result is collected or dropped on the current tile when inventory is
+full. One craft spends one game tick so long ingredient stacks cannot monopolize
+the actor loop. The next turn reevaluates all requirements. The existing
+Pasty/ration/meat eating reserves and manual crafting remain unchanged.
 
 ### Bomb fire and frost interactions
 

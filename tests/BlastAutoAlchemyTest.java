@@ -68,8 +68,26 @@ public final class BlastAutoAlchemyTest {
                 "mapped terrain without a pot must not trigger alchemy");
     }
 
+    private static void toolkitEnergyPolicy() {
+        check(!BlastAutoAlchemy.shouldUseToolkit(true, 6, 6, 6),
+                "known pot uses global energy first");
+        check(BlastAutoAlchemy.shouldUseToolkit(false, 0, 6, 6),
+                "toolkit-only energy works without a pot");
+        check(BlastAutoAlchemy.shouldUseToolkit(false, 3, 3, 6),
+                "toolkit and global energy can be combined");
+        check(BlastAutoAlchemy.shouldUseToolkit(false, 6, 0, 6),
+                "ready empty toolkit can provide portable alchemy with global energy");
+        check(BlastAutoAlchemy.shouldUseToolkit(true, 3, 3, 6),
+                "toolkit supplements insufficient pot energy");
+        check(!BlastAutoAlchemy.shouldUseToolkit(false, 2, 3, 6),
+                "insufficient combined energy cannot brew");
+        check(!BlastAutoAlchemy.shouldUseToolkit(true, 2, 3, 6),
+                "known pot with insufficient combined energy cannot brew");
+    }
+
     public static void main(String[] args) {
         knownPotDiscovery();
+        toolkitEnergyPolicy();
         Pasty pasty = new Pasty();
         Food ration = new Food();
         MysteryMeat meat = new MysteryMeat();
