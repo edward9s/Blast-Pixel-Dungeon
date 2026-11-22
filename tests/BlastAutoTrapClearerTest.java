@@ -6,9 +6,11 @@ import com.shatteredpixel.shatteredpixeldungeon.items.food.Food;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.WornShortsword;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.BurningTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.ChillingTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.CursingTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.ExplosiveTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.FlashingTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.FrostTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.OozeTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.PoisonDartTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.ToxicTrap;
@@ -29,6 +31,10 @@ public final class BlastAutoTrapClearerTest {
         equal(1, BlastAutoTrapClearer.minimumThrowDistance(new FlashingTrap()), "local trap");
         equal(1, BlastAutoTrapClearer.minimumThrowDistance(new CursingTrap()), "item curse");
         equal(2, BlastAutoTrapClearer.minimumThrowDistance(new OozeTrap()), "adjacent ooze");
+        equal(2, BlastAutoTrapClearer.minimumThrowDistance(new ChillingTrap()),
+                "one-cell freezing aura");
+        equal(3, BlastAutoTrapClearer.minimumThrowDistance(new FrostTrap()),
+                "two-cell freezing aura");
         equal(4, BlastAutoTrapClearer.minimumThrowDistance(new ToxicTrap()), "spreading toxic gas");
         equal(-1, BlastAutoTrapClearer.minimumThrowDistance(new BurningTrap()), "spreading fire");
         equal(-1, BlastAutoTrapClearer.minimumThrowDistance(new ExplosiveTrap()), "blast");
@@ -53,6 +59,25 @@ public final class BlastAutoTrapClearerTest {
         hiddenGas.active = false;
         equal(0, BlastAutoTrapClearer.canTrigger(hiddenGas, Terrain.SECRET_TRAP) ? 1 : 0,
                 "inactive gas trap remains excluded");
+
+        ChillingTrap hiddenChill = new ChillingTrap();
+        hiddenChill.visible = false;
+        equal(1, BlastAutoTrapClearer.canTrigger(hiddenChill, Terrain.SECRET_TRAP) ? 1 : 0,
+                "hidden chilling trap eligible");
+        equal(1, BlastAutoTrapClearer.canTrigger(hiddenChill, Terrain.TRAP) ? 1 : 0,
+                "revealed chilling trap eligible");
+        hiddenChill.active = false;
+        equal(0, BlastAutoTrapClearer.canTrigger(hiddenChill, Terrain.SECRET_TRAP) ? 1 : 0,
+                "inactive chilling trap excluded");
+        FrostTrap hiddenFrost = new FrostTrap();
+        hiddenFrost.visible = false;
+        equal(1, BlastAutoTrapClearer.canTrigger(hiddenFrost, Terrain.SECRET_TRAP) ? 1 : 0,
+                "hidden frost trap eligible");
+        equal(1, BlastAutoTrapClearer.canTrigger(hiddenFrost, Terrain.TRAP) ? 1 : 0,
+                "revealed frost trap eligible");
+        hiddenFrost.active = false;
+        equal(0, BlastAutoTrapClearer.canTrigger(hiddenFrost, Terrain.SECRET_TRAP) ? 1 : 0,
+                "inactive frost trap excluded");
 
         int width = 7;
         int trap = 3 + 3 * width;
