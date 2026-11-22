@@ -22,6 +22,34 @@ result collection:
 python -m unittest discover -s tests -p test_auto_alchemy.py
 ```
 
+## Automatic trap clearance
+
+After combat, food, pickup, interaction and farming, idle auto-play may use a
+native inventory throw to clear an armed trap that separates two
+known safe ends of a one-tile corridor. Revealed and secret traps are both
+eligible, including mapped or previously visited terrain outside the current
+field of view. The trap must disarm on activation,
+be unoccupied, and have a verified unobstructed projectile path. Only
+unequipped weapons/armor or one item from the largest food stack may be
+thrown. Unrecognized trap effects, remote-targeting traps, explosive traps,
+spreading fire/gas and teleporting effects are excluded. Trap types with
+strictly local effects are handled at a safe stand-off distance (two tiles
+for the adjoining-cell ooze trap). Automatic movement still avoids the
+active trap and any hazardous terrain after activation.
+
+`BlastAutoTrapClearerTest.java` tests trap safety categories, choke-point
+reachability and sacrifice selection against the patched SPD core:
+
+```sh
+javac --release 11 -encoding UTF-8 -cp "$BLAST_TEST_CLASSPATH" \
+  -d /tmp/blast-tests tests/BlastAutoTrapClearerTest.java
+java -cp "/tmp/blast-tests:$BLAST_TEST_CLASSPATH" com.spd.blast.BlastAutoTrapClearerTest
+```
+
+```sh
+python -m unittest discover -s tests -p test_auto_trap_clearance.py
+```
+
 ## Automatic mystery meat
 
 `BlastAutoFoodTest.java` checks selection by available stack size, raw Mystery
@@ -135,9 +163,11 @@ java -cp "/tmp/blast-tests:$BLAST_TEST_CLASSPATH" com.spd.blast.BlastAutoPickupT
 The existing Blast **Debug Log** checkbox also traces automatic decisions while
 a visible ordinary floor heap is within two cells of the hero. The single-line
 `[Blast] auto-loot` event contains the hero and item cells, top-item class,
-pickup eligibility (`ready`, `type`, `capacity`, `unsafe`, `blocked`,
+pickup eligibility (`ready`, `type`, `full`, `lost-inventory`,
+`dew-full`, `rose-unavailable`, `unsafe`, `blocked`,
 `unreachable`, or `cooldown`), the winning task (`chosen`), and the
-issued action. `ready` means the floor item passes its local conditions and
+issued action. Full and lost-inventory rejections also include the occupied
+and maximum slot counts for the backpack and its contained bags. `ready` means the floor item passes its local conditions and
 the base distance map; task-specific exclusions on intermediate steps may
 still prevent pickup. Logs are emitted only when Debug Log is enabled and
 identical consecutive observations are limited to one in ten decisions.

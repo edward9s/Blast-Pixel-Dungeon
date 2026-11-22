@@ -861,6 +861,17 @@ public final class BlastAutoPlay {
 
         idleSafe = progress.safeFor(safe, hero.pos, BlastAutoProgressGuard.Intent.ROAM);
         idleDistances = navigationDistances(hero.pos, safe, distances, idleSafe);
+        debugDecision = "trap";
+        BlastAutoTrapClearer.Action trapAction =
+                BlastAutoTrapClearer.chooseAction(hero, idleSafe, idleDistances);
+        if (trapAction != BlastAutoTrapClearer.Action.NONE) {
+            roaming.clearDestination();
+            if (trapAction == BlastAutoTrapClearer.Action.MOVE) {
+                progress.intent(BlastAutoProgressGuard.Intent.ROAM);
+            }
+            return trapAction == BlastAutoTrapClearer.Action.THROW;
+        }
+
         debugDecision = "roam";
         int step = roamStep(hero, idleSafe, idleDistances);
         if (step >= 0) {
