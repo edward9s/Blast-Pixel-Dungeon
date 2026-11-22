@@ -367,7 +367,8 @@ final class BlastAutoTrapClearer {
 
     /** Find a reachable throwing cell with a true line of fire, even around a bend. */
     private static int nearbyStand(Level level, int trapCell, int target, int minimum,
-                                   boolean gas, Trap trap, boolean[] safe, int[] distances) {
+                                   boolean gas, Trap trap, boolean[] safe, int[] distances,
+                                   Hero hero, AimedTargets aimed) {
         int width = level.width();
         int centerX = trapCell % width;
         int centerY = trapCell / width;
@@ -386,6 +387,7 @@ final class BlastAutoTrapClearer {
                         || (target != trapCell && stand == target)) continue;
                 if (new Ballistica(stand, target, Ballistica.PROJECTILE).collisionPos != target
                         || !standSafeForEffect(level, trap, stand)
+                        || !safeAimedStand(hero, level, trapCell, stand, aimed)
                         || (gas && !hasGasRetreat(level, trapCell, stand, safe))) {
                     continue;
                 }
@@ -397,7 +399,8 @@ final class BlastAutoTrapClearer {
     }
 
     private static int throwingStand(Level level, int trapCell, int side, int minimum,
-                                     boolean gas, Trap trap, boolean[] safe, int[] distances) {
+                                     boolean gas, Trap trap, boolean[] safe, int[] distances,
+                                     Hero hero, AimedTargets aimed) {
         int best = -1;
         int shortest = Integer.MAX_VALUE;
         for (int steps = 1; steps <= MAX_THROW_DISTANCE; steps++) {
@@ -406,6 +409,7 @@ final class BlastAutoTrapClearer {
             if (steps < minimum || distances[stand] == Integer.MAX_VALUE
                     || distances[stand] >= shortest
                     || !standSafeForEffect(level, trap, stand)
+                    || !safeAimedStand(hero, level, trapCell, stand, aimed)
                     || (gas && !hasGasRetreat(level, trapCell, stand, safe))) continue;
             // Terrain and characters may stop an item before it presses the trap.
             if (new Ballistica(stand, trapCell, Ballistica.PROJECTILE).collisionPos != trapCell) {
@@ -415,7 +419,8 @@ final class BlastAutoTrapClearer {
             shortest = distances[stand];
         }
         return best >= 0 ? best
-                : nearbyStand(level, trapCell, trapCell, minimum, gas, trap, safe, distances);
+                : nearbyStand(level, trapCell, trapCell, minimum, gas, trap, safe, distances,
+                        hero, aimed);
     }
 
     /** A thrown item lands on the closed door and keeps it open as a floor heap. */
@@ -446,7 +451,8 @@ final class BlastAutoTrapClearer {
             shortest = distances[stand];
         }
         return best >= 0 ? best
-                : nearbyStand(level, trapCell, door, minimum, false, null, safe, distances);
+                : nearbyStand(level, trapCell, door, minimum, false, null, safe, distances,
+                        Dungeon.hero, null);
     }
 
     private static int closedDoor(Level level, int trapCell, int side) {
@@ -505,6 +511,16 @@ final class BlastAutoTrapClearer {
     }
 
     static Action chooseAction(Hero hero, boolean[] safe, int[] distances) {
+        return chooseAction(hero, safe, distances, false);
+    }
+
+    /** Use opportunistic offensive traps without detouring away from combat. */
+    static Action chooseAimedAction(Hero hero, boolean[] safe, int[] distances) {
+        return chooseAction(hero, safe, distances, true);
+    }
+
+    private static Action chooseAction(Hero hero, boolean[] safe, int[] distances,
+                                       boolean aimedOnly) {
         Level level = Dungeon.level;
         if (safe.length != level.length() || distances.length != level.length()) {
             throw new IllegalArgumentException("Invalid trap clearance navigation map");
@@ -518,6 +534,7 @@ final class BlastAutoTrapClearer {
         String rejectedReason = null;
         int rejectedDistance = MAX_THROW_DISTANCE + 1;
         for (Trap trap : level.traps.valueList()) {
+            if (aimedOnly && !aimedTrap(trap)) continue;
             int cell = trap.pos;
             if (!level.insideMap(cell) || !trap.active
                     || !(level.visited[cell] || level.mapped[cell] || hero.fieldOfView[cell])) {
@@ -530,45 +547,59 @@ final class BlastAutoTrapClearer {
             else if (Actor.findChar(cell) != null) reason = "occupied";
             else if (level.plants.get(cell) != null) reason = "plant";
             else {
-                int side = reachableSide(cell, level.width(), level.solid, level.passable,
-                        level.pit, safe, level.visited, level.mapped, hero.fieldOfView, distances);
-                int minimum = minimumThrowDistance(trap);
-                boolean gas = spreadingGas(trap) != null;
-                int stand = side == 0
-                        ? nearbyStand(level, cell, cell, minimum, gas, trap, safe, distances)
-                        : throwingStand(level, cell, side, minimum, gas, trap, safe, distances);
-                // A short-range gas throw is only valid with a known escape route.
-                if (stand < 0 && gas) {
-                    // Corrosive gas needs extra distance even on a retreat-capable route.
-                    int fallback = trap.getClass() == CorrosionTrap.class ? 2 : 1;
-                    stand = side == 0
-                            ? nearbyStand(level, cell, cell, fallback, true, trap, safe, distances)
-                            : throwingStand(level, cell, side, fallback, true, trap, safe, distances);
-                }
-                int target = cell;
-                boolean frost = false;
-                if (stand < 0 && fireTrap(trap)) {
-                    PotionOfFrost potion = hero.belongings.getItem(PotionOfFrost.class);
-                    if (potion != null && potion.quantity() > 0 && potion.isKnown()) {
+                AimedTargets aimed = aimedTrap(trap)
+                        ? predictAimedTargets(hero, level, cell) : null;
+                if (aimed != null && !aimed.safeToFire(
+                        Math.max(6, level.viewDistance) + 0.5f,
+                        Float.POSITIVE_INFINITY)) {
+                    reason = "unsafe-target";
+                } else {
+                    int side = reachableSide(cell, level.width(), level.solid, level.passable,
+                            level.pit, safe, level.visited, level.mapped,
+                            hero.fieldOfView, distances);
+                    int minimum = minimumThrowDistance(trap);
+                    boolean gas = spreadingGas(trap) != null;
+                    int stand = side == 0
+                            ? nearbyStand(level, cell, cell, minimum, gas, trap, safe, distances,
+                                    hero, aimed)
+                            : throwingStand(level, cell, side, minimum, gas, trap, safe, distances,
+                                    hero, aimed);
+                    // A short-range gas throw still needs a verified escape route.
+                    if (stand < 0 && gas) {
+                        int fallback = trap.getClass() == CorrosionTrap.class ? 2 : 1;
                         stand = side == 0
-                                ? nearbyStand(level, cell, cell, 1, false, trap, safe, distances)
-                                : throwingStand(level, cell, side, 1, false, trap, safe, distances);
-                        frost = stand >= 0;
+                                ? nearbyStand(level, cell, cell, fallback, true, trap,
+                                        safe, distances, hero, aimed)
+                                : throwingStand(level, cell, side, fallback, true, trap,
+                                        safe, distances, hero, aimed);
                     }
-                }
-                if (stand < 0 && side != 0) {
-                    // Door opening alone cannot activate gas; recheck on the next turn.
-                    stand = doorStand(level, cell, side, 1, safe, distances);
-                    if (stand >= 0) target = closedDoor(level, cell, side);
-                }
-                if (stand < 0) reason = "no-safe-stand";
-                else if (hero.rooted && (stand != hero.pos || gas)) reason = "rooted";
-                else if (distances[stand] < shortest) {
-                    chosen = trap;
-                    bestStand = stand;
-                    bestTarget = target;
-                    bestFrost = frost;
-                    shortest = distances[stand];
+                    int target = cell;
+                    boolean frost = false;
+                    if (stand < 0 && fireTrap(trap)) {
+                        PotionOfFrost potion = hero.belongings.getItem(PotionOfFrost.class);
+                        if (potion != null && potion.quantity() > 0 && potion.isKnown()) {
+                            stand = side == 0
+                                    ? nearbyStand(level, cell, cell, 1, false, trap,
+                                            safe, distances, hero, aimed)
+                                    : throwingStand(level, cell, side, 1, false, trap,
+                                            safe, distances, hero, aimed);
+                            frost = stand >= 0;
+                        }
+                    }
+                    if (stand < 0 && side != 0) {
+                        stand = doorStand(level, cell, side, 1, safe, distances);
+                        if (stand >= 0) target = closedDoor(level, cell, side);
+                    }
+                    if (stand < 0) reason = "no-safe-stand";
+                    else if (aimedOnly && stand != hero.pos) reason = "not-in-range";
+                    else if (hero.rooted && (stand != hero.pos || gas)) reason = "rooted";
+                    else if (distances[stand] < shortest) {
+                        chosen = trap;
+                        bestStand = stand;
+                        bestTarget = target;
+                        bestFrost = frost;
+                        shortest = distances[stand];
+                    }
                 }
             }
             if (reason != null) {
@@ -604,6 +635,13 @@ final class BlastAutoTrapClearer {
             BlastLog.debug("auto-trap pos=" + hero.pos + " trap=" + chosen.getClass().getSimpleName()
                     + "@" + chosen.pos + " stand=" + bestStand + " action=move");
             return Action.MOVE;
+        }
+        // A target can move while the hero approaches; verify again at launch.
+        if (bestTarget == chosen.pos && aimedTrap(chosen)
+                && !safeAimedStand(hero, level, chosen.pos, hero.pos,
+                        predictAimedTargets(hero, level, chosen.pos))) {
+            logRejection(hero, chosen, "unsafe-target");
+            return Action.NONE;
         }
         // A cast must use the item's real trajectory for both door and trap.
         if (item.throwPos(hero, bestTarget) != bestTarget) {
