@@ -418,8 +418,12 @@ final class BlastAutoTrapClearer {
         }
         Item item = bestFrost ? hero.belongings.getItem(PotionOfFrost.class)
                 : chooseThrowItem(hero.belongings.backpack, candidate -> candidate.isEquipped(hero));
-        if (item == null || (bestFrost && (!((PotionOfFrost) item).isKnown()
-                || item.quantity() <= 0))) {
+        // If no spare item exists, a known frost potion can still clear a fire trap.
+        if (item == null && bestTarget == chosen.pos && fireTrap(chosen)) {
+            item = hero.belongings.getItem(PotionOfFrost.class);
+        }
+        if (item == null || (item instanceof PotionOfFrost
+                && (!((PotionOfFrost) item).isKnown() || item.quantity() <= 0))) {
             logRejection(hero, chosen, "no-throwable-item");
             return Action.NONE;
         }
@@ -438,7 +442,7 @@ final class BlastAutoTrapClearer {
         BlastLog.debug("auto-trap pos=" + hero.pos + " trap=" + chosen.getClass().getSimpleName()
                 + "@" + chosen.pos + " item=" + item.getClass().getSimpleName()
                 + " target=" + bestTarget + " action="
-                + (openDoor ? "open-door" : bestFrost ? "frost" : "throw"));
+                + (openDoor ? "open-door" : item instanceof PotionOfFrost ? "frost" : "throw"));
         if (openDoor) {
             heldDoor = bestTarget;
             heldDoorTrap = chosen.pos;
