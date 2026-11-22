@@ -86,6 +86,8 @@ class AutoTrapClearanceTest(unittest.TestCase):
         self.assertIn("Math.max(TOXIC_ESCAPE_DISTANCE, distance + 1)", CLEAR)
         self.assertIn("nearbyStand(level, trapCell, trapCell, minimum, toxic, safe, distances)", CLEAR)
         self.assertIn("toxicEscapeStep(toxicOrigin, hero.pos, level.width(), safe", CLEAR)
+        self.assertIn("if (stand < 0 && toxic)", CLEAR)
+        self.assertIn("throwingStand(level, cell, side, 1, true, safe, distances)", CLEAR)
         self.assertIn("hero.rooted", CLEAR)
         self.assertNotIn("hasToxicRetreat(level, trapCell, stand, side, safe)", CLEAR)
         self.assertIn("toxicOrigin = chosen.pos", CLEAR)
