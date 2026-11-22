@@ -14,6 +14,10 @@ class AutoTrapClearanceTest(unittest.TestCase):
         self.assertLess(PLAY.index('debugDecision = "pickup";'), PLAY.index('debugDecision = "trap";'))
         self.assertLess(PLAY.index('debugDecision = "trap";'), PLAY.index('debugDecision = "farm";'))
         self.assertLess(PLAY.index('debugDecision = "trap";'), PLAY.index('debugDecision = "roam";'))
+        # Farming may use its own restricted navigation grid; roaming must restore ROAM.
+        roam_section = PLAY.split('debugDecision = "roam";', 1)[0]
+        self.assertIn("BlastAutoProgressGuard.Intent.ROAM", roam_section.split(
+            'debugDecision = "farm";', 1)[1])
         self.assertIn("BlastAutoTrapClearer.chooseAction(hero, idleSafe, idleDistances)", PLAY)
         self.assertIn("trapAction == BlastAutoTrapClearer.Action.THROW", PLAY)
 
