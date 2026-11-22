@@ -50,7 +50,7 @@ class AutoTrapClearanceTest(unittest.TestCase):
         self.assertIn("type == FrostTrap.class) return 3", CLEAR)
         self.assertIn("terrain == Terrain.TRAP || terrain == Terrain.SECRET_TRAP", CLEAR)
         self.assertIn("new Ballistica(stand, trapCell, Ballistica.PROJECTILE)", CLEAR)
-        self.assertIn("minimumThrowDistance(trap),", CLEAR)
+        self.assertIn("int minimum = minimumThrowDistance(trap);", CLEAR)
 
     def test_rejection_diagnostic_is_bounded_and_specific(self):
         self.assertIn('status=" + reason', CLEAR)
