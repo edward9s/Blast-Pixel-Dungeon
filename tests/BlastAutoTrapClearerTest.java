@@ -89,6 +89,24 @@ public final class BlastAutoTrapClearerTest {
                 "disarmed hidden trap");
         equal(0, BlastAutoTrapClearer.canTrigger(new ExplosiveTrap(), Terrain.SECRET_TRAP) ? 1 : 0,
                 "dangerous hidden trap remains excluded");
+
+        // Aqua Brew changes trap terrain to water without activating the trap.
+        equal(1, BlastAutoTrapClearer.canDouse(new ExplosiveTrap(), Terrain.TRAP) ? 1 : 0,
+                "aqua disarms explosion without detonating it");
+        equal(1, BlastAutoTrapClearer.canDouse(new ExplosiveTrap(), Terrain.SECRET_TRAP) ? 1 : 0,
+                "aqua disarms hidden unsupported traps");
+        equal(1, BlastAutoTrapClearer.canDouse(new FlashingTrap(), Terrain.TRAP) ? 1 : 0,
+                "aqua removes persistent traps that cannot be activated away");
+        equal(1, BlastAutoTrapClearer.canDouse(new GrippingTrap(), Terrain.SECRET_TRAP) ? 1 : 0,
+                "aqua removes hidden persistent traps");
+        equal(1, BlastAutoTrapClearer.canDouse(new TenguDartTrap(), Terrain.TRAP) ? 1 : 0,
+                "aqua removes specialized boss traps without firing them");
+        equal(0, BlastAutoTrapClearer.canDouse(new ExplosiveTrap(), Terrain.EMPTY) ? 1 : 0,
+                "aqua does not spend on a non-trap tile");
+        ExplosiveTrap inactive = new ExplosiveTrap();
+        inactive.active = false;
+        equal(0, BlastAutoTrapClearer.canDouse(inactive, Terrain.TRAP) ? 1 : 0,
+                "aqua does not spend on inactive traps");
         equal(1, BlastAutoTrapClearer.canTrigger(new WornDartTrap(), Terrain.TRAP) ? 1 : 0,
                 "dart is conditionally supported");
         equal(1, BlastAutoTrapClearer.canTrigger(new PoisonDartTrap(), Terrain.TRAP) ? 1 : 0,
