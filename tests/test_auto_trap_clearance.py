@@ -15,11 +15,14 @@ class AutoTrapClearanceTest(unittest.TestCase):
         self.assertIn("BlastAutoTrapClearer.chooseAction(hero, idleSafe, idleDistances)", PLAY)
         self.assertIn("trapAction == BlastAutoTrapClearer.Action.THROW", PLAY)
 
-    def test_only_visible_disarming_corridor_traps(self):
+    def test_hidden_and_revealed_disarming_corridor_traps(self):
         self.assertIn("trap.active", CLEAR)
-        self.assertIn("trap.visible", CLEAR)
+        self.assertNotIn("trap.visible", CLEAR)
         self.assertIn("trap.disarmedByActivation", CLEAR)
-        self.assertIn("hero.fieldOfView[cell]", CLEAR)
+        self.assertIn("terrain == Terrain.TRAP || terrain == Terrain.SECRET_TRAP", CLEAR)
+        self.assertIn("level.visited[cell] || level.mapped[cell] || hero.fieldOfView[cell]", CLEAR)
+        self.assertIn("visited[first] || mapped[first] || visible[first]", CLEAR)
+        self.assertIn("visited[second] || mapped[second] || visible[second]", CLEAR)
         self.assertIn("Actor.findChar(cell) != null", CLEAR)
         self.assertIn("separatedSide(", CLEAR)
         self.assertIn("firstReached == secondReached", CLEAR)
