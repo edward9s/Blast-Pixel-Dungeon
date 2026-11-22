@@ -24,42 +24,73 @@ python -m unittest discover -s tests -p test_auto_alchemy.py
 
 ## Automatic trap clearance
 
-After combat, food, pickup, interaction and farming, idle auto-play may use a
-native inventory throw to clear an armed trap that blocks a reachable
-approach to the other end of a one-tile corridor. Revealed and secret traps are both
-eligible, including mapped or previously visited terrain outside the current
-field of view. The corridor's far side may also be unexplored, provided its
-actual floor cell is passable, is not a chasm, and no known hazard blocks it.
-The trap must disarm on activation,
-be unoccupied, and have a verified unobstructed projectile path. Only
-unequipped weapons/armor or one item from the largest food stack may be
-thrown. Unrecognized trap effects, remote-targeting traps, explosive traps,
-chain-reacting traps and teleporting effects are excluded.
-BurningTrap and BlazingTrap are accepted at distances of at least two and
-three tiles respectively. At shorter range, an identified PotionOfFrost can
-be thrown directly onto the trap; native potion impact presses it before
-spreading freezing, which cancels the fire on subsequent blob updates.
-An adjacent splash does not press the trap. The throw still requires an
-unblocked projectile line, so corners are handled by approaching a reachable
-position with an unobstructed throw. Exactly two cardinal corridor openings
-may form a straight or L-shaped choke point; three-way intersections are
-excluded. Potions are not sacrificed on closed doors.
-Toxic gas traps are permitted only when a straight, safe retreat route exists:
-the hero throws from at least four cells away and immediately retreats toward
-eight cells of separation, then avoids returning while the gas persists.
-An obstructing closed door is first opened with a normal item throw, which
-leaves the item on the door to hold it open. Automatic pickup temporarily skips
-this door item until the trap has been disarmed. Local-effect traps retain their
-minimum standoff distance: two tiles for ooze and ChillingTrap, three tiles
-for FrostTrap (whose freezing area reaches two path steps). Both freezing
-traps work on revealed or hidden corridor cells, and the existing active
-Freezing blob exclusion keeps normal automatic movement out of the frost
-after activation. Automatic movement continues to avoid active hazards. When Debug Log is
-enabled, nearby rejected traps produce `[Blast] auto-trap` entries with their
-class, cell, hidden flag and rejection status (such as `unsupported`,
-`not-chokepoint`, `no-safe-stand`, `no-throwable-item` or
-`blocked-trajectory`). Identical rejections are suppressed for nine decisions
-then repeated, limiting diagnostic log growth.
+After combat, food, pickup, interaction, and ordinary harvesting, idle auto-play
+tries to clear supported armed traps before optional grass farming and roaming.
+Both visible and previously mapped/visited hidden trap terrain may be targeted.
+A trap need not be an exact two-exit corridor choke point: the hero can choose
+an unobstructed throwing position around a corner or in a room. The former
+choke-point analysis still supplies a preferred approach when applicable.
+
+Activation must disarm the trap and the target must be unoccupied and free of
+plants. Non-disarming Flashing and Gripping traps, explosions, falls,
+Tengu's specialized dart trap, and other unreviewed effects remain excluded.
+Four nearest-target traps (Worn Dart, Poison Dart, Disintegration and Grim)
+are eligible only when their native projectile line and true-distance targeting
+unambiguously select permitted hostile mobs. The predictor also respects the
+native minimum six-tile view range, invisibility distance treatment and current
+character occupancy. A tie involving the hero or any protected character
+vetoes firing. Sleeping or invisible mobs, allies, neutrals, quest/service NPCs,
+demon spawners and invulnerable/avoided/charmed targets are never deliberately
+attacked. Target eligibility is checked again from the actual throwing position
+before casting because characters may move during approach. The early
+opportunistic check runs after bomb tactics but before ordinary attacks,
+and only fires if the hero can throw without walking or opening a door.
+These traps still use the idle clearance flow when an approach is needed.
+
+A Flock trap is excluded if any other active trap is within the two-tile sheep
+spawn radius, preventing automatic chained activations.
+The throwing position for a Shocking trap must be dry as an additional
+precaution against electricity traveling through water.
+
+The supported additional types are Confusion, Corrosion, Geyser, Shocking,
+Disarming, Flock, Teleportation, and Warping traps. Toxic, Confusion, and
+Corrosion gas share a route-aware retreat mechanism that supports L-bends
+and sideways first steps, while rejecting closed corners and dead ends
+without adequate escape. Toxic and Confusion throws normally start at two
+cells, Corrosion at three. A shorter throw is a last resort *only* if an
+escape route is known: one cell for Toxic/Confusion and two for Corrosion.
+Escape searching is bounded to eight moves. Following activation, the hero prioritizes leaving the active gas
+and avoids turning back toward its source. Other effects retain specific
+stand-off ranges based on their native action.
+
+Burning and Blazing fire traps require at least two and three tiles,
+respectively; at shorter range an identified PotionOfFrost can be used.
+The native projectile must actually reach the trap, and any closed intervening
+door can be opened first with an expendable item (without casting the frost
+potion at the door). Automatic pickup temporarily skips the door-holding item
+until the trap is cleared.
+
+Aqua Brew is an alternative fallback for any active trap (including hidden,
+explosive, ranged, boss-specific, and non-disarming traps). Native AquaBrew
+does not press traps: its Geyser effect changes trap terrain to water using
+`Level.setCellToWater(true, cell)`, removing the trap without activation.
+The program throws it at the trap's exact cell from at least two cells away,
+validates projectile collision, checks custom tiles that forbid water and
+avoids a landing point that could knock back protected characters within
+one cell. It is spent only if the normal safe throw is unavailable or has no
+eligible expendable item. Aqua Brew is not used for opportunistic pre-combat
+aimed-trap attacks, because it would remove the trap without attacking the
+enemy. Water cannot be created on every custom tile, and the native geyser
+may push nearby hostile mobs.
+
+Only un-equipped spare weapons/armor and surplus food are eligible
+sacrifices. The food selection shares the automatic feeding reserve for
+Meat Pie ingredients, and finished Meat Pies are never sacrificed. Other inventory items, which may have dangerous or
+irreversible throw effects, are not thrown blindly. This avoids spending
+valuable potions, scrolls, runestones, and special-purpose objects on trap
+clearing. Debug Log records nearby rejections (e.g. `unsupported`,
+`chain-reaction`, `no-safe-stand`, `no-throwable-item` and
+`blocked-trajectory`) at a bounded repeated-message rate.
 
 `BlastAutoTrapClearerTest.java` tests trap safety categories, choke-point
 reachability and sacrifice selection against the patched SPD core:

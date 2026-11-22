@@ -573,14 +573,14 @@ public final class BlastAutoPlay {
         progress.refreshHazards(Dungeon.level.length(),
                 cell -> BlastAutoEnvironment.hazardousAt(cell, hazards)
                         || specialBarriers[cell]);
-        int toxicRetreat = BlastAutoTrapClearer.toxicRetreatStep(hero, safe);
+        int toxicRetreat = BlastAutoTrapClearer.gasRetreatStep(hero, safe);
         if (toxicRetreat >= 0) {
             debugDecision = "trap-retreat";
             progress.intent(BlastAutoProgressGuard.Intent.RETREAT);
             hero.curAction = new HeroAction.Move(toxicRetreat);
             return false;
         }
-        BlastAutoTrapClearer.avoidToxicReturn(hero, safe);
+        BlastAutoTrapClearer.avoidGasReturn(hero, safe);
         // Compute reachability once, rather than doing up to nine searches per mob.
         PathFinder.buildDistanceMap(hero.pos, safe);
         int[] distances = PathFinder.distance.clone();
@@ -651,6 +651,12 @@ public final class BlastAutoPlay {
         // Blast-specific tactics are isolated from the portable AI policy.
         debugDecision = "bomb";
         if (BlastAutoBombAI.actAgainstOtherEnemies(hero)) return true;
+
+        // A safe, immediately throwable ranged trap can hit a hostile target
+        // before ordinary combat consumes the opportunity. Never detour for it.
+        debugDecision = "aimed-trap";
+        if (BlastAutoTrapClearer.chooseAimedAction(hero, safe, distances)
+                == BlastAutoTrapClearer.Action.THROW) return true;
 
         debugDecision = "combat";
         BlastAutoCombat.Action combat = BlastAutoCombat.chooseAction(hero, safe, distances);
@@ -875,6 +881,20 @@ public final class BlastAutoPlay {
             return false;
         }
 
+        // Clear reachable traps before repeatedly planting new grass.
+        idleSafe = progress.safeFor(safe, hero.pos, BlastAutoProgressGuard.Intent.ROAM);
+        idleDistances = navigationDistances(hero.pos, safe, distances, idleSafe);
+        debugDecision = "trap";
+        BlastAutoTrapClearer.Action trapAction =
+                BlastAutoTrapClearer.chooseAction(hero, idleSafe, idleDistances);
+        if (trapAction != BlastAutoTrapClearer.Action.NONE) {
+            roaming.clearDestination();
+            if (trapAction == BlastAutoTrapClearer.Action.MOVE) {
+                progress.intent(BlastAutoProgressGuard.Intent.ROAM);
+            }
+            return trapAction == BlastAutoTrapClearer.Action.THROW;
+        }
+
         // Only planting new grass depends on the separate farming setting.
         debugDecision = "farm";
         if (BlastSettings.autoFarming()) {
@@ -894,17 +914,6 @@ public final class BlastAutoPlay {
 
         idleSafe = progress.safeFor(safe, hero.pos, BlastAutoProgressGuard.Intent.ROAM);
         idleDistances = navigationDistances(hero.pos, safe, distances, idleSafe);
-        debugDecision = "trap";
-        BlastAutoTrapClearer.Action trapAction =
-                BlastAutoTrapClearer.chooseAction(hero, idleSafe, idleDistances);
-        if (trapAction != BlastAutoTrapClearer.Action.NONE) {
-            roaming.clearDestination();
-            if (trapAction == BlastAutoTrapClearer.Action.MOVE) {
-                progress.intent(BlastAutoProgressGuard.Intent.ROAM);
-            }
-            return trapAction == BlastAutoTrapClearer.Action.THROW;
-        }
-
         debugDecision = "roam";
         int step = roamStep(hero, idleSafe, idleDistances);
         if (step >= 0) {
