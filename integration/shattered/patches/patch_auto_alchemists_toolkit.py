@@ -20,6 +20,8 @@ def patch(path: Path) -> None:
         "\n"
         + anchor
     )
+    if "public boolean canBrewNow(Hero hero)" in source:
+        raise SystemExit(f"{path}: native AlchemistsToolkit is already patched")
     if source.count(anchor) != 1:
         raise SystemExit(f"{path}: expected one native AlchemistsToolkit.availableEnergy anchor")
     path.write_text(source.replace(anchor, replacement, 1), encoding="utf-8")
