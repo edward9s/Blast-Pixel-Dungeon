@@ -108,10 +108,9 @@ public final class BlastSettingsTab extends Component {
             protected void onClick() {
                 super.onClick();
                 BlastSettings.setTestInfiniteBomb(checked());
-                if (BlastSecret.canToggleTests()) {
-                    BlastBombManiac buff = BlastBombManiac.current();
-                    if (buff == null) throw new IllegalStateException("Missing Bomb Maniac buff");
-                    buff.setSecretBombTypes(checked());
+                BlastBombManiac buff = BlastBombManiac.current();
+                if (buff != null) {
+                    buff.setInfiniteBombTypes(checked());
                     Item.updateQuickslot();
                 }
             }
@@ -274,7 +273,7 @@ public final class BlastSettingsTab extends Component {
     /** Clear enabled test features before hiding their controls. */
     private void disableTestOptions() {
         BlastBombManiac buff = BlastBombManiac.current();
-        if (buff != null) buff.setSecretBombTypes(false);
+        if (buff != null) buff.setInfiniteBombTypes(false);
         BlastRadius.clearTestBoost(Dungeon.hero);
         refreshRadius();
 
