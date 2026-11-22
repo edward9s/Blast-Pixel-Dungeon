@@ -32,6 +32,17 @@ class SecretDoorSearchTests(unittest.TestCase):
         self.assertIn("hero.fieldOfView[cell]", search)
         self.assertIn("level.map[cell] == Terrain.SECRET_DOOR", search)
 
+    def test_return_to_seen_dead_end_before_roaming(self):
+        source = self.source
+        approach = source.index("BlastAutoSecretDoors.nearestStand(")
+        self.assertLess(source.index("BlastAutoInteract.chooseAction(hero"), approach)
+        self.assertLess(approach, source.index("BlastAutoSacrifice.patrol(hero"))
+        self.assertLess(approach, source.index("BlastAutoFarming.chooseAction(hero"))
+        self.assertLess(approach, source.index("BlastAutoTrapClearer.chooseAction(hero"))
+        self.assertLess(approach, source.index("roamStep(hero, idleSafe, idleDistances)"))
+        self.assertIn("roaming.clearDestination();", source[approach:approach + 500])
+        self.assertIn("Intent.ROAM", source[approach:approach + 500])
+
     def test_native_search_spends_turn_without_second_wait(self):
         search = self.search
         self.assertIn("hero.search(true);", search)
