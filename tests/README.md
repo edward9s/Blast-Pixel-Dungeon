@@ -57,8 +57,9 @@ door can be opened first with an expendable item (without casting the frost
 potion at the door). Automatic pickup temporarily skips the door-holding item
 until the trap is cleared.
 
-Only un-equipped spare weapons/armor and one unit from the largest food stack
-are eligible sacrifices. Other inventory items, which may have dangerous or
+Only un-equipped spare weapons/armor and surplus food are eligible
+sacrifices. The food selection shares the automatic feeding reserve for
+Meat Pie ingredients, and finished Meat Pies are never sacrificed. Other inventory items, which may have dangerous or
 irreversible throw effects, are not thrown blindly. This avoids spending
 valuable potions, scrolls, runestones, and special-purpose objects on trap
 clearing. Debug Log records nearby rejections (e.g. `unsupported`,
