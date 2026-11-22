@@ -13,6 +13,9 @@ class AutoTrapClearanceTest(unittest.TestCase):
     def test_only_after_combat_loot_and_idle_tasks(self):
         self.assertLess(PLAY.index('debugDecision = "pickup";'), PLAY.index('debugDecision = "trap";'))
         self.assertLess(PLAY.index('debugDecision = "trap";'), PLAY.index('debugDecision = "farm";'))
+        self.assertLess(PLAY.index('debugDecision = "aimed-trap";'),
+                        PLAY.index('debugDecision = "combat";'))
+        self.assertIn("BlastAutoTrapClearer.chooseAimedAction(hero, safe, distances)", PLAY)
         self.assertLess(PLAY.index('debugDecision = "trap";'), PLAY.index('debugDecision = "roam";'))
         # Farming may use its own restricted navigation grid; roaming must restore ROAM.
         roam_section = PLAY.split('debugDecision = "roam";', 1)[0]
@@ -47,8 +50,11 @@ class AutoTrapClearanceTest(unittest.TestCase):
                      "GeyserTrap", "ShockingTrap", "FlockTrap",
                      "TeleportationTrap", "WarpingTrap"):
             self.assertIn("type == " + name + ".class", allowed)
-        for name in ("ExplosiveTrap", "DisintegrationTrap", "PoisonDartTrap",
-                     "FlashingTrap", "GrippingTrap"):
+        for name in ("WornDartTrap", "PoisonDartTrap",
+                     "DisintegrationTrap", "GrimTrap"):
+            self.assertIn("type == " + name + ".class", allowed)
+        for name in ("ExplosiveTrap", "FlashingTrap", "GrippingTrap",
+                     "TenguDartTrap"):
             self.assertNotIn("type == " + name + ".class", allowed)
         self.assertIn("return -1;", allowed)
         self.assertIn("item.throwPos(hero, bestTarget) != bestTarget", CLEAR)
@@ -65,13 +71,13 @@ class AutoTrapClearanceTest(unittest.TestCase):
     def test_corner_fire_and_frost_potion(self):
         self.assertIn("Exactly two walkable cardinal openings also includes L-shaped corridors", CLEAR)
         self.assertIn("return second < 0 ? 0 : separatedSide(first, second, cell", CLEAR)
-        self.assertIn("nearbyStand(level, trapCell, trapCell, minimum, gas, trap, safe, distances)", CLEAR)
-        self.assertIn("nearbyStand(level, trapCell, door, minimum, false, null, safe, distances)", CLEAR)
+        self.assertIn("nearbyStand(level, trapCell, trapCell, minimum, gas, trap, safe, distances,", CLEAR)
+        self.assertIn("nearbyStand(level, trapCell, door, minimum, false, null, safe, distances,", CLEAR)
         self.assertIn("type == BurningTrap.class) return 2", CLEAR)
         self.assertIn("type == BlazingTrap.class) return 3", CLEAR)
         self.assertIn("hero.belongings.getItem(PotionOfFrost.class)", CLEAR)
         self.assertIn("potion.quantity() > 0 && potion.isKnown()", CLEAR)
-        self.assertIn("throwingStand(level, cell, side, 1, false, trap, safe, distances)", CLEAR)
+        self.assertIn("throwingStand(level, cell, side, 1, false, trap,", CLEAR)
         self.assertIn('item instanceof PotionOfFrost ? "frost" : "throw"', CLEAR)
         self.assertIn("item == null && bestTarget == chosen.pos && fireTrap(chosen)", CLEAR)
         self.assertIn("item.throwPos(hero, bestTarget) != bestTarget", CLEAR)
@@ -81,7 +87,8 @@ class AutoTrapClearanceTest(unittest.TestCase):
         self.assertIn('status=" + reason', CLEAR)
         self.assertIn('" hidden=" + !trap.visible', CLEAR)
         for reason in ("unsupported", "chain-reaction", "no-safe-stand",
-                       "lost-inventory", "no-throwable-item", "blocked-trajectory"):
+                       "lost-inventory", "no-throwable-item", "blocked-trajectory",
+                       "unsafe-target", "not-in-range"):
             self.assertIn('"' + reason + '"', CLEAR)
         self.assertIn("LOG_REPEAT_INTERVAL = 10", CLEAR)
         self.assertIn("Dungeon.level.distance(hero.pos, trap.pos) > MAX_THROW_DISTANCE", CLEAR)
@@ -94,11 +101,11 @@ class AutoTrapClearanceTest(unittest.TestCase):
         self.assertIn('openDoor ? "open-door" : item instanceof PotionOfFrost ? "frost" : "throw"', CLEAR)
         self.assertIn("gasEscapeStep(trapCell, stand, level.width(), safe", CLEAR)
         self.assertIn("Math.max(GAS_ESCAPE_DISTANCE, distance + 1)", CLEAR)
-        self.assertIn("nearbyStand(level, trapCell, trapCell, minimum, gas, trap, safe, distances)", CLEAR)
+        self.assertIn("nearbyStand(level, trapCell, trapCell, minimum, gas, trap, safe, distances,", CLEAR)
         self.assertIn("gasEscapeStep(gasOrigin, hero.pos, level.width(), safe", CLEAR)
         self.assertIn("if (stand < 0 && gas)", CLEAR)
         self.assertIn("int fallback = trap.getClass() == CorrosionTrap.class ? 2 : 1;", CLEAR)
-        self.assertIn("throwingStand(level, cell, side, fallback, true, trap, safe, distances)", CLEAR)
+        self.assertIn("throwingStand(level, cell, side, fallback, true, trap,", CLEAR)
         self.assertIn("MAX_ESCAPE_STEPS = 8", CLEAR)
         self.assertIn("hero.rooted", CLEAR)
         self.assertNotIn("hasGasRetreat(level, trapCell, stand, side, safe)", CLEAR)
@@ -120,6 +127,27 @@ class AutoTrapClearanceTest(unittest.TestCase):
         self.assertIn("holdingDoorOpen(int cell)", CLEAR)
         self.assertIn("BlastAutoTrapClearer.holdingDoorOpen(cell)", PICKUP)
         self.assertIn('status = "door-held"', PICKUP)
+
+    def test_aimed_traps_check_hostile_targets_at_launch(self):
+        for name in ("WornDartTrap", "PoisonDartTrap",
+                     "DisintegrationTrap", "GrimTrap"):
+            self.assertIn("type == " + name + ".class", CLEAR)
+        self.assertIn("Math.max(6, level.viewDistance) + 0.5f", CLEAR)
+        self.assertIn("level.trueDistance(trapCell, character.pos)", CLEAR)
+        self.assertIn("character.invisible > 0", CLEAR)
+        self.assertIn("new Ballistica(trapCell, character.pos, Ballistica.PROJECTILE)", CLEAR)
+        self.assertIn("character.alignment == Char.Alignment.ENEMY", CLEAR)
+        self.assertIn("BlastAutoPlay.isAwake(mob)", CLEAR)
+        self.assertIn("BlastAutoPlay.isAutoAttackExcluded(mob)", CLEAR)
+        self.assertIn("hero.isCharmedBy(mob)", CLEAR)
+        self.assertIn("hero.fieldOfView[mob.pos]", CLEAR)
+        self.assertIn("mob.isInvulnerable(Hero.class)", CLEAR)
+        self.assertIn("else if (distance == closest && !hostile)", CLEAR)
+        self.assertIn("heroDistance > closest", CLEAR)
+        self.assertIn("safeAimedStand(hero, level, trapCell, stand, aimed)", CLEAR)
+        self.assertIn("aimedOnly && (stand != hero.pos || target != cell)", CLEAR)
+        self.assertIn("predictAimedTargets(hero, level, chosen.pos)", CLEAR)
+        self.assertIn("BlastAutoTrapClearer.Action.THROW", PLAY)
 
     def test_inventory_and_native_throw(self):
         self.assertIn("item instanceof Weapon || item instanceof Armor", CLEAR)
