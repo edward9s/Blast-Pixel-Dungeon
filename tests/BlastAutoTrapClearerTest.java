@@ -195,6 +195,11 @@ public final class BlastAutoTrapClearerTest {
         gasSafe[9 + 7 * gasWidth] = true;
         equal(6 + 7 * gasWidth, BlastAutoTrapClearer.toxicEscapeStep(gasTrap, gasStand,
                 gasWidth, gasSafe, 4), "retreat may begin sideways around an elbow");
+        // When only the adjacent throwing cell is visible, retreat straight back first.
+        int closeStand = 5 + 6 * gasWidth;
+        gasSafe[closeStand] = true;
+        equal(gasStand, BlastAutoTrapClearer.toxicEscapeStep(gasTrap, closeStand,
+                gasWidth, gasSafe, 4), "close toxic throw has an immediate escape step");
         // No diagonal escape through two impassable orthogonal neighbors.
         boolean[] blockedCorner = new boolean[gasWidth * gasWidth];
         blockedCorner[gasStand] = true;
