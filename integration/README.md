@@ -20,7 +20,12 @@ If the Horn cannot feed the hero, Mystery Meat is eligible alongside other food.
 The automatic selection never eats Pasties; it reserves one plain Ration and one
 recipe-compatible meat (Mystery, Stewed, Chargrilled, or Frozen) per Pasty in the
 inventory, then prefers the largest remaining eligible quantity. Finished Meat
-Pies remain eligible. Reserves protect ingredients only from automatic eating;
+Pies are saved for a new Starving episode at maximum hunger and without an
+existing WellFed buff, so the pie's satiety and hunger-pausing WellFed effect
+are both fully useful. An equipped, charged Horn still takes priority; if it
+reduces hunger below the Starving threshold, that meal will use regular foods
+rather than waste a pie. The normal no-overflow rule never selects a pie mid-meal,
+including under On Diet. Reserves protect ingredients only from automatic eating;
 manual use and alchemy are unchanged. `BlastAutoFood` scopes native eating
 with a `ThreadLocal`, and the native `MysteryMeat.satisfy` patch skips only
 the meat's random harmful effect inside that scope. Hunger recovery, eating
