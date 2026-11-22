@@ -889,7 +889,6 @@ public final class BlastAutoPlay {
             return trapAction == BlastAutoTrapClearer.Action.THROW;
         }
 
-
         // Only planting new grass depends on the separate farming setting.
         debugDecision = "farm";
         if (BlastSettings.autoFarming()) {
@@ -907,6 +906,8 @@ public final class BlastAutoPlay {
             }
         }
 
+        idleSafe = progress.safeFor(safe, hero.pos, BlastAutoProgressGuard.Intent.ROAM);
+        idleDistances = navigationDistances(hero.pos, safe, distances, idleSafe);
         debugDecision = "roam";
         int step = roamStep(hero, idleSafe, idleDistances);
         if (step >= 0) {
