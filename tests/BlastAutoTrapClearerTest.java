@@ -3,6 +3,8 @@ package com.spd.blast;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.armor.ClothArmor;
 import com.shatteredpixel.shatteredpixeldungeon.items.food.Food;
+import com.shatteredpixel.shatteredpixeldungeon.items.food.MeatPie;
+import com.shatteredpixel.shatteredpixeldungeon.items.food.Pasty;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.WornShortsword;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.BlazingTrap;
@@ -251,6 +253,17 @@ public final class BlastAutoTrapClearerTest {
                 item -> item == armor || item == sword), "largest food stack");
         same(null, BlastAutoTrapClearer.chooseThrowItem(Arrays.asList(inventory),
                 item -> true), "no permitted inventory");
+        Pasty pasty = new Pasty();
+        MeatPie pie = new MeatPie();
+        Food reservedRation = new Food();
+        reservedRation.quantity(1);
+        same(null, BlastAutoTrapClearer.chooseThrowItem(
+                Arrays.asList(pasty, pie, reservedRation), item -> false),
+                "preserve meat pie and matching ration for cooking");
+        reservedRation.quantity(3);
+        same(reservedRation, BlastAutoTrapClearer.chooseThrowItem(
+                Arrays.asList(pasty, pie, reservedRation), item -> false),
+                "spare ration may be sacrificed after pie reserve");
         System.out.println("BlastAutoTrapClearerTest passed");
     }
 }
