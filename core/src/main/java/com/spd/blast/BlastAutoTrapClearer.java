@@ -591,7 +591,8 @@ final class BlastAutoTrapClearer {
                         if (stand >= 0) target = closedDoor(level, cell, side);
                     }
                     if (stand < 0) reason = "no-safe-stand";
-                    else if (aimedOnly && stand != hero.pos) reason = "not-in-range";
+                    else if (aimedOnly && (stand != hero.pos || target != cell))
+                        reason = "not-in-range";
                     else if (hero.rooted && (stand != hero.pos || gas)) reason = "rooted";
                     else if (distances[stand] < shortest) {
                         chosen = trap;
