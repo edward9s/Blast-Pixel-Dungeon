@@ -12,8 +12,10 @@ import com.shatteredpixel.shatteredpixeldungeon.items.food.Food;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.Weapon;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.ChillingTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.CursingTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.FlashingTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.FrostTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.GrippingTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.OozeTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.ToxicTrap;
@@ -84,7 +86,10 @@ final class BlastAutoTrapClearer {
         if (type == CursingTrap.class || type == FlashingTrap.class || type == GrippingTrap.class
                 || type == WeakeningTrap.class) return 1;
         // Ooze is applied to the trap and eight adjoining cells, without a lingering blob.
-        if (type == OozeTrap.class) return 2;
+        if (type == OozeTrap.class || type == ChillingTrap.class) return 2;
+        // Frost seeds freezing blobs as far as two connected floor cells from the trap.
+        // A three-cell stand-off keeps the hero outside the initial frost area.
+        if (type == FrostTrap.class) return 3;
         if (type == ToxicTrap.class) return TOXIC_MIN_DISTANCE;
         return -1;
     }
