@@ -20,12 +20,15 @@ import com.shatteredpixel.shatteredpixeldungeon.levels.traps.ToxicTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.ConfusionTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.CorrosionTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.DisarmingTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.DisintegrationTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.FlockTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.GeyserTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.GrimTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.GrippingTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.ShockingTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.TeleportationTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.WarpingTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.WornDartTrap;
 
 import java.util.Arrays;
 
@@ -62,7 +65,14 @@ public final class BlastAutoTrapClearerTest {
         equal(2, BlastAutoTrapClearer.minimumThrowDistance(new BurningTrap()), "adjacent fire");
         equal(3, BlastAutoTrapClearer.minimumThrowDistance(new BlazingTrap()), "two-step fire");
         equal(-1, BlastAutoTrapClearer.minimumThrowDistance(new ExplosiveTrap()), "blast");
-        equal(-1, BlastAutoTrapClearer.minimumThrowDistance(new PoisonDartTrap()), "remote dart");
+        equal(2, BlastAutoTrapClearer.minimumThrowDistance(new WornDartTrap()),
+                "aimed dart permits predicted hostile");
+        equal(2, BlastAutoTrapClearer.minimumThrowDistance(new PoisonDartTrap()),
+                "aimed poison dart permits predicted hostile");
+        equal(2, BlastAutoTrapClearer.minimumThrowDistance(new DisintegrationTrap()),
+                "aimed disintegration permits predicted hostile");
+        equal(2, BlastAutoTrapClearer.minimumThrowDistance(new GrimTrap()),
+                "aimed grim permits predicted hostile");
         CursingTrap hidden = new CursingTrap();
         hidden.visible = false;
         equal(1, BlastAutoTrapClearer.canTrigger(hidden, Terrain.SECRET_TRAP) ? 1 : 0,
@@ -76,6 +86,14 @@ public final class BlastAutoTrapClearerTest {
                 "disarmed hidden trap");
         equal(0, BlastAutoTrapClearer.canTrigger(new ExplosiveTrap(), Terrain.SECRET_TRAP) ? 1 : 0,
                 "dangerous hidden trap remains excluded");
+        equal(1, BlastAutoTrapClearer.canTrigger(new WornDartTrap(), Terrain.TRAP) ? 1 : 0,
+                "dart is conditionally supported");
+        equal(1, BlastAutoTrapClearer.canTrigger(new PoisonDartTrap(), Terrain.TRAP) ? 1 : 0,
+                "poison dart is conditionally supported");
+        equal(1, BlastAutoTrapClearer.canTrigger(new DisintegrationTrap(), Terrain.TRAP) ? 1 : 0,
+                "disintegration is conditionally supported");
+        equal(1, BlastAutoTrapClearer.canTrigger(new GrimTrap(), Terrain.TRAP) ? 1 : 0,
+                "grim is conditionally supported");
         equal(0, BlastAutoTrapClearer.canTrigger(new FlashingTrap(), Terrain.TRAP) ? 1 : 0,
                 "flashing trap does not disarm");
         equal(0, BlastAutoTrapClearer.canTrigger(new GrippingTrap(), Terrain.TRAP) ? 1 : 0,
@@ -237,6 +255,41 @@ public final class BlastAutoTrapClearerTest {
         blockedCorner[7 + 9 * gasWidth] = true;
         equal(-1, BlastAutoTrapClearer.gasEscapeStep(gasTrap, gasStand,
                 gasWidth, blockedCorner, 4), "blocked diagonal corner is not an exit");
+
+        // Exclude tied protected characters, out-of-range shots, and closer heroes.
+        BlastAutoTrapClearer.AimedTargets aim = new BlastAutoTrapClearer.AimedTargets();
+        equal(0, aim.safeToFire(6.5f, Float.POSITIVE_INFINITY) ? 1 : 0,
+                "no valid target");
+        aim.consider(2f, true);
+        equal(1, aim.safeToFire(6.5f, 3f) ? 1 : 0,
+                "closest hostile selected");
+        equal(0, aim.safeToFire(6.5f, 2f) ? 1 : 0,
+                "hero at equal distance must not be shot");
+        equal(0, aim.safeToFire(6.5f, 1.5f) ? 1 : 0,
+                "hero closer than hostile must not be shot");
+        aim.consider(2f, true);
+        equal(1, aim.safeToFire(6.5f, 3f) ? 1 : 0,
+                "multiple equally close hostiles are safe");
+        aim.consider(2f, false);
+        equal(0, aim.safeToFire(6.5f, 3f) ? 1 : 0,
+                "tied protected character vetoes firing regardless of order");
+        aim.consider(1f, true);
+        equal(1, aim.safeToFire(6.5f, 3f) ? 1 : 0,
+                "strictly closer hostile overrides previously tied characters");
+        aim.consider(0.5f, false);
+        equal(0, aim.safeToFire(6.5f, 3f) ? 1 : 0,
+                "nearest protected character vetoes firing");
+
+        BlastAutoTrapClearer.AimedTargets distant = new BlastAutoTrapClearer.AimedTargets();
+        distant.consider(7f, true);
+        equal(0, distant.safeToFire(6.5f, 10f) ? 1 : 0,
+                "no ranged shot beyond native targeting distance");
+        distant.consider(6.5f, true);
+        equal(1, distant.safeToFire(6.5f, Float.POSITIVE_INFINITY) ? 1 : 0,
+                "invisible hero outside line of fire cannot be hit");
+        distant.consider(6.5f, false);
+        equal(0, distant.safeToFire(6.5f, Float.POSITIVE_INFINITY) ? 1 : 0,
+                "invisible or protected character at maximum range vetoes tie");
 
         ClothArmor armor = new ClothArmor();
         WornShortsword sword = new WornShortsword();
