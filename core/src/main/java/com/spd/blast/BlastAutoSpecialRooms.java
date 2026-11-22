@@ -171,6 +171,10 @@ final class BlastAutoSpecialRooms {
         Action fire = clearEternalFire(hero, safe, distances);
         if (fire != Action.NONE) return fire;
 
+        Action toxic = BlastAutoToxicRoom.chooseAction(hero, safe, distances,
+                hazards, specialBarriers);
+        if (toxic != Action.NONE) return toxic;
+
         TrapsRoom room = (TrapsRoom) ((RegularLevel) level).room(TrapsRoom.class);
         if (room == null || room.entrance() == null) return Action.NONE;
         Heap chest = knownChest(level, room, hero);

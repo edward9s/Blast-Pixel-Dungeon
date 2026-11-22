@@ -11,6 +11,7 @@ import com.shatteredpixel.shatteredpixeldungeon.items.potions.brews.AquaBrew;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
 import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.Room;
+import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.special.ToxicGasRoom;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.Trap;
 import com.shatteredpixel.shatteredpixeldungeon.mechanics.Ballistica;
 import com.shatteredpixel.shatteredpixeldungeon.tiles.CustomTilemap;
@@ -185,10 +186,12 @@ final class BlastAutoAqua {
         int width = level.width();
         for (Trap trap : level.traps.valueList()) {
             int cell = trap.pos;
-            if (!level.insideMap(cell) || !trap.active || safe[cell]
+            if (!level.insideMap(cell) || safe[cell]
                     || !(level.visited[cell] || level.mapped[cell] || hero.fieldOfView[cell])
                     || (room != null && !room.inside(level.cellToPoint(cell)))
-                    || !BlastAutoTrapClearer.canDouse(trap, level.map[cell])
+                    || (!BlastAutoTrapClearer.canDouse(trap, level.map[cell])
+                        && !(room instanceof ToxicGasRoom
+                             && BlastAutoToxicRoom.activeVent(level, trap)))
                     || level.plants.get(cell) != null || Actor.findChar(cell) != null
                     || !canFlood(level, cell)) continue;
             trapCells.add(cell);
