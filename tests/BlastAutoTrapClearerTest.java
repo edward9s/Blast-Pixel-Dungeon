@@ -15,6 +15,15 @@ import com.shatteredpixel.shatteredpixeldungeon.levels.traps.FrostTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.OozeTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.PoisonDartTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.ToxicTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.ConfusionTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.CorrosionTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.DisarmingTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.FlockTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.GeyserTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.GrippingTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.ShockingTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.TeleportationTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.WarpingTrap;
 
 import java.util.Arrays;
 
@@ -29,7 +38,10 @@ public final class BlastAutoTrapClearerTest {
     }
 
     public static void main(String[] args) {
-        equal(1, BlastAutoTrapClearer.minimumThrowDistance(new FlashingTrap()), "local trap");
+        equal(-1, BlastAutoTrapClearer.minimumThrowDistance(new FlashingTrap()),
+                "persistent flashing trap cannot be cleared");
+        equal(-1, BlastAutoTrapClearer.minimumThrowDistance(new GrippingTrap()),
+                "persistent gripping trap cannot be cleared");
         equal(1, BlastAutoTrapClearer.minimumThrowDistance(new CursingTrap()), "item curse");
         equal(2, BlastAutoTrapClearer.minimumThrowDistance(new OozeTrap()), "adjacent ooze");
         equal(2, BlastAutoTrapClearer.minimumThrowDistance(new ChillingTrap()),
@@ -37,6 +49,14 @@ public final class BlastAutoTrapClearerTest {
         equal(3, BlastAutoTrapClearer.minimumThrowDistance(new FrostTrap()),
                 "two-cell freezing aura");
         equal(2, BlastAutoTrapClearer.minimumThrowDistance(new ToxicTrap()), "escape-capable toxic gas");
+        equal(2, BlastAutoTrapClearer.minimumThrowDistance(new ConfusionTrap()), "confusion gas");
+        equal(3, BlastAutoTrapClearer.minimumThrowDistance(new CorrosionTrap()), "corrosive gas");
+        equal(1, BlastAutoTrapClearer.minimumThrowDistance(new DisarmingTrap()), "floor disarming");
+        equal(2, BlastAutoTrapClearer.minimumThrowDistance(new GeyserTrap()), "geyser knockback");
+        equal(3, BlastAutoTrapClearer.minimumThrowDistance(new ShockingTrap()), "adjacent electricity");
+        equal(3, BlastAutoTrapClearer.minimumThrowDistance(new FlockTrap()), "sheep chain");
+        equal(2, BlastAutoTrapClearer.minimumThrowDistance(new TeleportationTrap()), "teleport");
+        equal(2, BlastAutoTrapClearer.minimumThrowDistance(new WarpingTrap()), "warping teleport");
         equal(2, BlastAutoTrapClearer.minimumThrowDistance(new BurningTrap()), "adjacent fire");
         equal(3, BlastAutoTrapClearer.minimumThrowDistance(new BlazingTrap()), "two-step fire");
         equal(-1, BlastAutoTrapClearer.minimumThrowDistance(new ExplosiveTrap()), "blast");
@@ -54,6 +74,14 @@ public final class BlastAutoTrapClearerTest {
                 "disarmed hidden trap");
         equal(0, BlastAutoTrapClearer.canTrigger(new ExplosiveTrap(), Terrain.SECRET_TRAP) ? 1 : 0,
                 "dangerous hidden trap remains excluded");
+        equal(0, BlastAutoTrapClearer.canTrigger(new FlashingTrap(), Terrain.TRAP) ? 1 : 0,
+                "flashing trap does not disarm");
+        equal(0, BlastAutoTrapClearer.canTrigger(new GrippingTrap(), Terrain.TRAP) ? 1 : 0,
+                "gripping trap does not disarm");
+        equal(1, BlastAutoTrapClearer.canTrigger(new CorrosionTrap(), Terrain.TRAP) ? 1 : 0,
+                "corrosion trap remotely cleared");
+        equal(1, BlastAutoTrapClearer.canTrigger(new TeleportationTrap(), Terrain.SECRET_TRAP) ? 1 : 0,
+                "hidden teleportation trap remotely cleared");
         BurningTrap hiddenFire = new BurningTrap();
         hiddenFire.visible = false;
         equal(1, BlastAutoTrapClearer.canTrigger(hiddenFire, Terrain.SECRET_TRAP) ? 1 : 0,
@@ -190,22 +218,22 @@ public final class BlastAutoTrapClearerTest {
         gasSafe[6 + 7 * gasWidth] = true;
         gasSafe[7 + 7 * gasWidth] = true;
         gasSafe[8 + 7 * gasWidth] = true;
-        equal(-1, BlastAutoTrapClearer.toxicEscapeStep(gasTrap, gasStand,
+        equal(-1, BlastAutoTrapClearer.gasEscapeStep(gasTrap, gasStand,
                 gasWidth, gasSafe, 4), "short dead-end cannot outrun gas");
         gasSafe[9 + 7 * gasWidth] = true;
-        equal(6 + 7 * gasWidth, BlastAutoTrapClearer.toxicEscapeStep(gasTrap, gasStand,
+        equal(6 + 7 * gasWidth, BlastAutoTrapClearer.gasEscapeStep(gasTrap, gasStand,
                 gasWidth, gasSafe, 4), "retreat may begin sideways around an elbow");
         // When only the adjacent throwing cell is visible, retreat straight back first.
         int closeStand = 5 + 6 * gasWidth;
         gasSafe[closeStand] = true;
-        equal(gasStand, BlastAutoTrapClearer.toxicEscapeStep(gasTrap, closeStand,
+        equal(gasStand, BlastAutoTrapClearer.gasEscapeStep(gasTrap, closeStand,
                 gasWidth, gasSafe, 4), "close toxic throw has an immediate escape step");
         // No diagonal escape through two impassable orthogonal neighbors.
         boolean[] blockedCorner = new boolean[gasWidth * gasWidth];
         blockedCorner[gasStand] = true;
         blockedCorner[6 + 8 * gasWidth] = true;
         blockedCorner[7 + 9 * gasWidth] = true;
-        equal(-1, BlastAutoTrapClearer.toxicEscapeStep(gasTrap, gasStand,
+        equal(-1, BlastAutoTrapClearer.gasEscapeStep(gasTrap, gasStand,
                 gasWidth, blockedCorner, 4), "blocked diagonal corner is not an exit");
 
         ClothArmor armor = new ClothArmor();
