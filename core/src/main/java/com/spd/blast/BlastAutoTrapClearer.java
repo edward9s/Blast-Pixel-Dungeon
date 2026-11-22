@@ -1,6 +1,7 @@
 package com.spd.blast;
 
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroAction;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
@@ -10,7 +11,6 @@ import com.shatteredpixel.shatteredpixeldungeon.items.weapon.Weapon;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.CursingTrap;
-import com.shatteredpixel.shatteredpixeldungeon.levels.traps.DisarmingTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.FlashingTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.GrippingTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.OozeTrap;
@@ -31,8 +31,7 @@ final class BlastAutoTrapClearer {
     /** Unknown, remote-targeting, persistent and chain-reaction traps are never auto-triggered. */
     static int minimumThrowDistance(Trap trap) {
         Class<?> type = trap.getClass();
-        if (type == CursingTrap.class || type == DisarmingTrap.class
-                || type == FlashingTrap.class || type == GrippingTrap.class
+        if (type == CursingTrap.class || type == FlashingTrap.class || type == GrippingTrap.class
                 || type == WeakeningTrap.class) return 1;
         // Ooze is applied to the trap and eight adjoining cells, without a lingering blob.
         if (type == OozeTrap.class) return 2;
@@ -119,7 +118,8 @@ final class BlastAutoTrapClearer {
             int minimum = minimumThrowDistance(trap);
             if (minimum < 0 || !trap.active || !trap.visible || !trap.disarmedByActivation
                     || !level.insideMap(cell) || level.map[cell] != Terrain.TRAP
-                    || !hero.fieldOfView[cell] || safe[cell]) continue;
+                    || !hero.fieldOfView[cell] || safe[cell]
+                    || Actor.findChar(cell) != null) continue;
             int side = reachableSide(cell, level.width(), level.solid, safe,
                     hero.fieldOfView, distances);
             if (side == 0) continue;
