@@ -145,6 +145,12 @@ final class BlastAutoSpecialRooms {
                 && BlastAutoPickup.chooseAction(hero, safe, distances,
                         BlastAutoPickupPolicy::isInstantPickup)) return Action.MOVE;
 
+        if (hero.pos == exit) {
+            // The chest route may have become blocked before the first step.
+            activeFlightRoom = null;
+            flightTreasure = -1;
+            return Action.NONE;
+        }
         if (!hero.rooted) {
             hero.curAction = new HeroAction.Move(BlastAutoPlay.firstStep(exit, safe, distances));
             return Action.MOVE;
