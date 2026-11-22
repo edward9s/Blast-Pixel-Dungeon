@@ -48,10 +48,10 @@ public final class BlastBombManiac extends Buff {
 
     /** Every living hero past the tutorial receives this buff, independently of test settings. */
     public static void ensureHero() {
-        if (!SPDSettings.intro() && Dungeon.hero != null && Dungeon.hero.isAlive()
-                && Dungeon.hero.buff(BlastBombManiac.class) == null) {
-            Buff.affect(Dungeon.hero, BlastBombManiac.class);
-        }
+        if (SPDSettings.intro() || Dungeon.hero == null || !Dungeon.hero.isAlive()) return;
+        BlastBombManiac buff = Dungeon.hero.buff(BlastBombManiac.class);
+        if (buff == null) buff = Buff.affect(Dungeon.hero, BlastBombManiac.class);
+        buff.setInfiniteBombTypes(BlastSettings.testInfiniteBomb());
     }
 
     public static BlastBombManiac current() {
@@ -66,17 +66,17 @@ public final class BlastBombManiac extends Buff {
         return BlastSettings.testInfiniteBomb();
     }
 
-    /** Temporarily add all bomb kinds without losing normally imbued kinds. */
-    public void setSecretBombTypes(boolean enabled) {
-        if (target != Dungeon.hero || !BlastSecret.canToggleTests()) {
-            throw new IllegalStateException("Secret bomb type change requires the easter egg conditions");
+    /** Infinite bombs unlocks all kinds while preserving normally imbued kinds. */
+    public void setInfiniteBombTypes(boolean enabled) {
+        if (target != Dungeon.hero) {
+            throw new IllegalStateException("Bomb type change requires the current hero");
         }
-        if (enabled) {
-            if (savedTypes == null) savedTypes = new ArrayList<>(types);
+        if (enabled && savedTypes == null) {
+            savedTypes = new ArrayList<>(types);
             for (Class<? extends Bomb> kind : Bomb.EnhanceBomb.validIngredients.values()) {
                 if (!types.contains(kind)) types.add(kind);
             }
-        } else if (savedTypes != null) {
+        } else if (!enabled && savedTypes != null) {
             Class<? extends Bomb> previousType = types.get(selected);
             types.clear();
             types.addAll(savedTypes);
