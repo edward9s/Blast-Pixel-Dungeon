@@ -196,6 +196,7 @@ public final class BlastAutoPlay {
         pendingBombInputs.clear();
         clearFreeBombInputs();
         BlastAutoPickup.reset();
+        BlastAutoTrapClearer.reset();
         BlastAutoSacrifice.reset();
         BlastAutoFood.stopFeeding();
 
@@ -954,6 +955,7 @@ public final class BlastAutoPlay {
         pendingBombInputs.clear();
         clearFreeBombInputs();
         BlastAutoPickup.reset();
+        BlastAutoTrapClearer.reset();
         BlastAutoSacrifice.reset();
         BlastAutoFood.stopFeeding();
     }
