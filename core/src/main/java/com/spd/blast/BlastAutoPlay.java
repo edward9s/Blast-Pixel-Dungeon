@@ -652,6 +652,12 @@ public final class BlastAutoPlay {
         debugDecision = "bomb";
         if (BlastAutoBombAI.actAgainstOtherEnemies(hero)) return true;
 
+        // A safe, immediately throwable ranged trap can hit a hostile target
+        // before ordinary combat consumes the opportunity. Never detour for it.
+        debugDecision = "aimed-trap";
+        if (BlastAutoTrapClearer.chooseAimedAction(hero, safe, distances)
+                == BlastAutoTrapClearer.Action.THROW) return true;
+
         debugDecision = "combat";
         BlastAutoCombat.Action combat = BlastAutoCombat.chooseAction(hero, safe, distances);
         if (combat != BlastAutoCombat.Action.NONE) {
