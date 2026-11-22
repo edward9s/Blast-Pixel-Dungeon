@@ -822,6 +822,21 @@ public final class BlastAutoPlay {
             return false;
         }
 
+        // Previously seen hidden doors remain investigation targets even after
+        // a short corridor stops qualifying as an unexplored roaming frontier.
+        idleSafe = progress.safeFor(safe, hero.pos, BlastAutoProgressGuard.Intent.ROAM);
+        idleDistances = navigationDistances(hero.pos, safe, distances, idleSafe);
+        int secretStand = BlastAutoSecretDoors.nearestStand(hero.pos, Dungeon.level.width(),
+                Dungeon.level.map, Dungeon.level.visited, Dungeon.level.mapped,
+                hero.fieldOfView, idleSafe, idleDistances);
+        if (secretStand >= 0) {
+            debugDecision = "secret-approach";
+            progress.intent(BlastAutoProgressGuard.Intent.ROAM);
+            roaming.clearDestination();
+            hero.curAction = new HeroAction.Move(firstStep(secretStand, idleSafe, idleDistances));
+            return false;
+        }
+
         // Sacrifice patrol is only an idle task. Picking up known loot and
         // opening reachable containers must not be starved by its roaming.
         if (sacrifice == BlastAutoSacrifice.Action.PATROL) {
