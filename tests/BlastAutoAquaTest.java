@@ -22,10 +22,10 @@ public final class BlastAutoAquaTest {
         }
 
         // The optimal landing is ordinary floor between three traps.
-        boolean[] traps = new boolean[81];
-        traps[3 + 3 * 9] = true;
-        traps[5 + 3 * 9] = true;
-        traps[3 + 5 * 9] = true;
+        java.util.ArrayList<Integer> traps = new java.util.ArrayList<>();
+        traps.add(3 + 3 * 9);
+        traps.add(5 + 3 * 9);
+        traps.add(3 + 5 * 9);
         PathFinder.buildDistanceMap(4 + 4 * 9, passable, 2);
         equal(BlastAutoAqua.countTargets(PathFinder.distance, traps, true), 3,
                 "ordinary-floor landing certainly removes all three traps");
