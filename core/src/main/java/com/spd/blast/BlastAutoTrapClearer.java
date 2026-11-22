@@ -27,7 +27,6 @@ import java.util.function.Predicate;
 final class BlastAutoTrapClearer {
     private static final int MAX_THROW_DISTANCE = 8;
     private static final int TOXIC_MIN_DISTANCE = 4;
-    private static final int TOXIC_RETREAT_STEPS = 2;
     private static final int LOG_REPEAT_INTERVAL = 10;
     private static String lastRejection;
     private static int repeatedRejections;
@@ -140,12 +139,14 @@ final class BlastAutoTrapClearer {
         return spareGear != null ? spareGear : largestFood;
     }
 
-    private static boolean hasToxicRetreat(Level level, int stand, int side, boolean[] safe) {
-        for (int step = 1; step <= TOXIC_RETREAT_STEPS; step++) {
+    private static boolean hasToxicRetreat(Level level, int trapCell, int stand,
+                                           int side, boolean[] safe) {
+        for (int step = 1; step <= MAX_THROW_DISTANCE; step++) {
             int cell = stand + side * step;
             if (!level.insideMap(cell) || !safe[cell]) return false;
+            if (level.distance(cell, trapCell) >= MAX_THROW_DISTANCE) return true;
         }
-        return true;
+        return false;
     }
 
     private static int throwingStand(Level level, int trapCell, int side, int minimum,
@@ -157,7 +158,7 @@ final class BlastAutoTrapClearer {
             if (!level.insideMap(stand) || !level.passable[stand] || !safe[stand]) break;
             if (steps < minimum || distances[stand] == Integer.MAX_VALUE
                     || distances[stand] >= shortest
-                    || (toxic && !hasToxicRetreat(level, stand, side, safe))) continue;
+                    || (toxic && !hasToxicRetreat(level, trapCell, stand, side, safe))) continue;
             // Terrain and characters may stop an item before it presses the trap.
             if (new Ballistica(stand, trapCell, Ballistica.PROJECTILE).collisionPos != trapCell) {
                 continue;
@@ -187,9 +188,9 @@ final class BlastAutoTrapClearer {
         for (int steps = minimum; steps <= MAX_THROW_DISTANCE; steps++) {
             int stand = trapCell + side * steps;
             if (!level.insideMap(stand) || !level.passable[stand] || !safe[stand]) break;
-            if (stand <= 0 || stand == door || level.map[stand] == Terrain.DOOR
+            if (stand == door || level.map[stand] == Terrain.DOOR
                     || distances[stand] == Integer.MAX_VALUE || distances[stand] >= shortest
-                    || (toxic && !hasToxicRetreat(level, stand, side, safe))) continue;
+                    || (toxic && !hasToxicRetreat(level, trapCell, stand, side, safe))) continue;
             if (new Ballistica(stand, door, Ballistica.PROJECTILE).collisionPos != door) {
                 continue;
             }
