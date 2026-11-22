@@ -2,6 +2,7 @@ package com.spd.blast;
 
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
+import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.Blob;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.ToxicGas;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroAction;
@@ -227,7 +228,7 @@ final class BlastAutoTrapClearer {
         return -1;
     }
 
-    private static boolean toxicGasNear(Level level, ToxicGas gas, int cell) {
+    private static boolean toxicGasNear(Level level, Blob gas, int cell) {
         if (gas.cur == null || gas.cur.length != level.length()) {
             throw new IllegalStateException("Invalid toxic gas state");
         }
@@ -242,7 +243,7 @@ final class BlastAutoTrapClearer {
     static int toxicRetreatStep(Hero hero, boolean[] safe) {
         if (toxicOrigin < 0) return -1;
         Level level = Dungeon.level;
-        ToxicGas gas = level.blobs.get(ToxicGas.class);
+        Blob gas = level.blobs.get(ToxicGas.class);
         if (gas == null || gas.volume <= 0) {
             toxicOrigin = -1;
             return -1;
@@ -267,7 +268,7 @@ final class BlastAutoTrapClearer {
     /** After retreat, keep roaming away from the active toxic trap's plume. */
     static void avoidToxicReturn(Hero hero, boolean[] safe) {
         if (toxicOrigin < 0) return;
-        ToxicGas gas = Dungeon.level.blobs.get(ToxicGas.class);
+        Blob gas = Dungeon.level.blobs.get(ToxicGas.class);
         if (gas == null || gas.volume <= 0) {
             toxicOrigin = -1;
             return;
