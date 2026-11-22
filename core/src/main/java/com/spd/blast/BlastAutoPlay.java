@@ -571,6 +571,14 @@ public final class BlastAutoPlay {
         progress.refreshHazards(Dungeon.level.length(),
                 cell -> BlastAutoEnvironment.hazardousAt(cell, hazards)
                         || specialBarriers[cell]);
+        int toxicRetreat = BlastAutoTrapClearer.toxicRetreatStep(hero, safe);
+        if (toxicRetreat >= 0) {
+            debugDecision = "trap-retreat";
+            progress.intent(BlastAutoProgressGuard.Intent.RETREAT);
+            hero.curAction = new HeroAction.Move(toxicRetreat);
+            return false;
+        }
+        BlastAutoTrapClearer.avoidToxicReturn(hero, safe);
         // Compute reachability once, rather than doing up to nine searches per mob.
         PathFinder.buildDistanceMap(hero.pos, safe);
         int[] distances = PathFinder.distance.clone();
