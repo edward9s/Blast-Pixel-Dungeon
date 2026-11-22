@@ -80,6 +80,16 @@ class ManualPriorityTests(unittest.TestCase):
         self.assertIn("return (blastManualFinished || actResult)", code)
         self.assertNotIn("finishManualAction(this)) next()", code)
 
+    def test_non_playable_cells_are_ignored_before_queueing(self):
+        source = AUTO.read_text(encoding="utf-8")
+        request = method(source, "public static void requestManualCell(int cell) {")
+        guard = "if (!level.insideMap(cell)) return;"
+        self.assertIn(guard, request)
+        self.assertLess(request.index(guard),
+                        request.index("pendingManualInput.set(new ManualCell"))
+        self.assertLess(request.index(guard), request.index("if (hero.ready) hero.next();"))
+        self.assertNotIn("throw new IllegalArgumentException", request)
+
     def test_latest_click_consumed_atomically(self):
         source = AUTO.read_text(encoding="utf-8")
         request = method(source, "public static void requestManualCell(int cell) {")

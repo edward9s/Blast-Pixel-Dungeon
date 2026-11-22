@@ -338,9 +338,9 @@ public final class BlastAutoPlay {
         if (!BlastSettings.testAutoPlay() || hero == null || level == null) {
             throw new IllegalStateException("Cannot request manual movement without auto-play");
         }
-        if (!level.insideMap(cell)) {
-            throw new IllegalArgumentException("Invalid manual destination: " + cell);
-        }
+        // Map taps and directional controls may select the unplayable border.
+        // Ignore those inputs before they reach the actor thread.
+        if (!level.insideMap(cell)) return;
         pendingManualInput.set(new ManualCell(hero, level, cell));
         if (hero.ready) hero.next();
     }
