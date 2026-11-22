@@ -34,10 +34,15 @@ The trap must disarm on activation,
 be unoccupied, and have a verified unobstructed projectile path. Only
 unequipped weapons/armor or one item from the largest food stack may be
 thrown. Unrecognized trap effects, remote-targeting traps, explosive traps,
-spreading fire/gas and teleporting effects are excluded. Trap types with
-strictly local effects are handled at a safe stand-off distance (two tiles
-for the adjoining-cell ooze trap). Automatic movement still avoids the
-active trap and any hazardous terrain after activation. When Debug Log is
+chain-reacting traps, spreading fire and teleporting effects are excluded.
+Toxic gas traps are permitted only when a straight, safe retreat route exists:
+the hero throws from at least four cells away and immediately retreats toward
+eight cells of separation, then avoids returning while the gas persists.
+An obstructing closed door is first opened with a normal item throw, which
+leaves the item on the door to hold it open. Automatic pickup temporarily skips
+this door item until the trap has been disarmed. Local-effect traps retain their
+minimum standoff distance (two tiles for the adjacent ooze trap). Automatic
+movement continues to avoid active hazards. When Debug Log is
 enabled, nearby rejected traps produce `[Blast] auto-trap` entries with their
 class, cell, hidden flag and rejection status (such as `unsupported`,
 `not-chokepoint`, `no-safe-stand`, `no-throwable-item` or
