@@ -260,7 +260,7 @@ final class BlastAutoSpecialRooms {
         return true;
     }
 
-    /** Frost and water both quench EternalFire; only target a visible flame. */
+    /** Use a nearby landable tile; a projectile stops short of impassable flame. */
     private static Action clearEternalFire(Hero hero, boolean[] safe, int[] distances) {
         Level level = Dungeon.level;
         Blob fire = level.blobs.get(MagicalFireRoom.EternalFire.class);
@@ -275,19 +275,34 @@ final class BlastAutoSpecialRooms {
         if (item == null || item.quantity() == 0) return Action.NONE;
         boolean aqua = item instanceof AquaBrew;
         int minimumDistance = aqua ? 3 : 2;
-        int bestTarget = -1, bestStand = -1, bestSteps = Integer.MAX_VALUE;
-        for (int cell = 0; cell < fire.cur.length; cell++) {
-            if (fire.cur[cell] <= 0 || !hero.fieldOfView[cell]
-                    || (aqua && !safeGeyser(cell, level))) continue;
-            for (int stand = 0; stand < level.length(); stand++) {
-                int steps = distances[stand];
-                if (!safe[stand] || steps == Integer.MAX_VALUE || steps >= bestSteps
-                        || level.distance(stand, cell) < minimumDistance
-                        || level.distance(stand, cell) > THROW_RANGE
-                        || new Ballistica(stand, cell, Ballistica.PROJECTILE).collisionPos != cell) continue;
-                bestTarget = cell;
-                bestStand = stand;
-                bestSteps = steps;
+        int bestFlame = -1, bestTarget = -1, bestStand = -1;
+        int bestSteps = Integer.MAX_VALUE;
+
+        for (int flame = 0; flame < fire.cur.length; flame++) {
+            if (fire.cur[flame] <= 0 || !hero.fieldOfView[flame]) continue;
+            // The water geyser floods at least one tile in all four directions;
+            // frost shatters into the same cardinal-neighbor footprint.
+            for (int offset : PathFinder.NEIGHBOURS4) {
+                int target = flame + offset;
+                if (!level.insideMap(target) || level.pit[target]
+                        || level.solid[target]
+                        || (!level.passable[target] && !level.avoid[target])
+                        || fire.cur[target] > 0
+                        || Actor.findChar(target) != null
+                        || level.heaps.get(target) != null
+                        || (aqua && !safeGeyser(target, level))) continue;
+                for (int stand = 0; stand < level.length(); stand++) {
+                    int steps = distances[stand];
+                    if (!safe[stand] || steps == Integer.MAX_VALUE || steps >= bestSteps
+                            || level.distance(stand, target) < minimumDistance
+                            || level.distance(stand, target) > THROW_RANGE
+                            || level.distance(stand, flame) < 2
+                            || new Ballistica(stand, target, Ballistica.PROJECTILE).collisionPos != target) continue;
+                    bestFlame = flame;
+                    bestTarget = target;
+                    bestStand = stand;
+                    bestSteps = steps;
+                }
             }
         }
         if (bestStand < 0) return Action.NONE;
@@ -300,7 +315,7 @@ final class BlastAutoSpecialRooms {
         attemptedFire = true;
         lastFireVolume = fire.volume;
         BlastLog.debug("auto-room action=" + (aqua ? "aqua-fire" : "frost-fire")
-                + " target=" + bestTarget);
+                + " flame=" + bestFlame + " landing=" + bestTarget);
         item.setCurrent(hero);
         item.cast(hero, bestTarget);
         return Action.USE;
