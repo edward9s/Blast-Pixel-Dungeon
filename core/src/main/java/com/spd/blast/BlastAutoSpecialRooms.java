@@ -203,51 +203,18 @@ final class BlastAutoSpecialRooms {
                 return Action.USE;
             }
         }
-        return floodTraps(hero, room, safe, distances);
+        return floodTraps(hero, room, chest.pos, safe, distances, hazards, specialBarriers);
     }
 
-    /** Prefer one Aqua Brew for multiple traps before throwing ordinary gear. */
-    private static Action floodTraps(Hero hero, TrapsRoom room,
-                                     boolean[] safe, int[] distances) {
-        AquaBrew aqua = hero.belongings.getItem(AquaBrew.class);
-        if (aqua == null || aqua.quantity() == 0) return Action.NONE;
-        Level level = Dungeon.level;
-        int bestCell = -1, bestStand = -1, bestCount = 1, bestSteps = Integer.MAX_VALUE;
-        for (Trap trap : level.traps.valueList()) {
-            int center = trap.pos;
-            if (!trap.active || level.map[center] != Terrain.TRAP
-                    || !room.inside(level.cellToPoint(center))
-                    || !(level.visited[center] || level.mapped[center] || hero.fieldOfView[center])
-                    || !safeGeyser(center, level)) continue;
-            int count = 0;
-            for (Trap other : level.traps.valueList()) {
-                if (other.active && level.distance(center, other.pos) <= 1) count++;
-            }
-            if (count < bestCount) continue;
-            for (int stand = 0; stand < level.length(); stand++) {
-                int steps = distances[stand];
-                if (!safe[stand] || steps == Integer.MAX_VALUE
-                        || (count == bestCount && steps >= bestSteps)
-                        || level.distance(stand, center) < 3
-                        || level.distance(stand, center) > THROW_RANGE
-                        || new Ballistica(stand, center, Ballistica.PROJECTILE).collisionPos != center) continue;
-                bestCount = count;
-                bestSteps = steps;
-                bestStand = stand;
-                bestCell = center;
-            }
-        }
-        if (bestCell < 0) return Action.NONE;
-        if (hero.pos != bestStand) {
-            if (hero.rooted) return Action.NONE;
-            hero.curAction = new HeroAction.Move(BlastAutoPlay.firstStep(bestStand, safe, distances));
-            return Action.MOVE;
-        }
-        if (aqua.throwPos(hero, bestCell) != bestCell) return Action.NONE;
-        BlastLog.debug("auto-room action=aqua-traps target=" + bestCell + " count=" + bestCount);
-        aqua.setCurrent(hero);
-        aqua.cast(hero, bestCell);
-        return Action.USE;
+    /** Route the trapped treasure-room puzzle through the shared Aqua planner. */
+    private static Action floodTraps(Hero hero, TrapsRoom room, int treasure,
+                                     boolean[] safe, int[] distances,
+                                     Blob[] hazards, boolean[] specialBarriers) {
+        BlastAutoAqua.Action action = BlastAutoAqua.chooseAction(
+                hero, safe, distances, room, treasure, hazards, specialBarriers);
+        if (action == BlastAutoAqua.Action.MOVE) return Action.MOVE;
+        if (action == BlastAutoAqua.Action.THROW) return Action.USE;
+        return Action.NONE;
     }
 
     /** Account for the geyser's two-cell shove and hostile NPC restrictions. */
