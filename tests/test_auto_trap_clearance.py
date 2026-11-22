@@ -149,6 +149,25 @@ class AutoTrapClearanceTest(unittest.TestCase):
         self.assertIn("predictAimedTargets(hero, level, chosen.pos)", CLEAR)
         self.assertIn("BlastAutoTrapClearer.Action.THROW", PLAY)
 
+    def test_aqua_brew_is_a_nonactivating_fallback(self):
+        self.assertIn("import com.shatteredpixel.shatteredpixeldungeon.items.potions.brews.AquaBrew;", CLEAR)
+        self.assertIn("static boolean canDouse(Trap trap, int terrain)", CLEAR)
+        self.assertIn("return trap.active && (terrain == Terrain.TRAP || terrain == Terrain.SECRET_TRAP)", CLEAR)
+        self.assertIn("AquaBrew aqua = hero.belongings.getItem(AquaBrew.class)", CLEAR)
+        self.assertIn("aqua.quantity() <= 0", CLEAR)
+        self.assertIn("!canFlood(level, cell)", CLEAR)
+        self.assertIn("tile.allowWater(tileX, tileY)", CLEAR)
+        self.assertIn("!douseSafeForCharacters(level, cell, hero)", CLEAR)
+        self.assertIn("character.alignment != Char.Alignment.ENEMY", CLEAR)
+        self.assertIn("BlastAutoPlay.isAutoAttackExcluded((Mob) character)", CLEAR)
+        self.assertIn("nearbyStand(level, cell, cell, 2, false, null, safe, distances,", CLEAR)
+        self.assertIn("if (aqua.throwPos(hero, chosen.pos) != chosen.pos)", CLEAR)
+        self.assertIn("aqua.cast(hero, chosen.pos)", CLEAR)
+        self.assertIn("Action aqua = douseWithAqua(hero, safe, distances)", CLEAR)
+        self.assertIn("if (!aimedOnly)", CLEAR)
+        self.assertNotIn("aqua.shatter(", CLEAR)
+        self.assertNotIn("level.pressCell(", CLEAR)
+
     def test_inventory_and_native_throw(self):
         self.assertIn("item instanceof Weapon || item instanceof Armor", CLEAR)
         self.assertIn("item instanceof Food", CLEAR)
