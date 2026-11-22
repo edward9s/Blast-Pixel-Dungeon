@@ -11,6 +11,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroAction;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.armor.Armor;
 import com.shatteredpixel.shatteredpixeldungeon.items.food.Food;
+import com.shatteredpixel.shatteredpixeldungeon.items.food.MeatPie;
 import com.shatteredpixel.shatteredpixeldungeon.items.potions.PotionOfFrost;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.Weapon;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
@@ -35,6 +36,7 @@ import com.shatteredpixel.shatteredpixeldungeon.levels.traps.WeakeningTrap;
 import com.shatteredpixel.shatteredpixeldungeon.mechanics.Ballistica;
 import com.watabou.utils.PathFinder;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.function.Predicate;
 
@@ -202,23 +204,22 @@ final class BlastAutoTrapClearer {
         return approach - trap;
     }
 
-    /** Only spare weapons/armor and the largest food stack may be sacrificed. */
+    /** Spare gear first; throw only food left after reserving Meat Pie ingredients. */
     static Item chooseThrowItem(Iterable<Item> inventory, Predicate<Item> equipped) {
         if (inventory == null || equipped == null) {
             throw new IllegalArgumentException("Inventory and equipment policy are required");
         }
         Item spareGear = null;
-        Food largestFood = null;
+        ArrayList<Food> foods = new ArrayList<>();
         for (Item item : inventory) {
             if (item.quantity() <= 0 || equipped.test(item)) continue;
             if (item instanceof Weapon || item instanceof Armor) {
                 if (spareGear == null) spareGear = item;
-            } else if (item instanceof Food
-                    && (largestFood == null || item.quantity() > largestFood.quantity())) {
-                largestFood = (Food) item;
+            } else if (item instanceof Food && !(item instanceof MeatPie)) {
+                foods.add((Food) item);
             }
         }
-        return spareGear != null ? spareGear : largestFood;
+        return spareGear != null ? spareGear : BlastAutoFood.mostAbundant(foods);
     }
 
     /** Find a route around corners without stepping closer to the gas. */
