@@ -45,6 +45,7 @@ final class BlastAutoTrapClearer {
     private static final int MAX_THROW_DISTANCE = 8;
     private static final int GAS_MIN_DISTANCE = 2;
     private static final int GAS_ESCAPE_DISTANCE = 4;
+    private static final int MAX_ESCAPE_STEPS = 8;
     private static final int LOG_REPEAT_INTERVAL = 10;
     private static String lastRejection;
     private static int repeatedRejections;
@@ -234,20 +235,20 @@ final class BlastAutoTrapClearer {
         int originDistance = gridDistance(origin, trapCell, width);
         int[] firstSteps = new int[safe.length];
         Arrays.fill(firstSteps, -1);
+        int[] routeSteps = new int[safe.length];
         int[] queue = new int[safe.length];
         int head = 0;
         int tail = 1;
         queue[0] = origin;
         firstSteps[origin] = origin;
-        int farthest = originDistance;
-        int bestStep = -1;
         while (head < tail) {
             int cell = queue[head++];
             int distance = gridDistance(cell, trapCell, width);
-            if (distance >= minimumDistance && distance > farthest) {
-                farthest = distance;
-                bestStep = firstSteps[cell];
+            // Breadth-first search gives the shortest escape; no full-floor scan.
+            if (distance >= minimumDistance && distance > originDistance) {
+                return firstSteps[cell];
             }
+            if (routeSteps[cell] >= MAX_ESCAPE_STEPS) continue;
             int x = cell % width;
             int y = cell / width;
             for (int dy = -1; dy <= 1; dy++) {
@@ -262,11 +263,12 @@ final class BlastAutoTrapClearer {
                             || (dx != 0 && dy != 0 && !safe[cell + dx]
                                     && !safe[cell + dy * width])) continue;
                     firstSteps[next] = cell == origin ? next : firstSteps[cell];
+                    routeSteps[next] = routeSteps[cell] + 1;
                     queue[tail++] = next;
                 }
             }
         }
-        return bestStep;
+        return -1;
     }
 
     private static int gridDistance(int a, int b, int width) {
