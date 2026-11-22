@@ -119,7 +119,7 @@ final class BlastAutoTrapClearer {
             if (minimum < 0 || !trap.active || !trap.visible || !trap.disarmedByActivation
                     || !level.insideMap(cell) || level.map[cell] != Terrain.TRAP
                     || !hero.fieldOfView[cell] || safe[cell]
-                    || Actor.findChar(cell) != null) continue;
+                    || Actor.findChar(cell) != null || level.plants.get(cell) != null) continue;
             int side = reachableSide(cell, level.width(), level.solid, safe,
                     hero.fieldOfView, distances);
             if (side == 0) continue;
