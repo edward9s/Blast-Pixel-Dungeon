@@ -27,6 +27,7 @@ import com.shatteredpixel.shatteredpixeldungeon.levels.traps.GrimTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.GrippingTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.ShockingTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.TeleportationTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.TenguDartTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.WarpingTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.WornDartTrap;
 
@@ -69,6 +70,8 @@ public final class BlastAutoTrapClearerTest {
                 "aimed dart permits predicted hostile");
         equal(2, BlastAutoTrapClearer.minimumThrowDistance(new PoisonDartTrap()),
                 "aimed poison dart permits predicted hostile");
+        equal(-1, BlastAutoTrapClearer.minimumThrowDistance(new TenguDartTrap()),
+                "boss-specialized dart uses a different target eligibility rule");
         equal(2, BlastAutoTrapClearer.minimumThrowDistance(new DisintegrationTrap()),
                 "aimed disintegration permits predicted hostile");
         equal(2, BlastAutoTrapClearer.minimumThrowDistance(new GrimTrap()),
