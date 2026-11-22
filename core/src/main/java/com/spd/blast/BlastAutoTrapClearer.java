@@ -46,10 +46,11 @@ final class BlastAutoTrapClearer {
     }
 
     /** Return the accessible corridor-side offset only when the trap separates its two ends. */
-    static int reachableSide(int cell, int width, boolean[] solid, boolean[] safe,
-                             boolean[] visited, boolean[] mapped, boolean[] visible,
-                             int[] distances) {
-        if (width < 3 || solid.length != safe.length || safe.length != visited.length
+    static int reachableSide(int cell, int width, boolean[] solid, boolean[] passable,
+                             boolean[] pit, boolean[] safe, boolean[] visited,
+                             boolean[] mapped, boolean[] visible, int[] distances) {
+        if (width < 3 || solid.length != passable.length || passable.length != pit.length
+                || pit.length != safe.length || safe.length != visited.length
                 || visited.length != mapped.length || mapped.length != visible.length
                 || visible.length != distances.length || solid.length % width != 0
                 || cell <= width || cell >= solid.length - width
@@ -57,26 +58,34 @@ final class BlastAutoTrapClearer {
             throw new IllegalArgumentException("Invalid trap corridor map");
         }
         if (solid[cell - width] && solid[cell + width]) {
-            return separatedSide(cell - 1, cell + 1, cell, safe,
-                    visited, mapped, visible, distances);
+            return separatedSide(cell - 1, cell + 1, cell, passable, pit,
+                    safe, visited, mapped, visible, distances);
         }
         if (solid[cell - 1] && solid[cell + 1]) {
-            return separatedSide(cell - width, cell + width, cell, safe,
-                    visited, mapped, visible, distances);
+            return separatedSide(cell - width, cell + width, cell, passable, pit,
+                    safe, visited, mapped, visible, distances);
         }
         return 0;
     }
 
-    private static int separatedSide(int first, int second, int trap, boolean[] safe,
+    private static int separatedSide(int first, int second, int trap,
+                                     boolean[] passable, boolean[] pit, boolean[] safe,
                                      boolean[] visited, boolean[] mapped, boolean[] visible,
                                      int[] distances) {
-        if (!(visited[first] || mapped[first] || visible[first])
-                || !(visited[second] || mapped[second] || visible[second])
-                || !safe[first] || !safe[second]) return 0;
-        boolean firstReached = distances[first] != Integer.MAX_VALUE;
-        boolean secondReached = distances[second] != Integer.MAX_VALUE;
+        // The exit may be unexplored. Requiring it to be "safe" would make
+        // a frontier corridor trap impossible to clear before discovering the exit.
+        boolean firstKnown = visited[first] || mapped[first] || visible[first];
+        boolean secondKnown = visited[second] || mapped[second] || visible[second];
+        boolean firstReached = firstKnown && safe[first] && distances[first] != Integer.MAX_VALUE;
+        boolean secondReached = secondKnown && safe[second] && distances[second] != Integer.MAX_VALUE;
         if (firstReached == secondReached) return 0;
-        return (firstReached ? first : second) - trap;
+
+        int approach = firstReached ? first : second;
+        int exit = firstReached ? second : first;
+        boolean exitKnown = firstReached ? secondKnown : firstKnown;
+        if (!passable[exit] || pit[exit] || distances[exit] != Integer.MAX_VALUE
+                || (exitKnown && !safe[exit])) return 0;
+        return approach - trap;
     }
 
     /** Only spare weapons/armor and the largest food stack may be sacrificed. */
@@ -134,8 +143,8 @@ final class BlastAutoTrapClearer {
                     || safe[cell] || Actor.findChar(cell) != null
                     || level.plants.get(cell) != null) continue;
             int minimum = minimumThrowDistance(trap);
-            int side = reachableSide(cell, level.width(), level.solid, safe,
-                    level.visited, level.mapped, hero.fieldOfView, distances);
+            int side = reachableSide(cell, level.width(), level.solid, level.passable,
+                    level.pit, safe, level.visited, level.mapped, hero.fieldOfView, distances);
             if (side == 0) continue;
             int stand = throwingStand(level, cell, side, minimum, safe, distances);
             if (stand < 0 || (hero.rooted && stand != hero.pos)
