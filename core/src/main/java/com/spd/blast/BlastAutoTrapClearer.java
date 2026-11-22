@@ -23,10 +23,35 @@ import java.util.function.Predicate;
 /** Clear a blocked one-tile corridor trap using an ordinary inventory throw. */
 final class BlastAutoTrapClearer {
     private static final int MAX_THROW_DISTANCE = 6;
+    private static final int LOG_REPEAT_INTERVAL = 10;
+    private static String lastRejection;
+    private static int repeatedRejections;
 
     enum Action { NONE, MOVE, THROW }
 
     private BlastAutoTrapClearer() {}
+
+    static void reset() {
+        lastRejection = null;
+        repeatedRejections = 0;
+    }
+
+    /** A rejected trap is logged only when near the hero; suppress repeated reasons. */
+    private static void logRejection(Hero hero, Trap trap, String reason) {
+        if (!BlastSettings.debugLog() || trap == null
+                || Dungeon.level.distance(hero.pos, trap.pos) > MAX_THROW_DISTANCE) return;
+        String key = trap.pos + ":" + trap.getClass().getName() + ":" + reason;
+        if (key.equals(lastRejection)) {
+            if (++repeatedRejections < LOG_REPEAT_INTERVAL) return;
+            repeatedRejections = 0;
+        } else {
+            lastRejection = key;
+            repeatedRejections = 0;
+        }
+        BlastLog.debug("auto-trap pos=" + hero.pos + " trap="
+                + trap.getClass().getSimpleName() + "@" + trap.pos
+                + " hidden=" + !trap.visible + " status=" + reason);
+    }
 
     /** Unknown, remote-targeting, persistent and chain-reaction traps are never auto-triggered. */
     static int minimumThrowDistance(Trap trap) {
@@ -131,32 +156,62 @@ final class BlastAutoTrapClearer {
         if (safe.length != level.length() || distances.length != level.length()) {
             throw new IllegalArgumentException("Invalid trap clearance navigation map");
         }
-        if (hero.belongings.lostInventory()) return Action.NONE;
-
         Trap chosen = null;
         int bestStand = -1;
         int shortest = Integer.MAX_VALUE;
+        Trap rejectedTrap = null;
+        String rejectedReason = null;
+        int rejectedDistance = MAX_THROW_DISTANCE + 1;
         for (Trap trap : level.traps.valueList()) {
             int cell = trap.pos;
-            if (!level.insideMap(cell) || !canTrigger(trap, level.map[cell])
-                    || !(level.visited[cell] || level.mapped[cell] || hero.fieldOfView[cell])
-                    || safe[cell] || Actor.findChar(cell) != null
-                    || level.plants.get(cell) != null) continue;
-            int minimum = minimumThrowDistance(trap);
-            int side = reachableSide(cell, level.width(), level.solid, level.passable,
-                    level.pit, safe, level.visited, level.mapped, hero.fieldOfView, distances);
-            if (side == 0) continue;
-            int stand = throwingStand(level, cell, side, minimum, safe, distances);
-            if (stand < 0 || (hero.rooted && stand != hero.pos)
-                    || distances[stand] >= shortest) continue;
-            chosen = trap;
-            bestStand = stand;
-            shortest = distances[stand];
+            if (!level.insideMap(cell) || !trap.active
+                    || !(level.visited[cell] || level.mapped[cell] || hero.fieldOfView[cell])) {
+                continue;
+            }
+            String reason = null;
+            if (!canTrigger(trap, level.map[cell])) reason = "unsupported";
+            else if (safe[cell]) reason = "traversable";
+            else if (Actor.findChar(cell) != null) reason = "occupied";
+            else if (level.plants.get(cell) != null) reason = "plant";
+            else {
+                int side = reachableSide(cell, level.width(), level.solid, level.passable,
+                        level.pit, safe, level.visited, level.mapped, hero.fieldOfView, distances);
+                if (side == 0) {
+                    reason = "not-chokepoint";
+                } else {
+                    int stand = throwingStand(level, cell, side,
+                            minimumThrowDistance(trap), safe, distances);
+                    if (stand < 0) reason = "no-safe-stand";
+                    else if (hero.rooted && stand != hero.pos) reason = "rooted";
+                    else if (distances[stand] < shortest) {
+                        chosen = trap;
+                        bestStand = stand;
+                        shortest = distances[stand];
+                    }
+                }
+            }
+            if (reason != null) {
+                int near = level.distance(hero.pos, cell);
+                if (near < rejectedDistance) {
+                    rejectedDistance = near;
+                    rejectedTrap = trap;
+                    rejectedReason = reason;
+                }
+            }
         }
-        if (chosen == null) return Action.NONE;
-
+        if (chosen == null) {
+            logRejection(hero, rejectedTrap, rejectedReason);
+            return Action.NONE;
+        }
+        if (hero.belongings.lostInventory()) {
+            logRejection(hero, chosen, "lost-inventory");
+            return Action.NONE;
+        }
         Item item = chooseThrowItem(hero.belongings.backpack, candidate -> candidate.isEquipped(hero));
-        if (item == null) return Action.NONE;
+        if (item == null) {
+            logRejection(hero, chosen, "no-throwable-item");
+            return Action.NONE;
+        }
         if (bestStand != hero.pos) {
             hero.curAction = new HeroAction.Move(BlastAutoPlay.firstStep(bestStand, safe, distances));
             BlastLog.debug("auto-trap pos=" + hero.pos + " trap=" + chosen.getClass().getSimpleName()
@@ -164,7 +219,10 @@ final class BlastAutoTrapClearer {
             return Action.MOVE;
         }
         // Use the actual item's native trajectory; a miss must never consume a throw.
-        if (item.throwPos(hero, chosen.pos) != chosen.pos) return Action.NONE;
+        if (item.throwPos(hero, chosen.pos) != chosen.pos) {
+            logRejection(hero, chosen, "blocked-trajectory");
+            return Action.NONE;
+        }
         BlastLog.debug("auto-trap pos=" + hero.pos + " trap=" + chosen.getClass().getSimpleName()
                 + "@" + chosen.pos + " item=" + item.getClass().getSimpleName()
                 + " action=throw");
