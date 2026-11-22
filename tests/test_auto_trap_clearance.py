@@ -6,6 +6,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 CLEAR = (ROOT / "core/src/main/java/com/spd/blast/BlastAutoTrapClearer.java").read_text(encoding="utf-8")
 PLAY = (ROOT / "core/src/main/java/com/spd/blast/BlastAutoPlay.java").read_text(encoding="utf-8")
+PICKUP = (ROOT / "core/src/main/java/com/spd/blast/BlastAutoPickup.java").read_text(encoding="utf-8")
 
 
 class AutoTrapClearanceTest(unittest.TestCase):
@@ -65,6 +66,11 @@ class AutoTrapClearanceTest(unittest.TestCase):
         self.assertLess(PLAY.index("BlastAutoTrapClearer.toxicRetreatStep(hero, safe)"),
                         PLAY.index('debugDecision = "combat";'))
         self.assertIn("gas.cur[adjacent] > 0", CLEAR)
+        self.assertIn("heldDoor = bestTarget", CLEAR)
+        self.assertIn("heldDoorTrap = chosen.pos", CLEAR)
+        self.assertIn("holdingDoorOpen(int cell)", CLEAR)
+        self.assertIn("BlastAutoTrapClearer.holdingDoorOpen(cell)", PICKUP)
+        self.assertIn('status = "door-held"', PICKUP)
 
     def test_inventory_and_native_throw(self):
         self.assertIn("item instanceof Weapon || item instanceof Armor", CLEAR)
