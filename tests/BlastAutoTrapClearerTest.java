@@ -75,7 +75,7 @@ public final class BlastAutoTrapClearerTest {
         safe[trap + width] = false;
         equal(0, BlastAutoTrapClearer.reachableSide(trap, width, solid, passable, pit, safe,
                 visited, mapped, visible, distances), "hazard on far side");
-        safe[trap + width] = true;
+        safe[trap + width] = false;
         visible[trap + width] = false;
         equal(-width, BlastAutoTrapClearer.reachableSide(trap, width, solid, passable, pit, safe,
                 visited, mapped, visible, distances), "unexplored exit allows trap clearance");
