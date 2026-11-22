@@ -190,6 +190,7 @@ final class BlastAutoAqua {
                     || !(level.visited[cell] || level.mapped[cell] || hero.fieldOfView[cell])
                     || (room != null && !room.inside(level.cellToPoint(cell)))
                     || !BlastAutoTrapClearer.canDouse(trap, level.map[cell])
+                    || level.plants.get(cell) != null || Actor.findChar(cell) != null
                     || !canFlood(level, cell)) continue;
             targets[cell] = true;
             trapCells.add(cell);
