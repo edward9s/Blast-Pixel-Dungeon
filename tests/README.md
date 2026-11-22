@@ -70,6 +70,19 @@ door can be opened first with an expendable item (without casting the frost
 potion at the door). Automatic pickup temporarily skips the door-holding item
 until the trap is cleared.
 
+Aqua Brew is an alternative fallback for any active trap (including hidden,
+explosive, ranged, boss-specific, and non-disarming traps). Native AquaBrew
+does not press traps: its Geyser effect changes trap terrain to water using
+`Level.setCellToWater(true, cell)`, removing the trap without activation.
+The program throws it at the trap's exact cell from at least two cells away,
+validates projectile collision, checks custom tiles that forbid water and
+avoids a landing point that could knock back protected characters within
+one cell. It is spent only if the normal safe throw is unavailable or has no
+eligible expendable item. Aqua Brew is not used for opportunistic pre-combat
+aimed-trap attacks, because it would remove the trap without attacking the
+enemy. Water cannot be created on every custom tile, and the native geyser
+may push nearby hostile mobs.
+
 Only un-equipped spare weapons/armor and surplus food are eligible
 sacrifices. The food selection shares the automatic feeding reserve for
 Meat Pie ingredients, and finished Meat Pies are never sacrificed. Other inventory items, which may have dangerous or
