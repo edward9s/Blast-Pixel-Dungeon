@@ -83,10 +83,16 @@ aimed-trap attacks, because it would remove the trap without attacking the
 enemy. Water cannot be created on every custom tile, and the native geyser
 may push nearby hostile mobs.
 
-Only un-equipped spare weapons/armor and surplus food are eligible
-sacrifices. The food selection shares the automatic feeding reserve for
-Meat Pie ingredients, and finished Meat Pies are never sacrificed. Other inventory items, which may have dangerous or
-irreversible throw effects, are not thrown blindly. This avoids spending
+Un-equipped ordinary thrown weapons now take priority as reusable trap
+activators: plain darts first, then unupgraded, unenchanted inexpensive missiles.
+Missiles that explode, return without landing, have special dart tips, or carry
+upgrades, enchantments, or curses are reserved and never chosen for trap
+activation. After a missile lands, ordinary auto-pickup can recover it once the
+tile is safe. If no suitable missile is available, un-equipped spare melee
+weapons/armor and surplus food remain eligible sacrifices. The food selection
+shares the automatic feeding reserve for Meat Pie ingredients, and finished
+Meat Pies are never sacrificed. Other inventory items, which may have dangerous
+or irreversible throw effects, are not thrown blindly. This avoids spending
 valuable potions, scrolls, runestones, and special-purpose objects on trap
 clearing. Debug Log records nearby rejections (e.g. `unsupported`,
 `chain-reaction`, `no-safe-stand`, `no-throwable-item` and

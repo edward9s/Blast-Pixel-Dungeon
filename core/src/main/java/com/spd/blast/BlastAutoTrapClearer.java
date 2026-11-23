@@ -17,6 +17,11 @@ import com.shatteredpixel.shatteredpixeldungeon.items.food.MeatPie;
 import com.shatteredpixel.shatteredpixeldungeon.items.potions.PotionOfFrost;
 import com.shatteredpixel.shatteredpixeldungeon.items.potions.brews.AquaBrew;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.Weapon;
+import com.shatteredpixel.shatteredpixeldungeon.items.weapon.missiles.ForceCube;
+import com.shatteredpixel.shatteredpixeldungeon.items.weapon.missiles.HeavyBoomerang;
+import com.shatteredpixel.shatteredpixeldungeon.items.weapon.missiles.MissileWeapon;
+import com.shatteredpixel.shatteredpixeldungeon.items.weapon.missiles.darts.Dart;
+import com.shatteredpixel.shatteredpixeldungeon.items.weapon.missiles.darts.TippedDart;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.MagesStaff;
 import com.shatteredpixel.shatteredpixeldungeon.items.wands.Wand;
 import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfCorrosion;
@@ -342,22 +347,48 @@ final class BlastAutoTrapClearer {
         return approach - trap;
     }
 
-    /** Spare gear first; throw only food left after reserving Meat Pie ingredients. */
+    /** Throw ordinary, reusable missiles before sacrificing gear or spare food. */
+    static boolean safeTrapMissile(MissileWeapon missile) {
+        if (missile == null) throw new IllegalArgumentException("Missing trap missile");
+        // These projectiles explode, return without landing, or carry special effects.
+        // Upgraded, enchanted, or cursed ammunition is reserved for combat.
+        return missile.quantity() > 0 && !missile.spawnedForEffect
+                && !(missile instanceof ForceCube)
+                && !(missile instanceof HeavyBoomerang)
+                && !(missile instanceof TippedDart)
+                && missile.trueLevel() == 0 && !missile.cursed
+                && !missile.hasGoodEnchant() && !missile.hasCurseEnchant();
+    }
+
+    /** Prefer an ordinary dart, then inexpensive missiles, spare gear, and spare food. */
     static Item chooseThrowItem(Iterable<Item> inventory, Predicate<Item> equipped) {
         if (inventory == null || equipped == null) {
             throw new IllegalArgumentException("Inventory and equipment policy are required");
         }
+        MissileWeapon missile = null;
         Item spareGear = null;
         ArrayList<Food> foods = new ArrayList<>();
         for (Item item : inventory) {
             if (item.quantity() <= 0 || equipped.test(item)) continue;
-            if (item instanceof Weapon || item instanceof Armor) {
+            if (item instanceof MissileWeapon) {
+                MissileWeapon candidate = (MissileWeapon) item;
+                if (safeTrapMissile(candidate)
+                        && (missile == null
+                            || (candidate.getClass() == Dart.class
+                                && missile.getClass() != Dart.class)
+                            || (candidate.getClass() != Dart.class
+                                && missile.getClass() != Dart.class
+                                && candidate.tier < missile.tier))) {
+                    missile = candidate;
+                }
+            } else if (item instanceof Weapon || item instanceof Armor) {
                 if (spareGear == null) spareGear = item;
             } else if (item instanceof Food && !(item instanceof MeatPie)) {
                 foods.add((Food) item);
             }
         }
-        return spareGear != null ? spareGear : BlastAutoFood.mostAbundant(foods);
+        return missile != null ? missile
+                : spareGear != null ? spareGear : BlastAutoFood.mostAbundant(foods);
     }
 
     /** Find a route around corners without stepping closer to the gas. */

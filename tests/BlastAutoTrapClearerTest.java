@@ -6,6 +6,10 @@ import com.shatteredpixel.shatteredpixeldungeon.items.food.Food;
 import com.shatteredpixel.shatteredpixeldungeon.items.food.MeatPie;
 import com.shatteredpixel.shatteredpixeldungeon.items.food.Pasty;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.WornShortsword;
+import com.shatteredpixel.shatteredpixeldungeon.items.weapon.missiles.ForceCube;
+import com.shatteredpixel.shatteredpixeldungeon.items.weapon.missiles.HeavyBoomerang;
+import com.shatteredpixel.shatteredpixeldungeon.items.weapon.missiles.ThrowingStone;
+import com.shatteredpixel.shatteredpixeldungeon.items.weapon.missiles.darts.Dart;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.BlazingTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.BurningTrap;
@@ -327,6 +331,31 @@ public final class BlastAutoTrapClearerTest {
                 item -> item == armor || item == sword), "largest food stack");
         same(null, BlastAutoTrapClearer.chooseThrowItem(Arrays.asList(inventory),
                 item -> true), "no permitted inventory");
+
+        // Reusable ordinary missiles should trigger traps before wasting spare gear.
+        ThrowingStone stone = new ThrowingStone();
+        Dart dart = new Dart();
+        same(dart, BlastAutoTrapClearer.chooseThrowItem(
+                Arrays.asList(armor, stone, large, dart), item -> false),
+                "plain infinite-durability dart is preferred");
+        same(stone, BlastAutoTrapClearer.chooseThrowItem(
+                Arrays.asList(armor, stone, large, dart), item -> item == dart),
+                "ordinary throwing stone preferred over sacrificing armor");
+        same(armor, BlastAutoTrapClearer.chooseThrowItem(
+                Arrays.asList(armor, stone, large, dart),
+                item -> item == dart || item == stone), "equipped missiles are protected");
+
+        ForceCube cube = new ForceCube();
+        HeavyBoomerang boomerang = new HeavyBoomerang();
+        same(armor, BlastAutoTrapClearer.chooseThrowItem(
+                Arrays.asList(cube, boomerang, armor), item -> false),
+                "special projectile effects must not be triggered");
+        ThrowingStone upgraded = new ThrowingStone();
+        upgraded.level(1);
+        same(armor, BlastAutoTrapClearer.chooseThrowItem(
+                Arrays.asList(upgraded, armor), item -> false),
+                "upgraded missiles reserved for combat");
+
         Pasty pasty = new Pasty();
         MeatPie pie = new MeatPie();
         Food reservedRation = new Food();
