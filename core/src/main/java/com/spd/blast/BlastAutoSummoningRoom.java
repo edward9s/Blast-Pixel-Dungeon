@@ -39,6 +39,10 @@ final class BlastAutoSummoningRoom {
         return registeredArcane || registeredShrapnel || heldArcane || heldShrapnel;
     }
 
+    static boolean canBomb(boolean remoteThrow, boolean protectedHero) {
+        return remoteThrow || protectedHero;
+    }
+
     private static SecretSummoningRoom knownRoom(Level level, Hero hero) {
         if (!(level instanceof RegularLevel)) return null;
         SecretSummoningRoom room = (SecretSummoningRoom)
@@ -107,7 +111,7 @@ final class BlastAutoSummoningRoom {
         boolean remote = BlastSettings.testRemoteThrow();
         boolean protectedHero = hero.buff(BlastIndestructible.class) != null
                 || hero.buff(BlastTestBuffs.Indestructible.class) != null;
-        if (!remote && !protectedHero) return false;
+        if (!canBomb(remote, protectedHero)) return false;
 
         int bestCount = 0, bestTarget = -1;
         Class<? extends Bomb> bestType = null;
@@ -183,7 +187,10 @@ final class BlastAutoSummoningRoom {
             throw new IllegalArgumentException("Invalid secret summoning room maps");
 
         BlastBombManiac maniac = BlastBombManiac.current();
-        if (!hasBombs(hero, maniac) || hasHostiles(level, room) || pendingCell >= 0)
+        boolean protectedHero = hero.buff(BlastIndestructible.class) != null
+                || hero.buff(BlastTestBuffs.Indestructible.class) != null;
+        if (!canBomb(BlastSettings.testRemoteThrow(), protectedHero)
+                || !hasBombs(hero, maniac) || hasHostiles(level, room) || pendingCell >= 0)
             return BlastAutoSpecialRooms.Action.NONE;
 
         boolean inside = inside(level, room, hero.pos);
