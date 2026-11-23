@@ -28,11 +28,11 @@ public final class BlastAutoToxicRoomTest {
                 "keep the doorway open for remaining gas to dissipate");
         check(!BlastAutoToxicRoom.holdDoor(false, false, false),
                 "recover the door wedge after the gas dissipates");
-        check(BlastAutoToxicRoom.demolishDoor(false, true),
+        check(BlastAutoToxicRoom.shouldDemolishDoor(false, true),
                 "destroy doorway permanently while residual gas remains");
-        check(!BlastAutoToxicRoom.demolishDoor(true, true),
+        check(!BlastAutoToxicRoom.shouldDemolishDoor(true, true),
                 "do not permanently vent a room with active gas sources");
-        check(!BlastAutoToxicRoom.demolishDoor(false, false),
+        check(!BlastAutoToxicRoom.shouldDemolishDoor(false, false),
                 "do not waste a charge after gas has dissipated");
         check(BlastAutoToxicRoom.breakableDoor(Terrain.DOOR),
                 "ordinary wooden doors can be bombed");
