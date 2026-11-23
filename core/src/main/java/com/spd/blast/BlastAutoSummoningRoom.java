@@ -3,7 +3,6 @@ package com.spd.blast;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
-import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.Blob;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroAction;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
@@ -88,7 +87,9 @@ final class BlastAutoSummoningRoom {
         Bomb held = hero.belongings.getItem(ShrapnelBomb.class);
         if (held == null) held = hero.belongings.getItem(ArcaneBomb.class);
         if (held == null) return false;
+        int selected = maniac.selectedIndex();
         maniac.imbue(held);
+        maniac.select(selected);
         BlastLog.debug("auto-summon action=imbue type=" + held.getClass().getSimpleName());
         hero.spendAndNext(Actor.TICK);
         return true;
