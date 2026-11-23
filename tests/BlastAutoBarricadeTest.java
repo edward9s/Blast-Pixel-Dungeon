@@ -1,5 +1,7 @@
 package com.spd.blast;
 
+import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
+
 /** Headless checks for barricade explosion targeting and hero safety. */
 public final class BlastAutoBarricadeTest {
     private static void check(boolean expected, boolean actual, String label) {
@@ -7,6 +9,19 @@ public final class BlastAutoBarricadeTest {
     }
 
     public static void main(String[] args) {
+        check(true, BlastAutoBarricade.demolitionTarget(Terrain.BARRICADE, false),
+                "ordinary barricade remains an auto-demolition objective");
+        check(true, BlastAutoBarricade.demolitionTarget(Terrain.BOOKSHELF, true),
+                "runestone-room bookshelf can be demolished");
+        check(false, BlastAutoBarricade.demolitionTarget(Terrain.BOOKSHELF, false),
+                "ordinary library bookshelves must be preserved");
+        check(false, BlastAutoBarricade.demolitionTarget(Terrain.WALL, true),
+                "stone wall is not a wooden demolition objective");
+        check(false, BlastAutoBarricade.demolitionTarget(Terrain.DOOR, true),
+                "normal doors remain outside the barricade task");
+        check(true, (Terrain.flags[Terrain.BOOKSHELF] & Terrain.FLAMABLE) != 0,
+                "native ordinary bombs can destroy bookshelf terrain");
+
         boolean[] footprint = {false, true, true, false};
         check(true, BlastAutoBarricade.reachesSafely(footprint, 2, 0, false),
                 "distant throw outside blast");
