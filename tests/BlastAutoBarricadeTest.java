@@ -9,16 +9,22 @@ public final class BlastAutoBarricadeTest {
     }
 
     public static void main(String[] args) {
-        check(true, BlastAutoBarricade.demolitionTarget(Terrain.BARRICADE, false),
+        check(true, BlastAutoBarricade.demolitionTarget(Terrain.BARRICADE, false, false),
                 "ordinary barricade remains an auto-demolition objective");
-        check(true, BlastAutoBarricade.demolitionTarget(Terrain.BOOKSHELF, true),
+        check(true, BlastAutoBarricade.demolitionTarget(Terrain.BOOKSHELF, true, false),
                 "runestone-room bookshelf can be demolished");
-        check(false, BlastAutoBarricade.demolitionTarget(Terrain.BOOKSHELF, false),
+        check(false, BlastAutoBarricade.demolitionTarget(Terrain.BOOKSHELF, false, false),
                 "ordinary library bookshelves must be preserved");
-        check(false, BlastAutoBarricade.demolitionTarget(Terrain.WALL, true),
+        check(false, BlastAutoBarricade.demolitionTarget(Terrain.WALL, true, false),
                 "stone wall is not a wooden demolition objective");
-        check(false, BlastAutoBarricade.demolitionTarget(Terrain.DOOR, true),
+        check(false, BlastAutoBarricade.demolitionTarget(Terrain.DOOR, true, false),
                 "normal doors remain outside the barricade task");
+        check(true, BlastAutoBarricade.demolitionTarget(Terrain.EMPTY, false, true),
+                "web on ordinary floor is a demolition objective");
+        check(false, BlastAutoBarricade.demolitionTarget(Terrain.EMPTY, false, false),
+                "bare floor is not a demolition objective");
+        check(true, BlastAutoBarricade.demolitionTarget(Terrain.BOOKSHELF, false, true),
+                "a web overlay is removable even on otherwise protected terrain");
         check(true, (Terrain.flags[Terrain.BOOKSHELF] & Terrain.FLAMABLE) != 0,
                 "native ordinary bombs can destroy bookshelf terrain");
 

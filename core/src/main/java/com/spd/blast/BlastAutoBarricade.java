@@ -2,6 +2,7 @@ package com.spd.blast;
 
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
+import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.Web;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Buff;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroAction;
@@ -13,16 +14,25 @@ import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.secret.SecretRunest
 import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
 import com.watabou.utils.PathFinder;
 
-/** Clear discovered barricades and SecretRunestoneRoom bookshelf partitions with ordinary bombs. */
+/** Clear barricades, runestone-room bookshelf partitions, and visible webs with ordinary bombs. */
 final class BlastAutoBarricade {
     enum Action { NONE, MOVE, DETONATE }
 
     private BlastAutoBarricade() {}
 
-    /** Only bookshelf partitions in the enchantment-runestone secret room are objectives. */
-    static boolean demolitionTarget(int terrain, boolean inRunestoneRoom) {
-        return terrain == Terrain.BARRICADE
+    /** Webs are temporary obstacles; ordinary bookshelves remain protected. */
+    static boolean demolitionTarget(int terrain, boolean inRunestoneRoom, boolean web) {
+        return web || terrain == Terrain.BARRICADE
                 || (terrain == Terrain.BOOKSHELF && inRunestoneRoom);
+    }
+
+    private static int[] activeWeb(Level level) {
+        Web web = (Web) level.blobs.get(Web.class);
+        if (web == null || web.volume <= 0) return null;
+        if (web.cur == null || web.cur.length != level.length()) {
+            throw new IllegalStateException("Invalid web grid");
+        }
+        return web.cur;
     }
 
     private static boolean inRunestoneRoom(Level level, SecretRunestoneRoom room, int cell) {
@@ -58,6 +68,43 @@ final class BlastAutoBarricade {
         return true;
     }
 
+    /** Rooting bypasses normal idle tasks; clear adjacent webs without trying to move. */
+    static Action clearAdjacentWeb(Hero hero) {
+        Level level = Dungeon.level;
+        int[] web = activeWeb(level);
+        if (web == null || !BlastSettings.testAutoPlay() || BlastRemoteBomb.isTimedMode()
+                || (hero.buff(BlastIndestructible.class) == null
+                    && hero.buff(BlastTestBuffs.Indestructible.class) == null)) {
+            return Action.NONE;
+        }
+        BlastBombManiac maniac = BlastBombManiac.current();
+        if (maniac == null || maniac.remaining() == 0) return Action.NONE;
+
+        boolean remoteThrow = BlastSettings.testRemoteThrow();
+        Bomb ordinaryBomb = maniac.bombAt(0);
+        boolean[] localBlast = remoteThrow ? null : ordinaryBomb.blastWarningCells(hero.pos);
+        for (int offset : PathFinder.NEIGHBOURS8) {
+            int target = hero.pos + offset;
+            if (!level.insideMap(target) || web[target] <= 0
+                    || !hero.fieldOfView[target]) continue;
+            int center = remoteThrow
+                    ? BlastBombTrajectory.throwPos(hero.pos, target) : hero.pos;
+            if (!level.insideMap(center) || level.pit[center]) continue;
+            boolean[] blast = remoteThrow ? ordinaryBomb.blastWarningCells(center) : localBlast;
+            if (!canDetonate(blast, target, hero.pos, true)) continue;
+            if (remoteThrow) {
+                return maniac.blastAutoThrowOrdinaryAndDetonate(target)
+                        ? Action.DETONATE : Action.NONE;
+            }
+            if (maniac.blastAutoPlaceOrdinaryAndDetonate()) {
+                hero.spendAndNext(1f);
+                return Action.DETONATE;
+            }
+            return Action.NONE;
+        }
+        return Action.NONE;
+    }
+
     static Action chooseAction(Hero hero, boolean[] safe, int[] distances) {
         Level level = Dungeon.level;
         if (safe.length != level.length() || distances.length != level.length()) {
@@ -72,6 +119,7 @@ final class BlastAutoBarricade {
         boolean remoteThrow = BlastSettings.testRemoteThrow();
         if (!protectedHero && !remoteThrow) return Action.NONE;
         Bomb ordinaryBomb = maniac.bombAt(0);
+        int[] web = activeWeb(level);
         SecretRunestoneRoom runestoneRoom = level instanceof RegularLevel
                 ? (SecretRunestoneRoom) ((RegularLevel) level).room(SecretRunestoneRoom.class)
                 : null;
@@ -82,9 +130,10 @@ final class BlastAutoBarricade {
             int target = -1;
             int nearest = Integer.MAX_VALUE;
             for (int cell = 0; cell < level.length(); cell++) {
-                if (!demolitionTarget(level.map[cell],
-                        inRunestoneRoom(level, runestoneRoom, cell))
-                        || !hero.fieldOfView[cell]) continue;
+                if (!hero.fieldOfView[cell]
+                        || !demolitionTarget(level.map[cell],
+                                inRunestoneRoom(level, runestoneRoom, cell),
+                                web != null && web[cell] > 0)) continue;
                 int landing = BlastBombTrajectory.throwPos(hero.pos, cell);
                 if (!level.insideMap(landing) || level.pit[landing]) continue;
                 boolean[] blast = ordinaryBomb.blastWarningCells(landing);
@@ -108,7 +157,8 @@ final class BlastAutoBarricade {
         int bestSteps = Integer.MAX_VALUE;
         for (int cell = 0; cell < level.length(); cell++) {
             if (!demolitionTarget(level.map[cell],
-                    inRunestoneRoom(level, runestoneRoom, cell))
+                    inRunestoneRoom(level, runestoneRoom, cell),
+                    web != null && web[cell] > 0 && hero.fieldOfView[cell])
                     || !(hero.fieldOfView[cell] || level.mapped[cell] || level.visited[cell])) {
                 continue;
             }

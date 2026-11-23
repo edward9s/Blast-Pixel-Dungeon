@@ -759,6 +759,12 @@ public final class BlastAutoPlay {
                     return false;
                 }
             }
+            // Normal demolition is an idle task; rooted heroes cannot reach it.
+            if (BlastAutoBarricade.clearAdjacentWeb(hero)
+                    == BlastAutoBarricade.Action.DETONATE) {
+                debugDecision = "web";
+                return true;
+            }
             hero.spendAndNext(Actor.TICK);
             return true;
         }
@@ -948,9 +954,9 @@ public final class BlastAutoPlay {
             return trapAction == BlastAutoTrapClearer.Action.THROW;
         }
 
-        // Barricades block navigation but can be destroyed by ordinary bombs.
+        // Barricades and webs block navigation but can be destroyed by ordinary bombs.
         // Keep trap clearance and manual travel above optional demolition.
-        debugDecision = "barricade";
+        debugDecision = "demolition";
         BlastAutoBarricade.Action barricadeAction =
                 BlastAutoBarricade.chooseAction(hero, idleSafe, idleDistances);
         if (barricadeAction != BlastAutoBarricade.Action.NONE) {
