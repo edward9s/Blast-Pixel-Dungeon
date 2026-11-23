@@ -199,6 +199,7 @@ public final class BlastAutoPlay {
         pendingBombInputs.clear();
         clearFreeBombInputs();
         BlastAutoPickup.reset();
+        BlastAutoEquipment.reset();
         BlastAutoTrapClearer.reset();
         BlastAutoSpecialRooms.reset();
         BlastAutoSacrifice.reset();
@@ -389,7 +390,8 @@ public final class BlastAutoPlay {
 
     /** An explicit item action supersedes the last AI movement order. */
     public static void beginItemAction(Hero hero) {
-        if (!BlastSettings.testAutoPlay() || BlastAutoFood.isEatingAutomatically()) return;
+        if (!BlastSettings.testAutoPlay() || BlastAutoFood.isEatingAutomatically()
+                || BlastAutoEquipment.isUsingAutomatically()) return;
         resetForLevel(hero);
         BlastAutoFood.stopFeeding();
         retainNativeManualTravel(hero);
@@ -866,6 +868,10 @@ public final class BlastAutoPlay {
             return flightAction == BlastAutoSpecialRooms.Action.USE;
         }
 
+        // Strength potions, cursed-gear sales and equipment upgrades run only while idle.
+        debugDecision = "equipment";
+        if (BlastAutoEquipment.manage(hero)) return true;
+
         // Feed only during idle auto-play, after combat and interrupted manual travel.
         // Food.execute owns the animated eating turn and its native time cost.
         debugDecision = "food";
@@ -1117,6 +1123,7 @@ public final class BlastAutoPlay {
         pendingBombInputs.clear();
         clearFreeBombInputs();
         BlastAutoPickup.reset();
+        BlastAutoEquipment.reset();
         BlastAutoTrapClearer.reset();
         BlastAutoSpecialRooms.reset();
         BlastAutoSacrifice.reset();
