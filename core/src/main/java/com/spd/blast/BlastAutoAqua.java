@@ -11,6 +11,7 @@ import com.shatteredpixel.shatteredpixeldungeon.items.potions.brews.AquaBrew;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
 import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.Room;
+import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.special.SentryRoom;
 import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.special.ToxicGasRoom;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.Trap;
 import com.shatteredpixel.shatteredpixeldungeon.mechanics.Ballistica;
@@ -136,7 +137,7 @@ final class BlastAutoAqua {
     /** Score newly reachable terrain after a guaranteed removal, without random assumptions. */
     private static Score score(Hero hero, Level level, int[] sprayDistance,
                                ArrayList<Integer> trapCells, boolean[] safe, int[] distances,
-                               int goal, int beforeGoalDistance, int stand,
+                               int goal, int beforeGoalDistance, int stand, Room room,
                                Blob[] hazards, boolean[] specialBarriers) {
         int certain = countTargets(sprayDistance, trapCells, true);
         int possible = countTargets(sprayDistance, trapCells, false);
@@ -146,7 +147,9 @@ final class BlastAutoAqua {
         for (int cell : trapCells) {
             if (sprayDistance[cell] < 2
                     && !BlastAutoEnvironment.hazardousAt(cell, hazards)
-                    && !specialBarriers[cell] && Actor.findChar(cell) == null
+                    && (!specialBarriers[cell] || (room instanceof SentryRoom
+                            && level.map[cell] == Terrain.EMPTY_SP))
+                    && Actor.findChar(cell) == null
                     && !AutoPlayPlantSafety.isHarmful(level.plants.get(cell))) {
                 opened[cell] = true;
             }
@@ -206,6 +209,30 @@ final class BlastAutoAqua {
                 }
             }
         }
+        // Unlike traps, the red sentry's EMPTY_SP floor has no Trap instance.
+        // Aqua Brew turns these cells into WATER and disables their beam trigger.
+        if (room instanceof SentryRoom) {
+            for (int y = room.top + 1; y < room.bottom; y++) {
+                for (int x = room.left + 1; x < room.right; x++) {
+                    int cell = x + y * width;
+                    if (level.map[cell] != Terrain.EMPTY_SP || !specialBarriers[cell]
+                            || !(level.visited[cell] || level.mapped[cell]
+                                    || hero.fieldOfView[cell])
+                            || !canFlood(level, cell) || level.plants.get(cell) != null
+                            || Actor.findChar(cell) != null) continue;
+                    trapCells.add(cell);
+                    for (int dy = -SPLASH_RANGE; dy <= SPLASH_RANGE; dy++) {
+                        int row = y + dy;
+                        if (row < 0 || row >= level.height()) continue;
+                        for (int dx = -SPLASH_RANGE; dx <= SPLASH_RANGE; dx++) {
+                            int col = x + dx;
+                            if (col >= 0 && col < width)
+                                centers[col + row * width] = true;
+                        }
+                    }
+                }
+            }
+        }
         if (trapCells.isEmpty()) return Action.NONE;
 
         int beforeGoalDistance = Integer.MAX_VALUE;
@@ -237,7 +264,7 @@ final class BlastAutoAqua {
             int[] coverage = PathFinder.distance.clone();
             if (countTargets(coverage, trapCells, true) == 0) continue;
             Score candidate = score(hero, level, coverage, trapCells, safe, distances,
-                    goal, beforeGoalDistance, stand, hazards, specialBarriers);
+                    goal, beforeGoalDistance, stand, room, hazards, specialBarriers);
             if (better(candidate, best)) {
                 best = candidate;
                 bestCenter = center;
