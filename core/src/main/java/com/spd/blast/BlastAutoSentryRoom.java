@@ -16,7 +16,6 @@ import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
 import com.shatteredpixel.shatteredpixeldungeon.levels.RegularLevel;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
 import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.special.SentryRoom;
-import com.watabou.utils.Rect;
 import com.watabou.utils.PathFinder;
 
 /** Neutralize a sentry's red floors with Aqua Brew or make a timed haste crossing. */
@@ -94,21 +93,6 @@ final class BlastAutoSentryRoom {
                         BlastAutoPickupPolicy::isInstantPickup));
     }
 
-    /** A room entered before is no longer an undiscovered-chest destination. */
-    static boolean visitedInterior(boolean[] visited, int width, Rect room) {
-        if (visited == null || width <= 0 || visited.length % width != 0
-                || room == null || room.left < 0 || room.top < 0
-                || room.right >= width || room.bottom >= visited.length / width
-                || room.left >= room.right || room.top >= room.bottom)
-            throw new IllegalArgumentException("Invalid sentry room exploration map");
-        for (int y = room.top + 1; y < room.bottom; y++) {
-            for (int x = room.left + 1; x < room.right; x++) {
-                if (visited[x + y * width]) return true;
-            }
-        }
-        return false;
-    }
-
     /** A started sprint has priority over combat and routine exploration. */
     static BlastAutoSpecialRooms.Action continueRun(Hero hero, boolean[] safe,
             int[] distances, Blob[] hazards, boolean[] barriers) {
@@ -172,16 +156,9 @@ final class BlastAutoSentryRoom {
         if (!safe[exit] || distances[exit] == Integer.MAX_VALUE)
             return BlastAutoSpecialRooms.Action.NONE;
         Heap treasure = chest(level, room, hero);
-        if (treasure == null) {
-            // After the room has been explored, the chest may already be opened
-            // or emptied. Never keep pulling the hero back to that entrance.
-            if (visitedInterior(level.visited, level.width(), room)
-                    || hero.pos == exit || hero.rooted)
-                return BlastAutoSpecialRooms.Action.NONE;
-            // The room is still unexplored: approach once to reveal its treasure.
-            hero.curAction = new HeroAction.Move(BlastAutoPlay.firstStep(exit, safe, distances));
-            return BlastAutoSpecialRooms.Action.MOVE;
-        }
+        // A missing chest can mean undiscovered, opened, or emptied. Leave the
+        // room reachable through ordinary roaming and pickup in all cases.
+        if (treasure == null) return BlastAutoSpecialRooms.Action.NONE;
         if (safe[treasure.pos] && distances[treasure.pos] != Integer.MAX_VALUE)
             return BlastAutoSpecialRooms.Action.NONE;
 
