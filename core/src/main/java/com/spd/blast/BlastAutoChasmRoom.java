@@ -198,7 +198,9 @@ final class BlastAutoChasmRoom {
         // Stay on solid ground until levitation ends or can be refreshed next turn.
         if (landing == exit) {
             activeEntrance = -1;
-            return BlastAutoSpecialRooms.Action.NONE;
+            // Refresh the movement map next turn; the old map still permits chasms.
+            hero.spendAndNext(Actor.TICK);
+            return BlastAutoSpecialRooms.Action.USE;
         }
         hero.spendAndNext(Actor.TICK);
         return BlastAutoSpecialRooms.Action.USE;
@@ -230,7 +232,7 @@ final class BlastAutoChasmRoom {
         float perStep = Math.max(1f, 1f / hero.speed());
         boolean lastPotion = potion.quantity() == 1;
         int goal = target(hero, room, flight, reach, entrance,
-                Levitation.DURATION, lastPotion, perStep);
+                Levitation.DURATION - 1f, lastPotion, perStep);
         if (goal < 0 && inside && reach[entrance] != Integer.MAX_VALUE
                 && enoughFlight(Levitation.DURATION, reach[entrance],
                         0, 0, false, perStep)) {
