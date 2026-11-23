@@ -634,7 +634,8 @@ final class BlastAutoTrapClearer {
                     int target = cell;
                     boolean frost = false;
                     boolean corrosion = false;
-                    if (corrosionWand != null && corrosionSafeForTrap(hero, level, cell)) {
+                    if (!hero.rooted && corrosionWand != null
+                            && corrosionSafeForTrap(hero, level, cell)) {
                         // Corrosion presses the unoccupied impact tile, but seeds gas.
                         int wandMinimum = Math.max(CORROSION_MIN_DISTANCE, minimum);
                         int wandStand = side == 0
@@ -731,6 +732,8 @@ final class BlastAutoTrapClearer {
             // Recheck the actual wand collision cell; another character may
             // have entered the trajectory during the approach.
             if (!corrosionWand.blastAutoCanZap(hero)
+                    || !canTrigger(chosen, level.map[chosen.pos])
+                    || Actor.findChar(chosen.pos) != null
                     || !corrosionSafeForTrap(hero, level, chosen.pos)
                     || level.distance(hero.pos, chosen.pos) < CORROSION_MIN_DISTANCE
                     || !hasGasRetreat(level, chosen.pos, hero.pos, safe)
