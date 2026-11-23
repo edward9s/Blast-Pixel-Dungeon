@@ -142,6 +142,12 @@ public final class BlastBombManiac extends Buff {
         return bombAt(selected);
     }
 
+    /** Stable lookup without changing the player's selected bomb. */
+    public int typeIndex(Class<? extends Bomb> kind) {
+        if (kind == null) throw new IllegalArgumentException("Bomb type is required");
+        return types.indexOf(kind);
+    }
+
     public void select(int index) {
         bombAt(index);
         selected = index;

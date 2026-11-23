@@ -638,6 +638,10 @@ public final class BlastAutoPlay {
             }
         }
 
+        // Wait for delayed summons, then let existing indestructible combat handle them.
+        debugDecision = "summoning-wait";
+        if (BlastAutoSummoningRoom.awaitWave(hero)) return true;
+
         // Bombard ranged enemies before sacrificial-fire luring or melee pursuit.
         // The trajectory and blast radius determine whether unseen targets can be hit.
         debugDecision = "ranged-bomb";
@@ -804,7 +808,8 @@ public final class BlastAutoPlay {
         // Finish a levitating crossing before ordinary idle tasks consume its duration.
         debugDecision = "special-flight";
         BlastAutoSpecialRooms.Action flightAction =
-                BlastAutoSpecialRooms.continueFlight(hero, safe, distances);
+                BlastAutoSpecialRooms.continueFlight(
+                        hero, safe, distances, hazards, specialBarriers);
         if (flightAction != BlastAutoSpecialRooms.Action.NONE) {
             roaming.clearDestination();
             return flightAction == BlastAutoSpecialRooms.Action.USE;
@@ -1193,15 +1198,18 @@ public final class BlastAutoPlay {
         boolean phaseEnabled = BlastMovement.enabled();
         com.shatteredpixel.shatteredpixeldungeon.levels.rooms.special.TrapsRoom flightRoom =
                 BlastAutoSpecialRooms.flightRoom(level, hero);
+        com.shatteredpixel.shatteredpixeldungeon.levels.rooms.secret.SecretChestChasmRoom chasmRoom =
+                BlastAutoChasmRoom.flightRoom(level, hero);
 
         for (int cell = 0; cell < safe.length; cell++) {
             boolean known = level.visited[cell] || level.mapped[cell] || hero.fieldOfView[cell];
             boolean airborne = known && flightRoom != null
                     && BlastAutoSpecialRooms.flightTile(level, flightRoom, cell);
+            airborne |= chasmRoom != null && BlastAutoChasmRoom.flightTile(level, chasmRoom, cell);
             boolean traversable = safe[cell]
                     || (phaseEnabled && known && BlastMovement.canPhase(cell))
                     || airborne;
-            safe[cell] = known && level.insideMap(cell) && traversable
+            safe[cell] = (known || airborne) && level.insideMap(cell) && traversable
                     && (!level.pit[cell] || airborne)
                     && (isTrapSafe(level.traps.get(cell)) || airborne)
                     && !AutoPlayPlantSafety.isHarmful(level.plants.get(cell))

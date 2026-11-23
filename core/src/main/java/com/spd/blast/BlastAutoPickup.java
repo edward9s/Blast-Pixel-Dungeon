@@ -219,7 +219,7 @@ public final class BlastAutoPickup {
         return rose != null && rose.level() < MAX_ROSE_LEVEL;
     }
 
-    private static boolean canCollect(Hero hero, Item item, Predicate<Item> instantPickup) {
+    static boolean canCollect(Hero hero, Item item, Predicate<Item> instantPickup) {
         if (item instanceof DriedRose.Petal) {
             return canUpgradeRose(hero.belongings.getItem(DriedRose.class));
         }

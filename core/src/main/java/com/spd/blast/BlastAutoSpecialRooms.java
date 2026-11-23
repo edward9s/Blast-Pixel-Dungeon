@@ -39,6 +39,8 @@ final class BlastAutoSpecialRooms {
         flightTreasure = -1;
         attemptedFire = false;
         lastFireVolume = 0;
+        BlastAutoChasmRoom.reset();
+        BlastAutoSummoningRoom.reset();
     }
 
     static boolean flightTerrain(int terrain) {
@@ -93,7 +95,11 @@ final class BlastAutoSpecialRooms {
     }
 
     /** An active crossing has priority over optional looting or roaming. */
-    static Action continueFlight(Hero hero, boolean[] safe, int[] distances) {
+    static Action continueFlight(Hero hero, boolean[] safe, int[] distances,
+                                 Blob[] hazards, boolean[] specialBarriers) {
+        Action chasm = BlastAutoChasmRoom.continueFlight(
+                hero, safe, distances, hazards, specialBarriers);
+        if (chasm != Action.NONE) return chasm;
         Level level = Dungeon.level;
         Levitation floating = hero.buff(Levitation.class);
         TrapsRoom room = flightRoom(level, hero);
@@ -120,7 +126,9 @@ final class BlastAutoSpecialRooms {
                 chest != null && chest.type == Heap.Type.CHEST, retreat)) {
             activeFlightRoom = null;
             flightTreasure = -1;
-            return Action.NONE;
+            // Rebuild safeCells next tick before unrelated roaming can use stale float paths.
+            hero.spendAndNext(Actor.TICK);
+            return Action.USE;
         }
         if (!retreat && chest != null && chest.type == Heap.Type.CHEST
                 && safe[flightTreasure] && distances[flightTreasure] != Integer.MAX_VALUE) {
@@ -139,11 +147,19 @@ final class BlastAutoSpecialRooms {
             }
         }
 
-        // One native pickup attempt is enough to retrieve eligible loose loot.
+        // Collect the opened chest's contents, including non-stackable equipment.
+        // Never divert to an unrelated floor item while floating over this room.
         if (!retreat && chest != null && chest.type == Heap.Type.HEAP
-                && hero.pos == flightTreasure
-                && BlastAutoPickup.chooseAction(hero, safe, distances,
-                        BlastAutoPickupPolicy::isInstantPickup)) return Action.MOVE;
+                && hero.pos == flightTreasure) {
+            Item loot = BlastAutoPickup.firstEligibleItem(chest,
+                    item -> BlastAutoPickup.canCollect(hero, item,
+                            BlastAutoPickupPolicy::isInstantPickup));
+            if (loot != null) {
+                BlastAutoPickup.exposeForPickup(chest, loot);
+                hero.curAction = new HeroAction.PickUp(flightTreasure);
+                return Action.MOVE;
+            }
+        }
 
         if (hero.pos == exit) {
             // The chest route may have become blocked before the first step.
@@ -174,6 +190,14 @@ final class BlastAutoSpecialRooms {
         Action toxic = BlastAutoToxicRoom.chooseAction(hero, safe, distances,
                 hazards, specialBarriers);
         if (toxic != Action.NONE) return toxic;
+
+        Action chasm = BlastAutoChasmRoom.chooseAction(
+                hero, safe, distances, hazards, specialBarriers);
+        if (chasm != Action.NONE) return chasm;
+
+        Action summoning = BlastAutoSummoningRoom.chooseAction(
+                hero, safe, distances, hazards, specialBarriers);
+        if (summoning != Action.NONE) return summoning;
 
         TrapsRoom room = (TrapsRoom) ((RegularLevel) level).room(TrapsRoom.class);
         if (room == null || room.entrance() == null) return Action.NONE;
