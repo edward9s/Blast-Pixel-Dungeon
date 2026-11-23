@@ -145,11 +145,19 @@ final class BlastAutoSpecialRooms {
             }
         }
 
-        // One native pickup attempt is enough to retrieve eligible loose loot.
+        // Collect the opened chest's contents, including non-stackable equipment.
+        // Never divert to an unrelated floor item while floating over this room.
         if (!retreat && chest != null && chest.type == Heap.Type.HEAP
-                && hero.pos == flightTreasure
-                && BlastAutoPickup.chooseAction(hero, safe, distances,
-                        BlastAutoPickupPolicy::isInstantPickup)) return Action.MOVE;
+                && hero.pos == flightTreasure) {
+            Item loot = BlastAutoPickup.firstEligibleItem(chest,
+                    item -> BlastAutoPickup.canCollect(hero, item,
+                            BlastAutoPickupPolicy::isInstantPickup));
+            if (loot != null) {
+                BlastAutoPickup.exposeForPickup(chest, loot);
+                hero.curAction = new HeroAction.PickUp(flightTreasure);
+                return Action.MOVE;
+            }
+        }
 
         if (hero.pos == exit) {
             // The chest route may have become blocked before the first step.
