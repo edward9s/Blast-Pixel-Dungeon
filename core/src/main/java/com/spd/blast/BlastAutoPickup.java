@@ -78,6 +78,7 @@ public final class BlastAutoPickup {
 
             int cell = heap.pos;
             if (!level.insideMap(cell) || BlastAutoTrapClearer.holdingDoorOpen(cell)
+                    || BlastAutoToxicRoom.holdingDoorOpen(cell)
                     || !knownLoot(heap.seen, hero.fieldOfView[cell])
                     || !safe[cell] || distances[cell] == Integer.MAX_VALUE) continue;
 

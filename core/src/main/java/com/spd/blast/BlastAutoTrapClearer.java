@@ -41,7 +41,6 @@ import com.shatteredpixel.shatteredpixeldungeon.levels.traps.WarpingTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.WeakeningTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.WornDartTrap;
 import com.shatteredpixel.shatteredpixeldungeon.mechanics.Ballistica;
-import com.shatteredpixel.shatteredpixeldungeon.tiles.CustomTilemap;
 import com.watabou.utils.PathFinder;
 
 import java.util.ArrayList;
@@ -243,74 +242,19 @@ final class BlastAutoTrapClearer {
         return trap.active && (terrain == Terrain.TRAP || terrain == Terrain.SECRET_TRAP);
     }
 
-    /** Mirror Level.setCellToWater's custom-tile restriction before spending a brew. */
-    private static boolean canFlood(Level level, int cell) {
-        int x = cell % level.width();
-        int y = cell / level.width();
-        for (CustomTilemap tile : level.customTiles) {
-            int tileX = x - tile.tileX;
-            int tileY = y - tile.tileY;
-            if (tileX >= 0 && tileY >= 0 && tileX < tile.tileW && tileY < tile.tileH
-                    && !tile.allowWater(tileX, tileY)) return false;
-        }
-        return true;
-    }
-
-    /** Aqua Brew's geyser pushes actors within one tile of the landing cell. */
-    private static boolean douseSafeForCharacters(Level level, int cell, Hero hero) {
-        for (Char character : Actor.chars()) {
-            if (!character.isAlive() || character == hero
-                    || level.distance(cell, character.pos) > 1) continue;
-            if (!(character instanceof Mob)
-                    || character.alignment != Char.Alignment.ENEMY
-                    || BlastAutoPlay.isAutoAttackExcluded((Mob) character)) return false;
-        }
-        return true;
-    }
-
-    /** No trap activation, gas, or aimed-target preconditions apply to Aqua Brew. */
+    /** Shared landing planner also covers ordinary non-special-room traps. */
     private static Action douseWithAqua(Hero hero, boolean[] safe, int[] distances) {
         if (hero.belongings.lostInventory()) return Action.NONE;
         AquaBrew aqua = hero.belongings.getItem(AquaBrew.class);
         if (aqua == null || aqua.quantity() <= 0) return Action.NONE;
         Level level = Dungeon.level;
-        int bestStand = -1;
-        Trap chosen = null;
-        int shortest = Integer.MAX_VALUE;
-        for (Trap trap : level.traps.valueList()) {
-            int cell = trap.pos;
-            if (!level.insideMap(cell) || !canDouse(trap, level.map[cell])
-                    || !(level.visited[cell] || level.mapped[cell] || hero.fieldOfView[cell])
-                    || safe[cell] || Actor.findChar(cell) != null
-                    || level.plants.get(cell) != null || !canFlood(level, cell)
-                    || !douseSafeForCharacters(level, cell, hero)) continue;
-            int stand = nearbyStand(level, cell, cell, 2, false, null, safe, distances,
-                    hero, null);
-            if (stand >= 0 && distances[stand] < shortest) {
-                chosen = trap;
-                bestStand = stand;
-                shortest = distances[stand];
-            }
-        }
-        if (chosen == null) return Action.NONE;
-        if (hero.rooted && bestStand != hero.pos) return Action.NONE;
-        if (bestStand != hero.pos) {
-            hero.curAction = new HeroAction.Move(BlastAutoPlay.firstStep(bestStand, safe, distances));
-            BlastLog.debug("auto-trap pos=" + hero.pos + " trap="
-                    + chosen.getClass().getSimpleName() + "@" + chosen.pos
-                    + " stand=" + bestStand + " action=aqua-move");
-            return Action.MOVE;
-        }
-        if (aqua.throwPos(hero, chosen.pos) != chosen.pos) {
-            logRejection(hero, chosen, "blocked-trajectory");
-            return Action.NONE;
-        }
-        BlastLog.debug("auto-trap pos=" + hero.pos + " trap="
-                + chosen.getClass().getSimpleName() + "@" + chosen.pos
-                + " item=AquaBrew action=aqua");
-        aqua.setCurrent(hero);
-        aqua.cast(hero, chosen.pos);
-        return Action.THROW;
+        BlastAutoAqua.Action action = BlastAutoAqua.chooseAction(
+                hero, safe, distances, null, -1,
+                BlastAutoEnvironment.activeHazards(level),
+                BlastAutoEnvironment.activeSpecialBarriers(level));
+        if (action == BlastAutoAqua.Action.MOVE) return Action.MOVE;
+        if (action == BlastAutoAqua.Action.THROW) return Action.THROW;
+        return Action.NONE;
     }
 
     /** Return a preferred corridor approach; zero allows an off-axis stand. */

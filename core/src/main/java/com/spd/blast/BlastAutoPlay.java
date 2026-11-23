@@ -199,6 +199,7 @@ public final class BlastAutoPlay {
         clearFreeBombInputs();
         BlastAutoPickup.reset();
         BlastAutoTrapClearer.reset();
+        BlastAutoSpecialRooms.reset();
         BlastAutoSacrifice.reset();
         BlastAutoFood.stopFeeding();
 
@@ -800,6 +801,15 @@ public final class BlastAutoPlay {
             return false;
         }
 
+        // Finish a levitating crossing before ordinary idle tasks consume its duration.
+        debugDecision = "special-flight";
+        BlastAutoSpecialRooms.Action flightAction =
+                BlastAutoSpecialRooms.continueFlight(hero, safe, distances);
+        if (flightAction != BlastAutoSpecialRooms.Action.NONE) {
+            roaming.clearDestination();
+            return flightAction == BlastAutoSpecialRooms.Action.USE;
+        }
+
         // Feed only during idle auto-play, after combat and interrupted manual travel.
         // Food.execute owns the animated eating turn and its native time cost.
         debugDecision = "food";
@@ -881,6 +891,21 @@ public final class BlastAutoPlay {
             return false;
         }
 
+        // Approach solvable fire and trap rooms before ordinary trap clearing.
+        idleSafe = progress.safeFor(safe, hero.pos, BlastAutoProgressGuard.Intent.ROAM);
+        idleDistances = navigationDistances(hero.pos, safe, distances, idleSafe);
+        debugDecision = "special-room";
+        BlastAutoSpecialRooms.Action roomAction =
+                BlastAutoSpecialRooms.chooseAction(hero, idleSafe, idleDistances,
+                        hazards, specialBarriers);
+        if (roomAction != BlastAutoSpecialRooms.Action.NONE) {
+            roaming.clearDestination();
+            if (roomAction == BlastAutoSpecialRooms.Action.MOVE) {
+                progress.intent(BlastAutoProgressGuard.Intent.ROAM);
+            }
+            return roomAction == BlastAutoSpecialRooms.Action.USE;
+        }
+
         // Clear reachable traps before repeatedly planting new grass.
         idleSafe = progress.safeFor(safe, hero.pos, BlastAutoProgressGuard.Intent.ROAM);
         idleDistances = navigationDistances(hero.pos, safe, distances, idleSafe);
@@ -893,6 +918,19 @@ public final class BlastAutoPlay {
                 progress.intent(BlastAutoProgressGuard.Intent.ROAM);
             }
             return trapAction == BlastAutoTrapClearer.Action.THROW;
+        }
+
+        // Barricades block navigation but can be destroyed by ordinary bombs.
+        // Keep trap clearance and manual travel above optional demolition.
+        debugDecision = "barricade";
+        BlastAutoBarricade.Action barricadeAction =
+                BlastAutoBarricade.chooseAction(hero, idleSafe, idleDistances);
+        if (barricadeAction != BlastAutoBarricade.Action.NONE) {
+            roaming.clearDestination();
+            if (barricadeAction == BlastAutoBarricade.Action.MOVE) {
+                progress.intent(BlastAutoProgressGuard.Intent.ROAM);
+            }
+            return barricadeAction == BlastAutoBarricade.Action.DETONATE;
         }
 
         // Only planting new grass depends on the separate farming setting.
@@ -1014,6 +1052,7 @@ public final class BlastAutoPlay {
         clearFreeBombInputs();
         BlastAutoPickup.reset();
         BlastAutoTrapClearer.reset();
+        BlastAutoSpecialRooms.reset();
         BlastAutoSacrifice.reset();
         BlastAutoFood.stopFeeding();
     }
@@ -1152,14 +1191,19 @@ public final class BlastAutoPlay {
         Level level = Dungeon.level;
         boolean[] safe = Dungeon.findPassable(hero, level.passable, hero.fieldOfView, true).clone();
         boolean phaseEnabled = BlastMovement.enabled();
+        com.shatteredpixel.shatteredpixeldungeon.levels.rooms.special.TrapsRoom flightRoom =
+                BlastAutoSpecialRooms.flightRoom(level, hero);
 
         for (int cell = 0; cell < safe.length; cell++) {
             boolean known = level.visited[cell] || level.mapped[cell] || hero.fieldOfView[cell];
+            boolean airborne = known && flightRoom != null
+                    && BlastAutoSpecialRooms.flightTile(level, flightRoom, cell);
             boolean traversable = safe[cell]
-                    || (phaseEnabled && known && BlastMovement.canPhase(cell));
+                    || (phaseEnabled && known && BlastMovement.canPhase(cell))
+                    || airborne;
             safe[cell] = known && level.insideMap(cell) && traversable
-                    && !level.pit[cell]
-                    && isTrapSafe(level.traps.get(cell))
+                    && (!level.pit[cell] || airborne)
+                    && (isTrapSafe(level.traps.get(cell)) || airborne)
                     && !AutoPlayPlantSafety.isHarmful(level.plants.get(cell))
                     && (!BlastAutoEnvironment.hazardousAt(cell, hazards)
                         || (allowGas && BlastAutoEnvironment.gasOnlyAt(cell, hazards)))
