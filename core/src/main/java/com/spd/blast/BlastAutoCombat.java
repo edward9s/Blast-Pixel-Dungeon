@@ -60,14 +60,8 @@ final class BlastAutoCombat {
         ArrayList<Mob> targets = enemies(hero);
         if (targets.isEmpty()) return Action.NONE;
 
-        // Reuse equipment candidates across targets; safety and damage stay target-dependent.
-        CombatEquipment equipment = new CombatEquipment(hero);
-
-        // Preserve threat priority, but try another enemy before spending a turn moving.
-        for (Mob target : targets) {
-            Action action = chooseAttack(hero, target, equipment);
-            if (action != Action.NONE) return action;
-        }
+        Action attack = attackFromTargets(hero, targets);
+        if (attack != Action.NONE) return attack;
 
         if (hero.rooted) return Action.NONE;
         for (Mob target : targets) {
@@ -82,6 +76,23 @@ final class BlastAutoCombat {
                         BlastAutoPlay.firstStep(destination, safe, distances));
                 return Action.QUEUED;
             }
+        }
+        return Action.NONE;
+    }
+
+    /** Attack from the current tile without moving toward an enemy. */
+    static Action attackIfPossible(Hero hero) {
+        return attackFromTargets(hero, enemies(hero));
+    }
+
+    private static Action attackFromTargets(Hero hero, ArrayList<Mob> targets) {
+        if (targets.isEmpty()) return Action.NONE;
+        // Reuse equipment candidates across targets; safety and damage stay target-dependent.
+        CombatEquipment equipment = new CombatEquipment(hero);
+        // Preserve threat priority, but try another enemy before spending a turn moving.
+        for (Mob target : targets) {
+            Action action = chooseAttack(hero, target, equipment);
+            if (action != Action.NONE) return action;
         }
         return Action.NONE;
     }
