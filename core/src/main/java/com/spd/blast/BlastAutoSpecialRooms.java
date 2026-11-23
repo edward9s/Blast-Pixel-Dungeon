@@ -41,6 +41,7 @@ final class BlastAutoSpecialRooms {
         lastFireVolume = 0;
         BlastAutoChasmRoom.reset();
         BlastAutoSummoningRoom.reset();
+        BlastAutoSentryRoom.reset();
     }
 
     static boolean flightTerrain(int terrain) {
@@ -186,6 +187,10 @@ final class BlastAutoSpecialRooms {
 
         Action fire = clearEternalFire(hero, safe, distances);
         if (fire != Action.NONE) return fire;
+
+        Action sentry = BlastAutoSentryRoom.chooseAction(
+                hero, safe, distances, hazards, specialBarriers);
+        if (sentry != Action.NONE) return sentry;
 
         Action toxic = BlastAutoToxicRoom.chooseAction(hero, safe, distances,
                 hazards, specialBarriers);
