@@ -7,6 +7,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.ToxicGas;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroAction;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
+import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
 import com.shatteredpixel.shatteredpixeldungeon.items.bombs.Bomb;
 import com.shatteredpixel.shatteredpixeldungeon.items.potions.brews.AquaBrew;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
@@ -43,7 +44,7 @@ final class BlastAutoToxicRoom {
     }
 
     /** Permanently destroy the doorway only after every gas source stops emitting. */
-    static boolean demolishDoor(boolean sourceActive, boolean gasInside) {
+    static boolean shouldDemolishDoor(boolean sourceActive, boolean gasInside) {
         return !sourceActive && gasInside;
     }
 
@@ -121,6 +122,14 @@ final class BlastAutoToxicRoom {
         return best;
     }
 
+    /** Do not destroy loose loot when opening ventilation with a bomb. */
+    private static boolean containsLooseItems(Level level, boolean[] blast) {
+        for (Heap heap : level.heaps.valueList()) {
+            if (!heap.isEmpty() && blast[heap.pos]) return true;
+        }
+        return false;
+    }
+
     /**
      * A normal Bomb destroys flammable DOOR and OPEN_DOOR terrain permanently.
      * Share the barricade explosion's allied / neutral / sleeping mob policy.
@@ -160,7 +169,8 @@ final class BlastAutoToxicRoom {
                 int landing = remoteThrow ? BlastBombTrajectory.throwPos(stand, door) : stand;
                 if (!level.insideMap(landing) || level.pit[landing]) continue;
                 boolean[] blast = ordinary.blastWarningCells(landing);
-                if (!BlastAutoBarricade.canDetonate(blast, door, stand, protectedHero)) continue;
+                if (!BlastAutoBarricade.canDetonate(blast, door, stand, protectedHero)
+                        || containsLooseItems(level, blast)) continue;
                 closestStand = stand;
                 shortest = distances[stand];
             }
@@ -213,18 +223,17 @@ final class BlastAutoToxicRoom {
 
         int door = level.pointToCell(room.entrance());
         int terrain = level.map[door];
-        if (!breakableDoor(terrain)) return BlastAutoSpecialRooms.Action.NONE;
+        if (!breakableDoor(terrain)
+                || level.heaps.get(door) != null || Actor.findChar(door) != null)
+            return BlastAutoSpecialRooms.Action.NONE;
 
         // Permanent ventilation is safe only after Aqua Brew has stopped every vent.
         // Keep the existing temporary item-wedge solution as a fallback.
-        if (demolishDoor(sourceActive, gas)) {
+        if (shouldDemolishDoor(sourceActive, gas)) {
             BlastAutoSpecialRooms.Action bombing = demolishDoor(
                     hero, level, room, door, safe, distances);
             if (bombing != BlastAutoSpecialRooms.Action.NONE) return bombing;
         }
-        if (level.heaps.get(door) != null || Actor.findChar(door) != null)
-            return BlastAutoSpecialRooms.Action.NONE;
-
         Item spare = BlastAutoTrapClearer.chooseThrowItem(hero.belongings.backpack,
                 candidate -> candidate.isEquipped(hero));
         if (spare == null) return BlastAutoSpecialRooms.Action.NONE;
