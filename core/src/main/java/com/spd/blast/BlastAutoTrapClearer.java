@@ -17,6 +17,9 @@ import com.shatteredpixel.shatteredpixeldungeon.items.food.MeatPie;
 import com.shatteredpixel.shatteredpixeldungeon.items.potions.PotionOfFrost;
 import com.shatteredpixel.shatteredpixeldungeon.items.potions.brews.AquaBrew;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.Weapon;
+import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.MagesStaff;
+import com.shatteredpixel.shatteredpixeldungeon.items.wands.Wand;
+import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfCorrosion;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.BlazingTrap;
@@ -51,6 +54,7 @@ import java.util.function.Predicate;
 final class BlastAutoTrapClearer {
     private static final int MAX_THROW_DISTANCE = 8;
     private static final int GAS_MIN_DISTANCE = 2;
+    private static final int CORROSION_MIN_DISTANCE = 4;
     private static final int GAS_ESCAPE_DISTANCE = 4;
     private static final int MAX_ESCAPE_STEPS = 8;
     private static final int LOG_REPEAT_INTERVAL = 10;
@@ -228,6 +232,37 @@ final class BlastAutoTrapClearer {
 
     private static boolean fireTrap(Trap trap) {
         return trap.getClass() == BurningTrap.class || trap.getClass() == BlazingTrap.class;
+    }
+
+    /** Reuse the native wand zap, including a staff's imbued wand. */
+    private static WandOfCorrosion readyCorrosionWand(Hero hero) {
+        if (hero.belongings.weapon() instanceof MagesStaff) {
+            Wand staff = ((MagesStaff) hero.belongings.weapon()).blastAutoPlayWand();
+            if (staff instanceof WandOfCorrosion && staff.blastAutoCanZap(hero)) {
+                return (WandOfCorrosion) staff;
+            }
+        }
+        if (!hero.belongings.lostInventory()) {
+            for (Item item : hero.belongings) {
+                if (item instanceof WandOfCorrosion
+                        && ((WandOfCorrosion) item).blastAutoCanZap(hero)) {
+                    return (WandOfCorrosion) item;
+                }
+            }
+        }
+        return null;
+    }
+
+    private static boolean corrosionSafeForTrap(Hero hero, Level level, int trapCell) {
+        if (Blob.volumeAt(hero.pos, CorrosiveGas.class) > 0
+                || Blob.volumeAt(trapCell, CorrosiveGas.class) > 0) return false;
+        // The cloud spreads over time; keep it away from protected characters.
+        for (Char character : Actor.chars()) {
+            if (character != hero && character.isAlive()
+                    && character.alignment != Char.Alignment.ENEMY
+                    && level.distance(trapCell, character.pos) <= 6) return false;
+        }
+        return true;
     }
 
     /** Both revealed and secret terrain can activate a trap when an item lands. */
@@ -546,10 +581,12 @@ final class BlastAutoTrapClearer {
         if (safe.length != level.length() || distances.length != level.length()) {
             throw new IllegalArgumentException("Invalid trap clearance navigation map");
         }
+        WandOfCorrosion corrosionWand = readyCorrosionWand(hero);
         Trap chosen = null;
         int bestStand = -1;
         int bestTarget = -1;
         boolean bestFrost = false;
+        boolean bestCorrosion = false;
         int shortest = Integer.MAX_VALUE;
         Trap rejectedTrap = null;
         String rejectedReason = null;
@@ -596,6 +633,21 @@ final class BlastAutoTrapClearer {
                     }
                     int target = cell;
                     boolean frost = false;
+                    boolean corrosion = false;
+                    if (corrosionWand != null && corrosionSafeForTrap(hero, level, cell)) {
+                        // Corrosion presses the unoccupied impact tile, but seeds gas.
+                        int wandMinimum = Math.max(CORROSION_MIN_DISTANCE, minimum);
+                        int wandStand = side == 0
+                                ? nearbyStand(level, cell, cell, wandMinimum, true, trap,
+                                        safe, distances, hero, aimed)
+                                : throwingStand(level, cell, side, wandMinimum, true, trap,
+                                        safe, distances, hero, aimed);
+                        if (wandStand >= 0 && new Ballistica(wandStand, cell,
+                                corrosionWand.collisionProperties(cell)).collisionPos == cell) {
+                            stand = wandStand;
+                            corrosion = true;
+                        }
+                    }
                     if (stand < 0 && fireTrap(trap)) {
                         PotionOfFrost potion = hero.belongings.getItem(PotionOfFrost.class);
                         if (potion != null && potion.quantity() > 0 && potion.isKnown()) {
@@ -614,12 +666,14 @@ final class BlastAutoTrapClearer {
                     if (stand < 0) reason = "no-safe-stand";
                     else if (aimedOnly && (stand != hero.pos || target != cell))
                         reason = "not-in-range";
-                    else if (hero.rooted && (stand != hero.pos || gas)) reason = "rooted";
-                    else if (distances[stand] < shortest) {
+                    else if (hero.rooted && (stand != hero.pos || gas || corrosion)) reason = "rooted";
+                    else if (distances[stand] < shortest
+                            || (distances[stand] == shortest && corrosion && !bestCorrosion)) {
                         chosen = trap;
                         bestStand = stand;
                         bestTarget = target;
                         bestFrost = frost;
+                        bestCorrosion = corrosion;
                         shortest = distances[stand];
                     }
                 }
@@ -641,18 +695,18 @@ final class BlastAutoTrapClearer {
             logRejection(hero, rejectedTrap, rejectedReason);
             return Action.NONE;
         }
-        if (hero.belongings.lostInventory()) {
+        if (!bestCorrosion && hero.belongings.lostInventory()) {
             logRejection(hero, chosen, "lost-inventory");
             return Action.NONE;
         }
-        Item item = bestFrost ? hero.belongings.getItem(PotionOfFrost.class)
+        Item item = bestCorrosion ? null : bestFrost ? hero.belongings.getItem(PotionOfFrost.class)
                 : chooseThrowItem(hero.belongings.backpack, candidate -> candidate.isEquipped(hero));
         // If no spare item exists, a known frost potion can still clear a fire trap.
-        if (item == null && bestTarget == chosen.pos && fireTrap(chosen)) {
+        if (!bestCorrosion && item == null && bestTarget == chosen.pos && fireTrap(chosen)) {
             item = hero.belongings.getItem(PotionOfFrost.class);
         }
-        if (item == null || (item instanceof PotionOfFrost
-                && (!((PotionOfFrost) item).isKnown() || item.quantity() <= 0))) {
+        if (!bestCorrosion && (item == null || (item instanceof PotionOfFrost
+                && (!((PotionOfFrost) item).isKnown() || item.quantity() <= 0)))) {
             if (!aimedOnly) {
                 Action aqua = douseWithAqua(hero, safe, distances);
                 if (aqua != Action.NONE) return aqua;
@@ -672,6 +726,27 @@ final class BlastAutoTrapClearer {
                         predictAimedTargets(hero, level, chosen.pos))) {
             logRejection(hero, chosen, "unsafe-target");
             return Action.NONE;
+        }
+        if (bestCorrosion) {
+            // Recheck the actual wand collision cell; another character may
+            // have entered the trajectory during the approach.
+            if (!corrosionWand.blastAutoCanZap(hero)
+                    || !corrosionSafeForTrap(hero, level, chosen.pos)
+                    || level.distance(hero.pos, chosen.pos) < CORROSION_MIN_DISTANCE
+                    || !hasGasRetreat(level, chosen.pos, hero.pos, safe)
+                    || new Ballistica(hero.pos, chosen.pos,
+                            corrosionWand.collisionProperties(chosen.pos)).collisionPos
+                            != chosen.pos) {
+                logRejection(hero, chosen, "unsafe-corrosion");
+                return Action.NONE;
+            }
+            if (!corrosionWand.blastAutoZap(hero, chosen.pos)) return Action.NONE;
+            gasOrigin = chosen.pos;
+            gasType = spreadingGas(chosen) == null ? CorrosiveGas.class : spreadingGas(chosen);
+            BlastLog.debug("auto-trap pos=" + hero.pos + " trap="
+                    + chosen.getClass().getSimpleName() + "@" + chosen.pos
+                    + " wand=corrosion action=zap");
+            return Action.THROW;
         }
         // A cast must use the item's real trajectory for both door and trap.
         if (item.throwPos(hero, bestTarget) != bestTarget) {

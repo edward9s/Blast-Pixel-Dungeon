@@ -39,6 +39,8 @@ import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfFrost;
 import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfLightning;
 import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfDisintegration;
 import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfCorrosion;
+import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfBlastWave;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.Trap;
 import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfMagicMissile;
 import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfPrismaticLight;
 import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfTransfusion;
@@ -250,6 +252,7 @@ final class BlastAutoCombat {
             damage = 2f * Math.max(1, 2 + wand.buffedLvl());
         } else if (wand instanceof DamageWand && (wand instanceof WandOfMagicMissile
                 || wand instanceof WandOfFrost || wand instanceof WandOfPrismaticLight
+                || wand instanceof WandOfBlastWave
                 || wand instanceof WandOfLightning || wand instanceof WandOfDisintegration
                 || (wand instanceof WandOfTransfusion
                     && target.properties().contains(Char.Property.UNDEAD)))) {
@@ -265,6 +268,8 @@ final class BlastAutoCombat {
             } else {
                 aim = QuickSlotButton.autoAim(target, wand);
                 if (aim < 0) return best;
+                if (wand instanceof WandOfBlastWave
+                        && !blastWaveSafe(hero, target, wand, aim)) return best;
                 if (wand instanceof WandOfLightning) {
                     float multiplier = lightningMultiplier(hero, target);
                     if (multiplier <= 0f) return best;
@@ -288,6 +293,47 @@ final class BlastAutoCombat {
         if (aim < 0 || aim == hero.pos || damage <= 0f) return best;
         if (best == null || damage > best.damage) return new Choice(null, wand, aim, damage);
         return best;
+    }
+
+    /** The native wave only affects the impact cell and its eight neighbours. */
+    static boolean blastWaveOutsideRadius(int heroCell, int impactCell, int width) {
+        if (heroCell < 0 || impactCell < 0 || width <= 0) {
+            throw new IllegalArgumentException("Invalid blast-wave coordinates");
+        }
+        return Math.abs(heroCell % width - impactCell % width) > 1
+                || Math.abs(heroCell / width - impactCell / width) > 1;
+    }
+
+    private static boolean blastWaveSafe(Hero hero, Mob target, Wand wand, int aim) {
+        int width = Dungeon.level.width();
+        int impact = new Ballistica(hero.pos, aim, wand.collisionProperties(aim)).collisionPos;
+        if (!Dungeon.level.insideMap(impact)
+                || !blastWaveOutsideRadius(hero.pos, impact, width)
+                || Math.abs(target.pos % width - impact % width) > 1
+                || Math.abs(target.pos / width - impact / width) > 1) return false;
+
+        // Native Blast Wave presses every tile before pushing characters.
+        // A triggered trap or displaced neutral could cause indirect harm.
+        int x = impact % width;
+        int y = impact / width;
+        for (int dy = -1; dy <= 1; dy++) {
+            for (int dx = -1; dx <= 1; dx++) {
+                int nx = x + dx, ny = y + dy;
+                if (nx < 0 || nx >= width || ny < 0
+                        || ny >= Dungeon.level.length() / width) continue;
+                int cell = nx + ny * width;
+                Trap trap = Dungeon.level.traps.get(cell);
+                if (trap != null && trap.active) return false;
+                Char occupant = Actor.findChar(cell);
+                if (occupant != null && occupant != target
+                        && (occupant.alignment != Char.Alignment.ENEMY
+                            || (occupant instanceof Mob
+                                && BlastAutoPlay.isAutoAttackExcluded((Mob) occupant)))) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     private static boolean disintegrationSafe(Hero hero, Mob target, Wand wand) {
