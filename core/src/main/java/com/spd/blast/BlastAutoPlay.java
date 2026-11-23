@@ -638,6 +638,19 @@ public final class BlastAutoPlay {
             }
         }
 
+        // Cleanse the rare red wraith before any bomb or weapon attack.
+        debugDecision = "grave-spirit";
+        BlastAutoSpecialRooms.Action spirit = BlastAutoGraves.cleanse(hero, safe, distances);
+        if (spirit != BlastAutoSpecialRooms.Action.NONE)
+            return spirit == BlastAutoSpecialRooms.Action.USE;
+
+        // Finish a sprint before unrelated actions consume the haste window.
+        debugDecision = "sentry-run";
+        BlastAutoSpecialRooms.Action sentryRun = BlastAutoSentryRoom.continueRun(
+                hero, safe, distances, hazards, specialBarriers);
+        if (sentryRun != BlastAutoSpecialRooms.Action.NONE)
+            return sentryRun == BlastAutoSpecialRooms.Action.USE;
+
         // Wait for delayed summons, then let existing indestructible combat handle them.
         debugDecision = "summoning-wait";
         if (BlastAutoSummoningRoom.awaitWave(hero)) return true;
@@ -841,6 +854,16 @@ public final class BlastAutoPlay {
         if (BlastAutoInteract.chooseAction(hero, idleSafe, idleDistances)) {
             progress.intent(BlastAutoProgressGuard.Intent.INTERACT);
             return false;
+        }
+
+        // Open prepared tombs; spawned wraiths go to the existing combat AI.
+        debugDecision = "grave";
+        BlastAutoSpecialRooms.Action grave =
+                BlastAutoGraves.openTomb(hero, idleSafe, idleDistances);
+        if (grave != BlastAutoSpecialRooms.Action.NONE) {
+            roaming.clearDestination();
+            progress.intent(BlastAutoProgressGuard.Intent.INTERACT);
+            return grave == BlastAutoSpecialRooms.Action.USE;
         }
 
         // Previously seen hidden doors remain investigation targets even after
