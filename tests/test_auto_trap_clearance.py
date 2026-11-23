@@ -168,6 +168,17 @@ class AutoTrapClearanceTest(unittest.TestCase):
         self.assertNotIn("aqua.shatter(", CLEAR)
         self.assertNotIn("level.pressCell(", CLEAR)
 
+    def test_reusable_missiles_trigger_traps_before_consuming_gear(self):
+        self.assertIn("static boolean safeTrapMissile(MissileWeapon missile)", CLEAR)
+        self.assertIn("candidate.getClass() == Dart.class", CLEAR)
+        self.assertIn("missile != null ? missile", CLEAR)
+        self.assertIn("missile.trueLevel() == 0", CLEAR)
+        self.assertIn("!(missile instanceof ForceCube)", CLEAR)
+        self.assertIn("!(missile instanceof HeavyBoomerang)", CLEAR)
+        self.assertIn("!(missile instanceof TippedDart)", CLEAR)
+        self.assertIn("!missile.hasGoodEnchant()", CLEAR)
+        self.assertIn("item.cast(hero, bestTarget)", CLEAR)
+
     def test_inventory_and_native_throw(self):
         self.assertIn("item instanceof Weapon || item instanceof Armor", CLEAR)
         self.assertIn("item instanceof Food", CLEAR)
