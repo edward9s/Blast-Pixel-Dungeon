@@ -583,6 +583,8 @@ public final class BlastAutoPlay {
         if (hero.buff(BlastTestBuffs.Indestructible.class) != null
                 && hero.buff(Burning.class) == null
                 && !specialBarriers[hero.pos]
+                && (!BlastAutoEnvironment.hazardousAt(hero.pos, hazards)
+                        || BlastAutoEnvironment.gasOnlyAt(hero.pos, hazards))
                 && (toxicRetreat >= 0 || BlastAutoEnvironment.gasOnlyAt(hero.pos, hazards))) {
             debugDecision = "gas-ranged-bomb";
             if (BlastAutoBombAI.actAgainstRanged(hero)) return true;
