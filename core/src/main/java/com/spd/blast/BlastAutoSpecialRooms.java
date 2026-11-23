@@ -126,7 +126,9 @@ final class BlastAutoSpecialRooms {
                 chest != null && chest.type == Heap.Type.CHEST, retreat)) {
             activeFlightRoom = null;
             flightTreasure = -1;
-            return Action.NONE;
+            // Rebuild safeCells next tick before unrelated roaming can use stale float paths.
+            hero.spendAndNext(Actor.TICK);
+            return Action.USE;
         }
         if (!retreat && chest != null && chest.type == Heap.Type.CHEST
                 && safe[flightTreasure] && distances[flightTreasure] != Integer.MAX_VALUE) {
