@@ -22,6 +22,31 @@ result collection:
 python -m unittest discover -s tests -p test_auto_alchemy.py
 ```
 
+## Special-room entrance objectives
+
+Special-room automation must establish a known, reachable pending objective
+before it takes control and navigates toward the room entrance. The shared
+`BlastAutoSpecialRooms.approachEntrance` guard rejects absent objectives,
+unreachable entrances, and rooted movement. Without a pending objective,
+ordinary exploration and pickup are free to re-enter an already visited room.
+
+The secret summoning room first finds a visible, mapped, or previously visited
+active Summoning Trap reachable from the entrance. When all eligible traps
+have fired, or none is known, it no longer pulls the hero from exploration
+back to the door. Chasm-vault automation no longer drinks Levitation solely
+to return to the entrance when there are no keys, unopened chests, or loot.
+Sentry and ordinary trapped-chest rooms also use the same entrance rule.
+
+An **active** timed crossing still uses its existing safety retreat; this
+change only prevents beginning or repeating work without an objective.
+
+`BlastAutoSpecialRoomsTest.java` verifies the shared entrance predicate,
+and the source-level checks enforce objective-first ordering in the room AIs:
+
+```sh
+python -m unittest discover -s tests -p test_auto_special_room_objectives.py
+```
+
 ## Automatic trap clearance
 
 After combat, food, pickup, interaction, and ordinary harvesting, idle auto-play
