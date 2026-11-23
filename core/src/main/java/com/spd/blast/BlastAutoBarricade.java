@@ -8,14 +8,29 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroAction;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
 import com.shatteredpixel.shatteredpixeldungeon.items.bombs.Bomb;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
+import com.shatteredpixel.shatteredpixeldungeon.levels.RegularLevel;
+import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.secret.SecretRunestoneRoom;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
 import com.watabou.utils.PathFinder;
 
-/** Approach discovered barricades and clear them with ordinary Bomb Maniac charges. */
+/** Clear discovered barricades and SecretRunestoneRoom bookshelf partitions with ordinary bombs. */
 final class BlastAutoBarricade {
     enum Action { NONE, MOVE, DETONATE }
 
     private BlastAutoBarricade() {}
+
+    /** Only bookshelf partitions in the enchantment-runestone secret room are objectives. */
+    static boolean demolitionTarget(int terrain, boolean inRunestoneRoom) {
+        return terrain == Terrain.BARRICADE
+                || (terrain == Terrain.BOOKSHELF && inRunestoneRoom);
+    }
+
+    private static boolean inRunestoneRoom(Level level, SecretRunestoneRoom room, int cell) {
+        if (room == null) return false;
+        int x = cell % level.width(), y = cell / level.width();
+        return x > room.left && x < room.right && y > room.top && y < room.bottom;
+    }
+
 
     static boolean reachesSafely(boolean[] blast, int barricade, int origin,
                                  boolean protectedHero) {
@@ -57,6 +72,9 @@ final class BlastAutoBarricade {
         boolean remoteThrow = BlastSettings.testRemoteThrow();
         if (!protectedHero && !remoteThrow) return Action.NONE;
         Bomb ordinaryBomb = maniac.bombAt(0);
+        SecretRunestoneRoom runestoneRoom = level instanceof RegularLevel
+                ? (SecretRunestoneRoom) ((RegularLevel) level).room(SecretRunestoneRoom.class)
+                : null;
 
         // A remote throw can clear a visible barricade immediately, even without
         // bomb immunity, provided the Hero stands outside the blast.
@@ -64,7 +82,9 @@ final class BlastAutoBarricade {
             int target = -1;
             int nearest = Integer.MAX_VALUE;
             for (int cell = 0; cell < level.length(); cell++) {
-                if (level.map[cell] != Terrain.BARRICADE || !hero.fieldOfView[cell]) continue;
+                if (!demolitionTarget(level.map[cell],
+                        inRunestoneRoom(level, runestoneRoom, cell))
+                        || !hero.fieldOfView[cell]) continue;
                 int landing = BlastBombTrajectory.throwPos(hero.pos, cell);
                 if (!level.insideMap(landing) || level.pit[landing]) continue;
                 boolean[] blast = ordinaryBomb.blastWarningCells(landing);
@@ -87,7 +107,8 @@ final class BlastAutoBarricade {
         int bestStand = -1;
         int bestSteps = Integer.MAX_VALUE;
         for (int cell = 0; cell < level.length(); cell++) {
-            if (level.map[cell] != Terrain.BARRICADE
+            if (!demolitionTarget(level.map[cell],
+                    inRunestoneRoom(level, runestoneRoom, cell))
                     || !(hero.fieldOfView[cell] || level.mapped[cell] || level.visited[cell])) {
                 continue;
             }
