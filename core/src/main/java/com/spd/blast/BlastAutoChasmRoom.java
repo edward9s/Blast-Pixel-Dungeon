@@ -41,7 +41,8 @@ final class BlastAutoChasmRoom {
                 ((RegularLevel) level).room(SecretChestChasmRoom.class);
         if (room == null || room.entrance() == null) return null;
         int entrance = level.pointToCell(room.entrance());
-        return activeEntrance == entrance || room.inside(level.cellToPoint(hero.pos))
+        boolean inside = room.inside(level.cellToPoint(hero.pos));
+        return (inside || activeEntrance == entrance && hero.pos == entrance)
                 ? room : null;
     }
 
