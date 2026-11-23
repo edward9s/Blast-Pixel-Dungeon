@@ -44,6 +44,7 @@ public final class BlastAutoAquaTest {
         check(BlastAutoAqua.waterableTerrain(Terrain.TRAP), "visible trap waterable");
         check(BlastAutoAqua.waterableTerrain(Terrain.SECRET_TRAP), "hidden trap waterable");
         check(BlastAutoAqua.waterableTerrain(Terrain.EMPTY), "empty floor waterable");
+        check(BlastAutoAqua.waterableTerrain(Terrain.EMPTY_SP), "red sentry floor waterable");
         check(BlastAutoAqua.waterableTerrain(Terrain.WATER), "existing water is valid landing");
         check(!BlastAutoAqua.waterableTerrain(Terrain.CHASM), "cannot flood chasm");
         check(!BlastAutoAqua.waterableTerrain(Terrain.PEDESTAL), "preserve treasure pedestal");
