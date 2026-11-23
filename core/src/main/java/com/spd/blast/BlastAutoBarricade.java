@@ -26,9 +26,10 @@ final class BlastAutoBarricade {
         return blast[barricade] && (protectedHero || !blast[origin]);
     }
 
-    private static boolean canDetonate(boolean[] blast, int barricade, int origin,
+    /** Shared safety policy for blasts aimed at a destructible terrain cell. */
+    static boolean canDetonate(boolean[] blast, int target, int origin,
                                        boolean protectedHero) {
-        if (!reachesSafely(blast, barricade, origin, protectedHero)) return false;
+        if (!reachesSafely(blast, target, origin, protectedHero)) return false;
         for (Mob mob : Dungeon.level.mobs) {
             if (!mob.isAlive() || !blast[mob.pos]) continue;
             // Keep automatic combat's sleeping-enemy and protected-NPC rules.
