@@ -23,6 +23,33 @@ public final class BlastAutoSpecialRoomsTest {
                 "cancel at the entrance when floating is about to expire");
         check(!BlastAutoSpecialRooms.finishFlight(false, false, true),
                 "retreat is still required while inside the room");
+
+        // The shared rule must not reclaim the entrance when a room is completed
+        // or its remaining objective is unreachable.
+        boolean[] safe = {true, true, true, true, true, true};
+        int[] distances = {0, 1, 2, 3, 4, 5};
+        check(BlastAutoSpecialRooms.canApproachEntrance(5, 2, 0, false, safe, distances),
+                "known reachable objective permits entrance approach");
+        check(!BlastAutoSpecialRooms.canApproachEntrance(-1, 2, 0, false, safe, distances),
+                "no objective means no return to the room entrance");
+        check(!BlastAutoSpecialRooms.canApproachEntrance(5, 2, 2, false, safe, distances),
+                "already at entrance");
+        check(!BlastAutoSpecialRooms.canApproachEntrance(5, 2, 0, true, safe, distances),
+                "rooted hero cannot approach");
+        safe[2] = false;
+        check(!BlastAutoSpecialRooms.canApproachEntrance(5, 2, 0, false, safe, distances),
+                "blocked entrance cannot be approached");
+        safe[2] = true;
+        distances[2] = Integer.MAX_VALUE;
+        check(!BlastAutoSpecialRooms.canApproachEntrance(5, 2, 0, false, safe, distances),
+                "unreachable entrance cannot be approached");
+        try {
+            BlastAutoSpecialRooms.canApproachEntrance(6, 2, 0, false, safe, distances);
+            throw new AssertionError("out-of-range objective must fail");
+        } catch (IllegalArgumentException expected) {
+            // Invalid navigation state is a programming error.
+        }
+
         System.out.println("BlastAutoSpecialRoomsTest passed");
     }
 }

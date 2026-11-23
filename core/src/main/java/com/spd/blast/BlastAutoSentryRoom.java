@@ -179,11 +179,9 @@ final class BlastAutoSentryRoom {
                 haste == null ? Haste.DURATION - 1f : haste.cooldown(),
                 forward, backward, 1f / speed)) return BlastAutoSpecialRooms.Action.NONE;
 
-        if (hero.pos != exit) {
-            if (hero.rooted) return BlastAutoSpecialRooms.Action.NONE;
-            hero.curAction = new HeroAction.Move(BlastAutoPlay.firstStep(exit, safe, distances));
-            return BlastAutoSpecialRooms.Action.MOVE;
-        }
+        if (hero.pos != exit)
+            return BlastAutoSpecialRooms.approachEntrance(
+                    hero, treasure.pos, exit, safe, distances);
         activeEntrance = exit;
         activeTreasure = treasure.pos;
         if (haste == null) {

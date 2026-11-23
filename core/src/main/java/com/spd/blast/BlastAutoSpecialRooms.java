@@ -44,6 +44,27 @@ final class BlastAutoSpecialRooms {
         BlastAutoSentryRoom.reset();
     }
 
+    /** Special rooms may claim the entrance only for a known, pending objective. */
+    static boolean canApproachEntrance(int objective, int entrance, int position,
+                                       boolean rooted, boolean[] safe, int[] distances) {
+        if (safe == null || distances == null || safe.length != distances.length
+                || objective < -1 || objective >= safe.length
+                || entrance < 0 || entrance >= safe.length
+                || position < 0 || position >= safe.length)
+            throw new IllegalArgumentException("Invalid special-room entrance route");
+        return objective >= 0 && position != entrance && !rooted
+                && safe[entrance] && distances[entrance] > 0
+                && distances[entrance] != Integer.MAX_VALUE;
+    }
+
+    static Action approachEntrance(Hero hero, int objective, int entrance,
+                                   boolean[] safe, int[] distances) {
+        if (!canApproachEntrance(objective, entrance, hero.pos, hero.rooted,
+                safe, distances)) return Action.NONE;
+        hero.curAction = new HeroAction.Move(BlastAutoPlay.firstStep(entrance, safe, distances));
+        return Action.MOVE;
+    }
+
     static boolean flightTerrain(int terrain) {
         return terrain == Terrain.TRAP || terrain == Terrain.SECRET_TRAP
                 || terrain == Terrain.CHASM;
@@ -223,12 +244,8 @@ final class BlastAutoSpecialRooms {
             float timePerStep = Math.max(1f, 1f / hero.speed());
             if (toChest != Integer.MAX_VALUE && back != Integer.MAX_VALUE
                     && (toChest + back + 4) * timePerStep < Levitation.DURATION) {
-                if (hero.pos != exit) {
-                    if (hero.rooted) return Action.NONE;
-                    hero.curAction = new HeroAction.Move(
-                            BlastAutoPlay.firstStep(exit, safe, distances));
-                    return Action.MOVE;
-                }
+                if (hero.pos != exit)
+                    return approachEntrance(hero, chest.pos, exit, safe, distances);
                 activeFlightRoom = room;
                 flightTreasure = chest.pos;
                 BlastLog.debug("auto-room action=levitate chest=" + chest.pos);

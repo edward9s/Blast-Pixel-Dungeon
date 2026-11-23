@@ -233,18 +233,12 @@ final class BlastAutoChasmRoom {
         boolean lastPotion = potion.quantity() == 1;
         int goal = target(hero, room, flight, reach, entrance,
                 Levitation.DURATION - 1f, lastPotion, perStep);
-        if (goal < 0 && inside && reach[entrance] != Integer.MAX_VALUE
-                && enoughFlight(Levitation.DURATION, reach[entrance],
-                        0, 0, false, perStep)) {
-            goal = entrance;
-        }
+        // Having entered the room does not justify spending another potion
+        // when no key, unopened chest, or collectible loot remains.
         if (goal < 0) return BlastAutoSpecialRooms.Action.NONE;
-
-        if (hero.pos != origin) {
-            if (hero.rooted) return BlastAutoSpecialRooms.Action.NONE;
-            hero.curAction = new HeroAction.Move(BlastAutoPlay.firstStep(origin, safe, distances));
-            return BlastAutoSpecialRooms.Action.MOVE;
-        }
+        if (hero.pos != origin)
+            return BlastAutoSpecialRooms.approachEntrance(
+                    hero, goal, origin, safe, distances);
 
         activeEntrance = entrance;
         BlastLog.debug("auto-room action=chasm-levitate goal=" + goal

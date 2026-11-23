@@ -113,13 +113,6 @@ final class BlastAutoSummoningRoom {
 
         boolean inside = inside(level, room, hero.pos);
         int door = level.pointToCell(room.entrance());
-        if (!inside && hero.pos != door) {
-            if (!safe[door] || distances[door] == Integer.MAX_VALUE || hero.rooted)
-                return BlastAutoSpecialRooms.Action.NONE;
-            hero.curAction = new HeroAction.Move(
-                    BlastAutoPlay.firstStep(door, safe, distances));
-            return BlastAutoSpecialRooms.Action.MOVE;
-        }
         boolean[] path = safe.clone();
         for (int y = room.top + 1; y < room.bottom; y++) {
             for (int x = room.left + 1; x < room.right; x++) {
@@ -133,7 +126,10 @@ final class BlastAutoSummoningRoom {
                 path[cell] = true;
             }
         }
-        PathFinder.buildDistanceMap(hero.pos, path);
+        // Outside the room, plan from its entrance before claiming control.
+        // A cleared room has no actionable trap and must be left to roaming.
+        int origin = inside ? hero.pos : door;
+        PathFinder.buildDistanceMap(origin, path);
         int[] crossing = PathFinder.distance.clone();
         int best = -1, steps = Integer.MAX_VALUE;
         for (int y = room.top + 1; y < room.bottom; y++) {
@@ -147,6 +143,9 @@ final class BlastAutoSummoningRoom {
             }
         }
         if (best < 0 || hero.rooted) return BlastAutoSpecialRooms.Action.NONE;
+        if (!inside && hero.pos != door)
+            return BlastAutoSpecialRooms.approachEntrance(
+                    hero, best, door, safe, distances);
         int step = BlastAutoPlay.firstStep(best, path, crossing);
         if (isActiveSummoning(level, step)) {
             pendingCell = step;
