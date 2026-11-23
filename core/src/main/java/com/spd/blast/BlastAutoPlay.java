@@ -5,6 +5,7 @@ import com.shatteredpixel.shatteredpixeldungeon.SPDSettings;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.Blob;
+import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.SacrificialFire;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Burning;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroAction;
@@ -575,6 +576,37 @@ public final class BlastAutoPlay {
                 cell -> BlastAutoEnvironment.hazardousAt(cell, hazards)
                         || specialBarriers[cell]);
         int toxicRetreat = BlastAutoTrapClearer.gasRetreatStep(hero, safe);
+
+        // Persistent test invulnerability allows attacking before leaving gas.
+        // Only attack from the current tile; failed attacks retain normal retreat.
+        // Temporary bomb protection is insufficient for this exception.
+        if (hero.buff(BlastTestBuffs.Indestructible.class) != null
+                && hero.buff(Burning.class) == null
+                && !specialBarriers[hero.pos]
+                && (!BlastAutoEnvironment.hazardousAt(hero.pos, hazards)
+                        || BlastAutoEnvironment.gasOnlyAt(hero.pos, hazards))
+                && (toxicRetreat >= 0 || BlastAutoEnvironment.gasOnlyAt(hero.pos, hazards))) {
+            debugDecision = "gas-ranged-bomb";
+            if (BlastAutoBombAI.actAgainstRanged(hero)) return true;
+
+            // Do not bypass the sacrificial-fire requirement for melee targets.
+            Blob fire = Dungeon.level.blobs.get(SacrificialFire.class);
+            boolean sacrificeActive = fire != null && fire.volume > 0
+                    && BlastAutoSacrifice.knownFireCell(fire.cur, Dungeon.level.visited,
+                            Dungeon.level.mapped, hero.fieldOfView) >= 0;
+            if (sacrificeActive) {
+                debugDecision = "gas-sacrifice";
+                if (BlastAutoBombAI.actAgainstSacrifice(hero, fire.cur)) return true;
+            } else {
+                debugDecision = "gas-bomb";
+                if (BlastAutoBombAI.actAgainstOtherEnemies(hero)) return true;
+                debugDecision = "gas-combat";
+                BlastAutoCombat.Action attack = BlastAutoCombat.attackIfPossible(hero);
+                if (attack != BlastAutoCombat.Action.NONE) {
+                    return attack == BlastAutoCombat.Action.STARTED;
+                }
+            }
+        }
         if (toxicRetreat >= 0) {
             debugDecision = "trap-retreat";
             progress.intent(BlastAutoProgressGuard.Intent.RETREAT);
