@@ -98,6 +98,20 @@ public final class BlastAutoCombatTest {
         check(true, BlastAutoPlay.isAutoAttackExcluded(new DemonSpawner()),
                 "demon spawners must not be auto-attacked");
 
+        // The impact cell and all eight adjacent cells are dangerous.
+        rank(0, BlastAutoCombat.blastWaveOutsideRadius(24, 24, 7) ? 1 : 0,
+                "self blast is unsafe");
+        rank(0, BlastAutoCombat.blastWaveOutsideRadius(24, 25, 7) ? 1 : 0,
+                "adjacent blast is unsafe");
+        rank(0, BlastAutoCombat.blastWaveOutsideRadius(24, 32, 7) ? 1 : 0,
+                "diagonal blast is unsafe");
+        rank(1, BlastAutoCombat.blastWaveOutsideRadius(24, 26, 7) ? 1 : 0,
+                "two horizontal cells are safe");
+        rank(1, BlastAutoCombat.blastWaveOutsideRadius(24, 38, 7) ? 1 : 0,
+                "two vertical cells are safe");
+        rank(1, BlastAutoCombat.blastWaveOutsideRadius(20, 21, 7) ? 1 : 0,
+                "row wrapping is not adjacency");
+
         System.out.println("BlastAutoCombatTest passed");
     }
 }
