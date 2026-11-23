@@ -39,6 +39,8 @@ final class BlastAutoSpecialRooms {
         flightTreasure = -1;
         attemptedFire = false;
         lastFireVolume = 0;
+        BlastAutoChasmRoom.reset();
+        BlastAutoSummoningRoom.reset();
     }
 
     static boolean flightTerrain(int terrain) {
@@ -93,7 +95,11 @@ final class BlastAutoSpecialRooms {
     }
 
     /** An active crossing has priority over optional looting or roaming. */
-    static Action continueFlight(Hero hero, boolean[] safe, int[] distances) {
+    static Action continueFlight(Hero hero, boolean[] safe, int[] distances,
+                                 Blob[] hazards, boolean[] specialBarriers) {
+        Action chasm = BlastAutoChasmRoom.continueFlight(
+                hero, safe, distances, hazards, specialBarriers);
+        if (chasm != Action.NONE) return chasm;
         Level level = Dungeon.level;
         Levitation floating = hero.buff(Levitation.class);
         TrapsRoom room = flightRoom(level, hero);
@@ -174,6 +180,14 @@ final class BlastAutoSpecialRooms {
         Action toxic = BlastAutoToxicRoom.chooseAction(hero, safe, distances,
                 hazards, specialBarriers);
         if (toxic != Action.NONE) return toxic;
+
+        Action chasm = BlastAutoChasmRoom.chooseAction(
+                hero, safe, distances, hazards, specialBarriers);
+        if (chasm != Action.NONE) return chasm;
+
+        Action summoning = BlastAutoSummoningRoom.chooseAction(
+                hero, safe, distances, hazards, specialBarriers);
+        if (summoning != Action.NONE) return summoning;
 
         TrapsRoom room = (TrapsRoom) ((RegularLevel) level).room(TrapsRoom.class);
         if (room == null || room.entrance() == null) return Action.NONE;
