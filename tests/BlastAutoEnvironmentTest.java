@@ -108,6 +108,13 @@ public final class BlastAutoEnvironmentTest {
         check(false, sentryFloors[4 + 2 * 7], "ordinary room floor is safe");
         check(false, sentryFloors[0], "special floor outside sentry room is safe");
         check(false, sentryFloors[1 + 3 * 7], "room perimeter stays safe");
+        // Flooded sentry floors must return to normal auto-exploration.
+        terrain[2 + 2 * 7] = Terrain.WATER;
+        sentryFloors = new boolean[terrain.length];
+        BlastAutoEnvironment.markSentryFloors(
+                terrain, 7, new Rect(1, 1, 5, 5), sentryFloors);
+        check(false, sentryFloors[2 + 2 * 7], "flooded floor is traversable");
+        check(true, sentryFloors[3 + 3 * 7], "unflooded red floor stays blocked");
 
         boolean[] safe = {true, true, true, true, true, true, true, true};
         boolean[] water = {false, false, false, false, true, true, false, false};
