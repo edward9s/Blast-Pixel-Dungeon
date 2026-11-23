@@ -156,11 +156,9 @@ final class BlastAutoSentryRoom {
         if (!safe[exit] || distances[exit] == Integer.MAX_VALUE)
             return BlastAutoSpecialRooms.Action.NONE;
         Heap treasure = chest(level, room, hero);
-        if (treasure == null) {
-            if (hero.pos == exit || hero.rooted) return BlastAutoSpecialRooms.Action.NONE;
-            hero.curAction = new HeroAction.Move(BlastAutoPlay.firstStep(exit, safe, distances));
-            return BlastAutoSpecialRooms.Action.MOVE;
-        }
+        // A missing chest can mean undiscovered, opened, or emptied. Leave the
+        // room reachable through ordinary roaming and pickup in all cases.
+        if (treasure == null) return BlastAutoSpecialRooms.Action.NONE;
         if (safe[treasure.pos] && distances[treasure.pos] != Integer.MAX_VALUE)
             return BlastAutoSpecialRooms.Action.NONE;
 
