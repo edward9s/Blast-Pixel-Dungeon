@@ -19,22 +19,20 @@ public final class BlastAutoSummoningRoomTest {
                 "inactive terrain is not an active summoning trap");
         check(!BlastAutoSummoningRoom.summoningTerrain(Terrain.EMPTY, true),
                 "ordinary floor is not a trap target");
-        check(BlastAutoSummoningRoom.eligibleBomb(true, false, false, false),
-                "registered arcane bomb is usable");
-        check(BlastAutoSummoningRoom.eligibleBomb(false, true, false, false),
-                "registered shrapnel bomb is usable");
-        check(BlastAutoSummoningRoom.eligibleBomb(false, false, true, false),
-                "held arcane bomb can be imbued");
-        check(BlastAutoSummoningRoom.eligibleBomb(false, false, false, true),
-                "held shrapnel bomb can be imbued");
-        check(!BlastAutoSummoningRoom.eligibleBomb(false, false, false, false),
-                "do not deliberately summon enemies without a special bomb");
-        check(BlastAutoSummoningRoom.canBomb(true, false),
-                "remote targeting is allowed if the blast can avoid the hero");
-        check(BlastAutoSummoningRoom.canBomb(false, true),
-                "protected heroes can place and detonate bombs in place");
-        check(!BlastAutoSummoningRoom.canBomb(false, false),
-                "do not start a wave if even a placement cannot be safe");
+        check(BlastAutoSummoningRoom.canTriggerWave(true, false, true),
+                "registered Arcane Bomb with indestructibility allows triggering");
+        check(BlastAutoSummoningRoom.canTriggerWave(false, true, true),
+                "registered Shrapnel Bomb with indestructibility allows triggering");
+        check(BlastAutoSummoningRoom.canTriggerWave(true, true, true),
+                "either registered type suffices");
+        check(!BlastAutoSummoningRoom.canTriggerWave(false, false, true),
+                "indestructibility alone is insufficient");
+        check(!BlastAutoSummoningRoom.canTriggerWave(true, false, false),
+                "registered Arcane Bomb alone is insufficient");
+        check(!BlastAutoSummoningRoom.canTriggerWave(false, true, false),
+                "registered Shrapnel Bomb alone is insufficient");
+        check(!BlastAutoSummoningRoom.canTriggerWave(false, false, false),
+                "neither condition cannot start a wave");
         System.out.println("BlastAutoSummoningRoomTest passed");
     }
 }

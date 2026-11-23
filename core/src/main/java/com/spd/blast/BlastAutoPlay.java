@@ -638,9 +638,7 @@ public final class BlastAutoPlay {
             }
         }
 
-        // A summoned wave is handled before generic combat and new trap triggers.
-        debugDecision = "summoning-bomb";
-        if (BlastAutoSummoningRoom.bombard(hero)) return true;
+        // Wait for delayed summons, then let existing indestructible combat handle them.
         debugDecision = "summoning-wait";
         if (BlastAutoSummoningRoom.awaitWave(hero)) return true;
 

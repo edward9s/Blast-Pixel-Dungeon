@@ -148,17 +148,6 @@ public final class BlastBombManiac extends Buff {
         return types.indexOf(kind);
     }
 
-    /** Fire the requested registered special bomb, keeping selection unchanged. */
-    public boolean blastAutoThrowTypeAndDetonate(int destination, Class<? extends Bomb> kind) {
-        int index = typeIndex(kind);
-        return index >= 0 && autoThrowAndDetonate(destination, index);
-    }
-
-    public boolean blastAutoPlaceTypeAndDetonate(Class<? extends Bomb> kind) {
-        int index = typeIndex(kind);
-        return index >= 0 && autoPlaceAndDetonate(index);
-    }
-
     public void select(int index) {
         bombAt(index);
         selected = index;
