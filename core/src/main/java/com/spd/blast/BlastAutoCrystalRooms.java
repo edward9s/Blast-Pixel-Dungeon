@@ -1,7 +1,9 @@
 package com.spd.blast;
 
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
+import com.shatteredpixel.shatteredpixeldungeon.Challenges;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.LostInventory;
 import com.shatteredpixel.shatteredpixeldungeon.items.keys.CrystalKey;
 import com.shatteredpixel.shatteredpixeldungeon.journal.Notes;
 import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
@@ -37,23 +39,33 @@ final class BlastAutoCrystalRooms {
     private static SpecialRoom phaseRoom;
     private static boolean phaseWasEnabled;
     private static boolean phaseActive;
+    private static boolean lootPending;
+    private static Item toStage;
     private static final Set<Item> staged = Collections.newSetFromMap(
             new IdentityHashMap<Item, Boolean>());
 
     private BlastAutoCrystalRooms() {}
 
     static void resetPhase() {
-        if (phaseActive) BlastSettings.setTestFreeMovement(phaseWasEnabled);
+        restorePhase();
         phaseLevel = null;
+        lootPending = false;
+        toStage = null;
+        staged.clear();
+    }
+
+    private static void restorePhase() {
+        if (phaseActive) BlastSettings.setTestFreeMovement(phaseWasEnabled);
         phaseRoom = null;
         phaseActive = false;
-        staged.clear();
     }
 
     /** Phase through remaining crystal locks after spending the last crystal key. */
     static void updatePhase(Hero hero) {
         Level level = Dungeon.level;
-        if (phaseActive && phaseLevel != level) resetPhase();
+        if (phaseLevel != level) resetPhase();
+        phaseLevel = level;
+        toStage = null;
         SpecialRoom room = null;
         if (level instanceof RegularLevel) {
             RegularLevel regular = (RegularLevel) level;
@@ -64,24 +76,42 @@ final class BlastAutoCrystalRooms {
             else if (choice != null && remainingCrystalDoors(level, choice) <= 1
                     && hasUncollectedLoot(level, choice)) room = choice;
         }
-        boolean pending = false;
+        lootPending = room != null;
+        boolean ready = false;
         if (room != null && room.entrance() != null && Dungeon.branch == 0
                 && Notes.keyCount(new CrystalKey(Dungeon.depth)) == 0
-                && (level.visited[level.pointToCell(room.entrance())]
-                    || level.mapped[level.pointToCell(room.entrance())]
-                    || hero.fieldOfView[level.pointToCell(room.entrance())])) {
-            pending = hasUncollectedLoot(level, room);
+                && hero.buff(LostInventory.class) == null) {
+            int entrance = level.pointToCell(room.entrance());
+            if (level.visited[entrance] || level.mapped[entrance] || hero.fieldOfView[entrance]) {
+                ArrayList<Item> prizes = new ArrayList<>();
+                for (Heap heap : level.heaps.valueList()) {
+                    if (!room.inside(level.cellToPoint(heap.pos))) continue;
+                    for (Item item : heap.items) {
+                        if (!staged.contains(item)) prizes.add(item);
+                    }
+                }
+                int required = requiredSlots(hero, prizes);
+                int free = hero.belongings.backpack.capacity() - hero.belongings.backpack.items.size();
+                if (required <= free) ready = true;
+                else {
+                    toStage = chooseStagingItem(hero, level, prizes, required - free);
+                    if (toStage == null) {
+                        BlastLog.debug("auto-crystal action=inventory-full required="
+                                + required + " free=" + free);
+                    }
+                }
+            }
         }
-        if (pending && !phaseActive) {
+        if (phaseActive && (!ready || phaseRoom != room)) {
+            restorePhase();
+            BlastLog.debug("auto-crystal action=restore-phase");
+        }
+        if (ready && !phaseActive) {
             phaseWasEnabled = BlastSettings.testFreeMovement();
-            phaseLevel = level;
             phaseRoom = room;
             phaseActive = true;
             BlastSettings.setTestFreeMovement(true);
             BlastLog.debug("auto-crystal action=enable-phase");
-        } else if (!pending && phaseActive) {
-            resetPhase();
-            BlastLog.debug("auto-crystal action=restore-phase");
         }
     }
 
@@ -113,42 +143,65 @@ final class BlastAutoCrystalRooms {
     }
 
     static boolean isStaged(Item item) {
-        return staged.contains(item);
+        return lootPending && staged.contains(item);
     }
 
     static boolean collect(Hero hero, boolean[] safe, int[] distances) {
-        if (!phaseActive || phaseLevel != Dungeon.level) return false;
+        if (phaseLevel != Dungeon.level) return false;
+        if (toStage != null) {
+            Item item = toStage;
+            toStage = null;
+            staged.add(item);
+            BlastLog.debug("auto-crystal action=stage item=" + item.getClass().getSimpleName());
+            item.doDrop(hero);
+            return true;
+        }
+        if (!phaseActive) return false;
         Level level = Dungeon.level;
-        Room room = phaseRoom;
-        if (room == null) return false;
 
-        ArrayList<Item> prizes = new ArrayList<>();
         Heap target = null;
+        Item prize = null;
+        int destination = -1;
         int priority = Integer.MIN_VALUE;
         int distance = Integer.MAX_VALUE;
         for (Heap heap : level.heaps.valueList()) {
-            if (!room.inside(level.cellToPoint(heap.pos)) || heap.isEmpty()) continue;
+            if (!containsActive(heap.pos) || heap.isEmpty()) continue;
+            boolean loose = heap.type == Heap.Type.HEAP;
+            int stand = loose ? heap.pos : adjacentStand(level, heap.pos, safe, distances);
+            if (stand < 0 || !safe[stand] || distances[stand] == Integer.MAX_VALUE) continue;
             for (Item item : heap.items) {
-                if (staged.contains(item)) continue;
-                prizes.add(item);
+                if (staged.contains(item) || (loose && !BlastAutoPickup.canCollect(
+                        hero, item, BlastAutoPickupPolicy::isInstantPickup))) continue;
                 int score = item instanceof ScrollOfTransmutation
                         || item instanceof ScrollOfMetamorphosis ? 30
                         : item instanceof PotionOfExperience
                         || item instanceof PotionOfDivineInspiration ? 20 : 10;
-                int stand = heap.type == Heap.Type.HEAP ? heap.pos
-                        : adjacentStand(level, heap.pos, safe, distances);
-                if (stand >= 0 && safe[stand] && distances[stand] != Integer.MAX_VALUE
-                        && (score > priority || score == priority
-                            && distances[stand] < distance)) {
+                if (score > priority || (score == priority && distances[stand] < distance)) {
                     target = heap;
+                    prize = item;
+                    destination = stand;
                     priority = score;
                     distance = distances[stand];
                 }
             }
         }
-        if (prizes.isEmpty() || target == null) return false;
+        if (target == null) return false;
+        if (hero.pos == destination) {
+            if (target.type == Heap.Type.HEAP) {
+                BlastAutoPickup.preparePickup(hero, target, prize);
+                hero.curAction = new HeroAction.PickUp(target.pos);
+            } else {
+                hero.curAction = new HeroAction.OpenChest(target.pos);
+            }
+        } else if (!hero.rooted) {
+            hero.curAction = new HeroAction.Move(
+                    BlastAutoPlay.firstStep(destination, safe, distances));
+        } else return false;
+        return true;
+    }
 
-        // Reserve all missing ordinary inventory slots before approaching the prizes.
+    /** Reserve space for distinct prizes after accounting for stacks and specialized bags. */
+    private static int requiredSlots(Hero hero, ArrayList<Item> prizes) {
         int required = 0;
         ArrayList<Item> unstacked = new ArrayList<>();
         for (Item item : prizes) {
@@ -156,14 +209,14 @@ final class BlastAutoCrystalRooms {
                 continue;
             boolean merged = false;
             if (item.stackable) {
-                for (Item held : hero.belongings) {
-                    if (held.isSimilar(item)) {
+                for (Item held : hero.belongings.backpack) {
+                    if (item.isSimilar(held)) {
                         merged = true;
                         break;
                     }
                 }
                 for (Item earlier : unstacked) {
-                    if (earlier.isSimilar(item)) {
+                    if (item.isSimilar(earlier)) {
                         merged = true;
                         break;
                     }
@@ -173,8 +226,6 @@ final class BlastAutoCrystalRooms {
             unstacked.add(item);
             required++;
         }
-        int free = Math.max(0, hero.belongings.backpack.capacity()
-                - hero.belongings.backpack.items.size());
         // Reserve existing specialized bag slots for compatible prizes.
         for (Item held : hero.belongings.backpack) {
             if (!(held instanceof Bag)) continue;
@@ -189,51 +240,40 @@ final class BlastAutoCrystalRooms {
                 }
             }
         }
-        int toDrop = Math.max(0, required - free);
-        if (toDrop > 0) {
-            Item candidate = null;
-            for (Item item : hero.belongings.backpack) {
-                if (!(item instanceof MeleeWeapon || item instanceof Armor)
-                        || item.isEquipped(hero) || staged.contains(item)
-                        || item.level() > 0) continue;
-                if (candidate == null || item.level() < candidate.level())
-                    candidate = item;
-            }
-            if (candidate != null) {
-                staged.add(candidate);
-                BlastLog.debug("auto-crystal action=stage item="
-                        + candidate.getClass().getSimpleName()
-                        + " required=" + required);
-                candidate.doDrop(hero);
-                return true;
-            }
-            BlastLog.debug("auto-crystal action=inventory-full required="
-                    + required + " free=" + free);
+        return required;
+    }
+
+    private static Item chooseStagingItem(Hero hero, Level level, ArrayList<Item> prizes,
+                                          int needed) {
+        int cell = hero.pos;
+        Heap ground = level.heaps.get(cell);
+        if (!level.passable[cell] || level.pit[cell] || level.traps.get(cell) != null
+                || level.plants.get(cell) != null || (ground != null && ground.type != Heap.Type.HEAP)) {
+            return null;
         }
-        int stand = target.type == Heap.Type.HEAP ? target.pos
-                : adjacentStand(level, target.pos, safe, distances);
-        if (stand < 0) return false;
-        if (hero.pos == stand) {
-            Item item = null;
-            for (Item prize : target.items) {
-                if (!staged.contains(prize)) {
-                    item = prize;
-                    break;
-                }
+
+        Item best = null;
+        int candidates = 0;
+        for (Item item : hero.belongings.backpack.items) {
+            if (item instanceof Bag || item.unique || item.isEquipped(hero)
+                    || item.level() > 0 || Challenges.isItemBlocked(item)) continue;
+            // Keep stacks used in the capacity estimate and avoid merging a staged item
+            // into a ground stack whose identity ordinary pickup can still target.
+            if (item.stackable && (prizes.stream().anyMatch(prize -> prize.isSimilar(item))
+                    || (ground != null && ground.items.stream().anyMatch(held -> held.isSimilar(item))))) {
+                continue;
             }
-            if (item == null) return false;
-            if (target.type == Heap.Type.HEAP
-                    && !BlastAutoPickup.canCollect(hero, item,
-                    BlastAutoPickupPolicy::isInstantPickup)) return false;
-            if (target.type == Heap.Type.HEAP) {
-                BlastAutoPickup.preparePickup(hero, target, item);
-                hero.curAction = new HeroAction.PickUp(target.pos);
-            } else hero.curAction = new HeroAction.OpenChest(target.pos);
-        } else if (!hero.rooted) {
-            hero.curAction = new HeroAction.Move(
-                    BlastAutoPlay.firstStep(stand, safe, distances));
-        } else return false;
-        return true;
+            candidates++;
+            if (best == null || stagingRank(item) < stagingRank(best)
+                    || (stagingRank(item) == stagingRank(best) && item.value() < best.value())) {
+                best = item;
+            }
+        }
+        return candidates >= needed ? best : null;
+    }
+
+    private static int stagingRank(Item item) {
+        return item instanceof MeleeWeapon || item instanceof Armor ? 0 : 1;
     }
 
     private static int adjacentStand(Level level, int target,
