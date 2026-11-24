@@ -1,6 +1,8 @@
 package com.spd.blast;
 
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.VaultFlameTraps;
+import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
+import com.watabou.utils.PathFinder;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.VaultLaser;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.VaultSentry;
@@ -12,6 +14,41 @@ import com.shatteredpixel.shatteredpixeldungeon.mechanics.ConeAOE;
 /** One-turn vault machinery forecast; never assumes test invulnerability protects the hero. */
 final class BlastAutoVault {
     private BlastAutoVault() {}
+
+    /**
+     * Find a safe staging tile next to a temporarily blocked route to unexplored
+     * floor. A caller at the staging tile must advance one turn and re-plan.
+     */
+    static int stagingCell(Hero hero, Level level, boolean[] safe, int[] distances) {
+        if (!(level instanceof VaultLevel)) return -1;
+        boolean[] danger = imminent(level);
+        int best = -1;
+        int shortest = Integer.MAX_VALUE;
+        for (int cell = 0; cell < danger.length; cell++) {
+            if (!danger[cell] || level.solid[cell] || level.pit[cell]) continue;
+            boolean unexploredBeyond = false;
+            for (int offset : PathFinder.NEIGHBOURS8) {
+                int next = cell + offset;
+                if (level.insideMap(next) && !level.solid[next] && !level.pit[next]
+                        && !level.visited[next] && !level.mapped[next]
+                        && !hero.fieldOfView[next]) {
+                    unexploredBeyond = true;
+                    break;
+                }
+            }
+            if (!unexploredBeyond) continue;
+            for (int offset : PathFinder.NEIGHBOURS8) {
+                int stand = cell + offset;
+                if (!level.insideMap(stand) || !safe[stand]
+                        || distances[stand] == Integer.MAX_VALUE) continue;
+                if (distances[stand] < shortest) {
+                    best = stand;
+                    shortest = distances[stand];
+                }
+            }
+        }
+        return best;
+    }
 
     static boolean[] imminent(Level level) {
         boolean[] danger = new boolean[level.length()];
