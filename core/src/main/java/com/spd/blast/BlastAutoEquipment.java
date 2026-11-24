@@ -245,8 +245,8 @@ final class BlastAutoEquipment {
         if (hero.belongings.lostInventory()) return false;
         if (sellReplaced(hero)) return true;
         if (sellCursedPickup(hero)) return true;
-        if (drinkStrength(hero)) return true;
         if (sellUnwearableAfterStrength(hero)) return true;
+        if (drinkStrength(hero)) return true;
         return equipBetterWeapon(hero) || equipBetterArmor(hero);
     }
 }
