@@ -407,16 +407,16 @@ final class BlastAutoToxicRoom {
             }
         }
         int[] order = shortestOrder(steps);
-        if (order == null) return BlastAutoSpecialRooms.Action.NONE;
         int actions = 0;
         for (Heap heap : loot) actions += roomActions(hero, heap);
         float duration = immunity == null
                 ? BlobImmunity.DURATION - 1f : immunity.cooldown();
         float stepTime = Math.max(1f, 1f / hero.speed());
-        if (!enoughPurity(duration, routeLength(steps, order), 0, actions, stepTime)) {
-            // If the full three-cache circuit is unusually long, recover the
-            // catalyst first and attempt the remaining caches with spare time.
-            // Never spend Purity unless that first pickup and retreat fit.
+        if (order == null || !enoughPurity(
+                duration, routeLength(steps, order), 0, actions, stepTime)) {
+            // If some other cache is blocked or the full circuit takes too
+            // long, collect the catalyst first, then use any spare immunity
+            // for the remaining caches. Check a guaranteed return route.
             int catalystIndex = -1;
             for (int i = 0; i < loot.length; i++) {
                 if (loot[i].pos == catalyst) catalystIndex = i;
@@ -425,11 +425,17 @@ final class BlastAutoToxicRoom {
                     steps[0][catalystIndex + 1], steps[catalystIndex + 1][0],
                     roomActions(hero, loot[catalystIndex]), stepTime))
                 return BlastAutoSpecialRooms.Action.NONE;
-            int[] fallback = new int[order.length];
+            int[] fallback = new int[loot.length];
             fallback[0] = catalystIndex;
             int next = 1;
-            for (int target : order) {
-                if (target != catalystIndex) fallback[next++] = target;
+            if (order == null) {
+                for (int i = 0; i < loot.length; i++) {
+                    if (i != catalystIndex) fallback[next++] = i;
+                }
+            } else {
+                for (int target : order) {
+                    if (target != catalystIndex) fallback[next++] = target;
+                }
             }
             order = fallback;
         }
