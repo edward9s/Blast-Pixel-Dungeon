@@ -41,6 +41,9 @@ import java.util.Collections;
 final class BlastAutoAlchemy {
 
     private static final int LEVITATION_RESERVE = 2;
+    private static final int LOW_STOCK = 2;
+    private static final int POT_ALCHEMIZE_STOCK = 32;
+    private static final int POT_AQUA_STOCK = 16;
     private static final Recipe PIE = new MeatPie.Recipe();
     private static final Recipe SELL = new Alchemize.Recipe();
     private static final Recipe AQUA = new AquaBrew.Recipe();
@@ -118,35 +121,11 @@ final class BlastAutoAlchemy {
         if (brew(hero, potKnown, toolkit, seeds, PIE,
                 pieIngredients(hero.belongings.getAllItems(Food.class)), 0)) return true;
 
-        if (hero.belongings.getItem(Alchemize.class) == null && canStore(hero, new Alchemize())) {
-            Seed seed = null;
-            for (Seed candidate : seeds) {
-                if (fuelSeed(candidate) && (seed == null || candidate.quantity() > seed.quantity())) {
-                    seed = candidate;
-                }
-            }
-            if (seed != null) {
-                for (Runestone stone : stones) {
-                    if (stone.quantity() > 0 && !importantStone(stone)
-                            && brew(hero, potKnown, toolkit, seeds, SELL,
-                                    ingredients(seed, stone), 0)) return true;
-                }
-            }
-        }
-
-        if (hero.belongings.getItem(AquaBrew.class) == null && canStore(hero, new AquaBrew())) {
-            PotionOfStormClouds clouds = hero.belongings.getItem(PotionOfStormClouds.class);
-            if (clouds != null) {
-                if (brew(hero, potKnown, toolkit, seeds, AQUA, ingredients(clouds), 0)) return true;
-            } else {
-                PotionOfLevitation levitation = hero.belongings.getItem(PotionOfLevitation.class);
-                if (levitation != null && levitation.isIdentified()
-                        && levitation.quantity() > LEVITATION_RESERVE
-                        && canStore(hero, new PotionOfStormClouds())
-                        && brew(hero, potKnown, toolkit, seeds, CLOUDS, ingredients(levitation),
-                                AQUA.cost(ingredients(new PotionOfStormClouds())))) return true;
-            }
-        }
+        // Refill either nearly empty stock before using a pot for larger reserves.
+        if (brewAlchemize(hero, potKnown, toolkit, seeds, stones, LOW_STOCK)
+                || brewAqua(hero, potKnown, toolkit, seeds, LOW_STOCK)) return true;
+        if (toolkit == null && (brewAlchemize(hero, potKnown, null, seeds, stones, POT_ALCHEMIZE_STOCK)
+                || brewAqua(hero, potKnown, null, seeds, POT_AQUA_STOCK))) return true;
 
         ScrollHolder scrolls = hero.belongings.getItem(ScrollHolder.class);
         if (hasSlot(scrolls)) {
@@ -174,6 +153,49 @@ final class BlastAutoAlchemy {
         }
 
         return false;
+    }
+
+    private static boolean brewAlchemize(Hero hero, boolean potKnown, AlchemistsToolkit toolkit,
+                                         ArrayList<Seed> seeds, ArrayList<Runestone> stones,
+                                         int minimumStock) {
+        if (!needsRestock(hero.belongings.getItem(Alchemize.class), minimumStock)
+                || !canStore(hero, new Alchemize())) return false;
+        Seed seed = null;
+        for (Seed candidate : seeds) {
+            if (fuelSeed(candidate) && (seed == null || candidate.quantity() > seed.quantity())) {
+                seed = candidate;
+            }
+        }
+        if (seed != null) {
+            for (Runestone stone : stones) {
+                if (stone.quantity() > 0 && !importantStone(stone)
+                        && brew(hero, potKnown, toolkit, seeds, SELL,
+                                ingredients(seed, stone), 0)) return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean brewAqua(Hero hero, boolean potKnown, AlchemistsToolkit toolkit,
+                                    ArrayList<Seed> seeds, int minimumStock) {
+        if (!needsRestock(hero.belongings.getItem(AquaBrew.class), minimumStock)
+                || !canStore(hero, new AquaBrew())) return false;
+        PotionOfStormClouds clouds = hero.belongings.getItem(PotionOfStormClouds.class);
+        if (clouds != null) {
+            if (brew(hero, potKnown, toolkit, seeds, AQUA, ingredients(clouds), 0)) return true;
+        } else {
+            PotionOfLevitation levitation = hero.belongings.getItem(PotionOfLevitation.class);
+            if (levitation != null && levitation.isIdentified()
+                    && levitation.quantity() > LEVITATION_RESERVE
+                    && canStore(hero, new PotionOfStormClouds())
+                    && brew(hero, potKnown, toolkit, seeds, CLOUDS, ingredients(levitation),
+                            AQUA.cost(ingredients(new PotionOfStormClouds())))) return true;
+        }
+        return false;
+    }
+
+    private static boolean needsRestock(Item stock, int minimum) {
+        return stock == null || stock.quantity() < minimum;
     }
 
     private static boolean energize(Hero hero, Item item) {
