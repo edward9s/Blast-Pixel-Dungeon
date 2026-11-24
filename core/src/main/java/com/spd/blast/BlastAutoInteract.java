@@ -99,6 +99,8 @@ public final class BlastAutoInteract {
             wornKeys = Notes.keyCount(new WornKey(Dungeon.depth));
         }
 
+        if (crystalKeys == 0 && demolishLastCrystalChest(hero, safe, distances)) return true;
+
         int target = -1;
         int stand = -1;
         int steps = Integer.MAX_VALUE;
@@ -138,7 +140,6 @@ public final class BlastAutoInteract {
             }
         }
 
-        if (target < 0 && demolishLastCrystalChest(hero, safe, distances)) return true;
         if (target < 0) return false;
         if (hero.pos == stand) {
             hero.curAction = chest ? new HeroAction.OpenChest(target)
@@ -170,7 +171,9 @@ public final class BlastAutoInteract {
                 chest = heap;
             }
         }
-        if (remaining != 1 || chest == null || !chest.seen) return false;
+        if (remaining != 1 || chest == null
+                || !(chest.seen || hero.fieldOfView[chest.pos]
+                        || level.visited[chest.pos] || level.mapped[chest.pos])) return false;
         BlastBombManiac maniac = BlastBombManiac.current();
         if (maniac == null || maniac.remaining() == 0) return false;
         Bomb bomb = maniac.bombAt(0);
