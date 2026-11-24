@@ -21,6 +21,8 @@ final class BlastAutoBlacksmith {
     private static boolean previousPhase;
     private static boolean enabledDemolition;
     private static boolean previousDemolition;
+    private static boolean bossDemolitionDisabled;
+    private static boolean bossDemolitionWasEnabled;
 
     private BlastAutoBlacksmith() {}
 
@@ -41,7 +43,11 @@ final class BlastAutoBlacksmith {
                 }
             }
         }
-        if (guardian && !enabledDemolition) {
+        if (bossDemolitionDisabled && (!active || Blacksmith.Quest.bossBeaten())) {
+            BlastSettings.setTestDemolition(bossDemolitionWasEnabled);
+            bossDemolitionDisabled = false;
+        }
+        if (guardian && !enabledDemolition && !bossDemolitionDisabled) {
             previousDemolition = BlastSettings.testDemolition();
             enabledDemolition = true;
             BlastSettings.setTestDemolition(true);
@@ -60,6 +66,8 @@ final class BlastAutoBlacksmith {
         enabledPhase = false;
         if (enabledDemolition) BlastSettings.setTestDemolition(previousDemolition);
         enabledDemolition = false;
+        if (bossDemolitionDisabled) BlastSettings.setTestDemolition(bossDemolitionWasEnabled);
+        bossDemolitionDisabled = false;
     }
 
     static boolean mine(Hero hero, boolean[] safe, int[] distances) {
@@ -96,13 +104,7 @@ final class BlastAutoBlacksmith {
         if (!(level instanceof MiningLevel) || !Blacksmith.Quest.given()
                 || Blacksmith.Quest.bossBeaten()
                 || hero.belongings.getItem(Pickaxe.class) == null) return false;
-        for (int cell = 0; cell < level.length(); cell++) {
-            if (level.map[cell] == Terrain.WALL_DECO) return false;
-        }
-        for (Heap heap : level.heaps.valueList()) {
-            if (heap.peek() instanceof com.shatteredpixel.shatteredpixeldungeon.items.quest.DarkGold)
-                return false;
-        }
+        if (!goldCollected()) return false;
         for (Mob mob : level.mobs) {
             if (mob instanceof CrystalGuardian && mob.isAlive()) return false;
         }
@@ -119,16 +121,62 @@ final class BlastAutoBlacksmith {
                 steps = distances[cell];
             }
             if (stand < 0) return false;
-            if (enabledDemolition) {
-                BlastSettings.setTestDemolition(previousDemolition);
+            if (!bossDemolitionDisabled) {
+                bossDemolitionWasEnabled = enabledDemolition
+                        ? previousDemolition : BlastSettings.testDemolition();
+                bossDemolitionDisabled = true;
                 enabledDemolition = false;
             }
+            BlastSettings.setTestDemolition(false);
             hero.curAction = hero.pos == stand
                     ? new HeroAction.Interact(mob)
                     : new HeroAction.Move(BlastAutoPlay.firstStep(stand, safe, distances));
             return true;
         }
         return false;
+    }
+
+    /** Special pickaxe strike for the geomancer's rock-armor phase. */
+    static boolean attackArmoredGeomancer(Hero hero, boolean[] safe, int[] distances) {
+        if (!(Dungeon.level instanceof MiningLevel) || !Blacksmith.Quest.given()
+                || Blacksmith.Quest.Type() != Blacksmith.Quest.GNOLL
+                || hero.belongings.getItem(Pickaxe.class) == null
+                || !goldCollected()) return false;
+        for (Mob mob : Dungeon.level.mobs) {
+            if (!(mob instanceof GnollGeomancer) || !mob.isAlive()
+                    || !hero.fieldOfView[mob.pos]
+                    || !mob.heroShouldInteract()) continue;
+            int stand = -1;
+            int steps = Integer.MAX_VALUE;
+            for (int offset : PathFinder.NEIGHBOURS8) {
+                int cell = mob.pos + offset;
+                if (Dungeon.level.insideMap(cell) && safe[cell]
+                        && distances[cell] < steps) {
+                    stand = cell;
+                    steps = distances[cell];
+                }
+            }
+            if (stand < 0) return false;
+            hero.curAction = hero.pos == stand
+                    ? new HeroAction.Interact(mob)
+                    : new HeroAction.Move(BlastAutoPlay.firstStep(stand, safe, distances));
+            return true;
+        }
+        return false;
+    }
+
+    static boolean goldCollected() {
+        if (!(Dungeon.level instanceof MiningLevel)) return false;
+        for (int cell = 0; cell < Dungeon.level.length(); cell++) {
+            if (Dungeon.level.map[cell] == Terrain.WALL_DECO) return false;
+        }
+        for (Heap heap : Dungeon.level.heaps.valueList()) {
+            for (com.shatteredpixel.shatteredpixeldungeon.items.Item item : heap.items) {
+                if (item instanceof com.shatteredpixel.shatteredpixeldungeon.items.quest.DarkGold)
+                    return false;
+            }
+        }
+        return true;
     }
 
 }
