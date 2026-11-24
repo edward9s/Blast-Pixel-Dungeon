@@ -70,6 +70,8 @@ class AutoClassArmorTests(unittest.TestCase):
                       equipment)
         self.assertIn("wouldLoseProtectedClassGlyph(classArmor, best)", equipment)
         self.assertIn("classArmor.charge != charge", equipment)
+        self.assertIn("hero.armorAbility != ability", equipment)
+        self.assertIn("hero.belongings.contains(best)", equipment)
 
 
 if __name__ == "__main__":
