@@ -61,6 +61,35 @@ public final class BlastAutoToxicRoomTest {
         check(!BlastAutoToxicRoom.enoughPurity(20f, 4, 4, 2, 0f),
                 "invalid movement speed must be rejected");
 
+        // Three caches: opening two chests plus one skeleton, then collecting
+        // their contents. Shortest order avoids wasting the 20-turn immunity.
+        int[][] threeCaches = {
+                {0, 2, 5, 5},
+                {2, 0, 3, 8},
+                {5, 3, 0, 2},
+                {5, 8, 2, 0}
+        };
+        int[] visit = BlastAutoToxicRoom.shortestOrder(threeCaches);
+        check(visit != null && visit.length == 3
+                && visit[0] == 0 && visit[1] == 1 && visit[2] == 2,
+                "shortest toxic-room trip must visit chest, chest, skeleton in order");
+        check(BlastAutoToxicRoom.enoughPurity(19f, 12, 0, 4, 1f),
+                "one Purity must allow the three-container trip when time permits");
+        int[][] blocked = {
+                {0, 1, Integer.MAX_VALUE},
+                {1, 0, Integer.MAX_VALUE},
+                {Integer.MAX_VALUE, Integer.MAX_VALUE, 0}
+        };
+        check(BlastAutoToxicRoom.shortestOrder(blocked) == null,
+                "unreachable skeleton must not be included in a drinking plan");
+        boolean malformed = false;
+        try {
+            BlastAutoToxicRoom.shortestOrder(new int[][]{{0, 1}, {1}});
+        } catch (IllegalArgumentException expected) {
+            malformed = true;
+        }
+        check(malformed, "invalid route matrix must fail early");
+        
         System.out.println("BlastAutoToxicRoomTest passed");
     }
 }
