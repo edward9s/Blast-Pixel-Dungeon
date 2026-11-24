@@ -42,7 +42,6 @@ final class BlastAutoSpecialRooms {
         BlastAutoChasmRoom.reset();
         BlastAutoSummoningRoom.reset();
         BlastAutoSentryRoom.reset();
-        BlastAutoToxicRoom.reset();
     }
 
     /** Special rooms may claim the entrance only for a known, pending objective. */
