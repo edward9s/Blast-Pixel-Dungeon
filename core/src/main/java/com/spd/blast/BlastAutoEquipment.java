@@ -87,9 +87,22 @@ final class BlastAutoEquipment {
         return !isCursed(item) || (alchemizeAvailable && Shopkeeper.canSell(item));
     }
 
-    /** Native pickup runs on the next hero turn; sale follows a successful pickup. */
+    /** Mark the exact auto-selected item before native pickup begins. */
     static void onPickupScheduled(Item item) {
-        if (isCursed(item)) pendingCursedPickup = item;
+        pendingCursedPickup = isCursed(item) ? item : null;
+    }
+
+    static void onPickupFailed(Item item) {
+        if (pendingCursedPickup == item) pendingCursedPickup = null;
+    }
+
+    /** Sell in Hero.actPickUp's success branch, without waiting for another AI turn. */
+    static void onPickupCompleted(Hero hero, Item item) {
+        if (pendingCursedPickup != item) return;
+        pendingCursedPickup = null;
+        if (!sellWithAlchemize(hero, item)) {
+            throw new IllegalStateException("Automatically collected cursed gear could not be sold");
+        }
     }
 
     /** Use persistent true upgrades, never unknown UI values or temporary buffs. */
@@ -226,17 +239,6 @@ final class BlastAutoEquipment {
             throw new IllegalStateException("Automatic strength potion did not raise strength");
         }
         pendingStrengthCleanup = true;
-        return true;
-    }
-
-    private static boolean sellCursedPickup(Hero hero) {
-        if (pendingCursedPickup == null) return false;
-        Item item = pendingCursedPickup;
-        pendingCursedPickup = null;
-        if (!hero.belongings.contains(item)) return false;
-        if (!sellWithAlchemize(hero, item)) {
-            throw new IllegalStateException("Automatically collected cursed gear could not be sold");
-        }
         return true;
     }
 
@@ -415,7 +417,6 @@ final class BlastAutoEquipment {
     static boolean manage(Hero hero) {
         if (hero.belongings.lostInventory()) return false;
         if (sellReplaced(hero)) return true;
-        if (sellCursedPickup(hero)) return true;
         // Finish all strength potions before making irreversible sale decisions.
         if (drinkStrength(hero)) return true;
         if (sellUnwearableAfterStrength(hero)) return true;
