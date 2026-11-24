@@ -23,7 +23,48 @@ import java.util.Arrays;
 
 /** Scores the three ordinary crystal-choice puzzles without changing their rewards. */
 final class BlastAutoCrystalRooms {
+    private static Level phaseLevel;
+    private static boolean phaseWasEnabled;
+    private static boolean phaseActive;
+
     private BlastAutoCrystalRooms() {}
+
+    static void resetPhase() {
+        if (phaseActive) BlastSettings.setTestFreeMovement(phaseWasEnabled);
+        phaseLevel = null;
+        phaseActive = false;
+    }
+
+    /** Phase through remaining crystal locks after spending the last crystal key. */
+    static void updatePhase(Hero hero) {
+        Level level = Dungeon.level;
+        if (phaseActive && phaseLevel != level) resetPhase();
+        CrystalPathRoom room = level instanceof RegularLevel
+                ? (CrystalPathRoom) ((RegularLevel) level).room(CrystalPathRoom.class) : null;
+        boolean pending = false;
+        if (room != null && Dungeon.branch == 0
+                && Notes.keyCount(new CrystalKey(Dungeon.depth)) == 0) {
+            for (Heap heap : level.heaps.valueList()) {
+                if (room.inside(level.cellToPoint(heap.pos))
+                        && heap.peek() != null
+                        && (heap.seen || hero.fieldOfView[heap.pos]
+                            || level.visited[heap.pos] || level.mapped[heap.pos])) {
+                    pending = true;
+                    break;
+                }
+            }
+        }
+        if (pending && !phaseActive) {
+            phaseWasEnabled = BlastSettings.testFreeMovement();
+            phaseLevel = level;
+            phaseActive = true;
+            BlastSettings.setTestFreeMovement(true);
+            BlastLog.debug("auto-crystal action=enable-phase");
+        } else if (!pending && phaseActive) {
+            resetPhase();
+            BlastLog.debug("auto-crystal action=restore-phase");
+        }
+    }
 
     static int rank(Item item) {
         if (item instanceof RingOfWealth || item instanceof RingOfSharpshooting
