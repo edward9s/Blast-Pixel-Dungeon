@@ -292,6 +292,17 @@ def patch(path: Path) -> None:
         "Hero.damage attack source"
     )
 
+    # A cursed item is sold only once the original pickup has really succeeded.
+    # Hook after heap.pickUp() to avoid the following idle-turn/combat delay.
+    s = replace_once(
+        s,
+        "\t\t\t\tif (item.doPickUp( this )) {\n\t\t\t\t\theap.pickUp();",
+        "\t\t\t\tif (item.doPickUp( this )) {\n"
+        "\t\t\t\t\theap.pickUp();\n"
+        "\t\t\t\t\tcom.spd.blast.BlastAutoPickup.onPickupSuccess(this, item, pos);",
+        "Hero.actPickUp report native pickup success"
+    )
+
     # Only an actual native pickup failure can suppress its next automatic retry.
     s = replace_once(
         s,
