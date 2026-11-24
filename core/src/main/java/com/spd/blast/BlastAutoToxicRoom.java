@@ -175,7 +175,7 @@ final class BlastAutoToxicRoom {
         } else if (hero.pos == target) {
             Item item = collectibleItem(hero, closest);
             if (item == null) return BlastAutoSpecialRooms.Action.NONE;
-            BlastAutoPickup.exposeForPickup(closest, item);
+            BlastAutoPickup.preparePickup(hero, closest, item);
             hero.curAction = new HeroAction.PickUp(target);
         } else if (!hero.rooted) {
             hero.curAction = new HeroAction.Move(BlastAutoPlay.firstStep(target, route, distances));
