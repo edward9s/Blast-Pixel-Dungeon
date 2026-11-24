@@ -40,10 +40,19 @@ public final class BlastAutoPickup {
         retryTurns = 0;
     }
 
+    /** Sell auto-picked cursed equipment as part of the successful native pickup. */
+    public static void onPickupSuccess(Hero hero, Item item, int cell) {
+        if (hero == currentHero && Dungeon.level == currentLevel
+                && item == attemptedItem && cell == attemptedCell) {
+            BlastAutoEquipment.onPickupCompleted(hero, item);
+        }
+    }
+
     /** Only native pickup failure starts a retry cooldown. */
     public static void onPickupFailure(Hero hero, Item item, int cell) {
         if (hero == currentHero && Dungeon.level == currentLevel
                 && item == attemptedItem && cell == attemptedCell) {
+            BlastAutoEquipment.onPickupFailed(item);
             retryTurns = RETRY_TURNS;
         }
     }
