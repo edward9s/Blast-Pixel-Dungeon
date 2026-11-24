@@ -34,6 +34,7 @@ import java.util.Arrays;
 /** Scores the three ordinary crystal-choice puzzles without changing their rewards. */
 final class BlastAutoCrystalRooms {
     private static Level phaseLevel;
+    private static Room phaseRoom;
     private static boolean phaseWasEnabled;
     private static boolean phaseActive;
     private static final Set<Item> staged = Collections.newSetFromMap(
@@ -44,6 +45,7 @@ final class BlastAutoCrystalRooms {
     static void resetPhase() {
         if (phaseActive) BlastSettings.setTestFreeMovement(phaseWasEnabled);
         phaseLevel = null;
+        phaseRoom = null;
         phaseActive = false;
         staged.clear();
     }
@@ -52,12 +54,17 @@ final class BlastAutoCrystalRooms {
     static void updatePhase(Hero hero) {
         Level level = Dungeon.level;
         if (phaseActive && phaseLevel != level) resetPhase();
-        CrystalPathRoom room = level instanceof RegularLevel
-                ? (CrystalPathRoom) ((RegularLevel) level).room(CrystalPathRoom.class) : null;
+        Room room = null;
+        if (level instanceof RegularLevel) {
+            RegularLevel regular = (RegularLevel) level;
+            CrystalPathRoom path = (CrystalPathRoom) regular.room(CrystalPathRoom.class);
+            CrystalChoiceRoom choice = (CrystalChoiceRoom) regular.room(CrystalChoiceRoom.class);
+            if (path != null && remainingCrystalDoors(level, path) <= 3) room = path;
+            else if (choice != null && remainingCrystalDoors(level, choice) <= 1) room = choice;
+        }
         boolean pending = false;
         if (room != null && room.entrance() != null && Dungeon.branch == 0
                 && Notes.keyCount(new CrystalKey(Dungeon.depth)) == 0
-                && remainingCrystalDoors(level, room) <= 3
                 && (level.visited[level.pointToCell(room.entrance())]
                     || level.mapped[level.pointToCell(room.entrance())]
                     || hero.fieldOfView[level.pointToCell(room.entrance())])) {
@@ -72,6 +79,7 @@ final class BlastAutoCrystalRooms {
         if (pending && !phaseActive) {
             phaseWasEnabled = BlastSettings.testFreeMovement();
             phaseLevel = level;
+            phaseRoom = room;
             phaseActive = true;
             BlastSettings.setTestFreeMovement(true);
             BlastLog.debug("auto-crystal action=enable-phase");
@@ -82,7 +90,7 @@ final class BlastAutoCrystalRooms {
     }
 
     /** The room starts with six locks and generates three crystal keys. */
-    private static int remainingCrystalDoors(Level level, CrystalPathRoom room) {
+    private static int remainingCrystalDoors(Level level, Room room) {
         int remaining = 0;
         for (int cell = 0; cell < level.length(); cell++) {
             if (level.map[cell] == Terrain.CRYSTAL_DOOR
@@ -102,7 +110,7 @@ final class BlastAutoCrystalRooms {
     static boolean collect(Hero hero, boolean[] safe, int[] distances) {
         if (!phaseActive || phaseLevel != Dungeon.level) return false;
         Level level = Dungeon.level;
-        CrystalPathRoom room = (CrystalPathRoom) ((RegularLevel) level).room(CrystalPathRoom.class);
+        Room room = phaseRoom;
         if (room == null) return false;
 
         ArrayList<Item> prizes = new ArrayList<>();
@@ -110,8 +118,7 @@ final class BlastAutoCrystalRooms {
         int priority = Integer.MIN_VALUE;
         int distance = Integer.MAX_VALUE;
         for (Heap heap : level.heaps.valueList()) {
-            if (!room.inside(level.cellToPoint(heap.pos)) || heap.type != Heap.Type.HEAP
-                    || heap.isEmpty()) continue;
+            if (!room.inside(level.cellToPoint(heap.pos)) || heap.isEmpty()) continue;
             for (Item item : heap.items) {
                 if (staged.contains(item)) continue;
                 prizes.add(item);
@@ -119,12 +126,14 @@ final class BlastAutoCrystalRooms {
                         || item instanceof ScrollOfMetamorphosis ? 30
                         : item instanceof PotionOfExperience
                         || item instanceof PotionOfDivineInspiration ? 20 : 10;
-                if (safe[heap.pos] && distances[heap.pos] != Integer.MAX_VALUE
+                int stand = heap.type == Heap.Type.HEAP ? heap.pos
+                        : adjacentStand(level, heap.pos, safe, distances);
+                if (stand >= 0 && safe[stand] && distances[stand] != Integer.MAX_VALUE
                         && (score > priority || score == priority
-                            && distances[heap.pos] < distance)) {
+                            && distances[stand] < distance)) {
                     target = heap;
                     priority = score;
-                    distance = distances[heap.pos];
+                    distance = distances[stand];
                 }
             }
         }
@@ -167,7 +176,10 @@ final class BlastAutoCrystalRooms {
             BlastLog.debug("auto-crystal action=inventory-full required="
                     + required + " free=" + free);
         }
-        if (hero.pos == target.pos) {
+        int stand = target.type == Heap.Type.HEAP ? target.pos
+                : adjacentStand(level, target.pos, safe, distances);
+        if (stand < 0) return false;
+        if (hero.pos == stand) {
             Item item = null;
             for (Item prize : target.items) {
                 if (!staged.contains(prize)) {
@@ -178,13 +190,27 @@ final class BlastAutoCrystalRooms {
             if (item == null) return false;
             if (!BlastAutoPickup.canCollect(hero, item,
                     BlastAutoPickupPolicy::isInstantPickup)) return false;
-            BlastAutoPickup.preparePickup(hero, target, item);
-            hero.curAction = new HeroAction.PickUp(target.pos);
+            if (target.type == Heap.Type.HEAP) {
+                BlastAutoPickup.preparePickup(hero, target, item);
+                hero.curAction = new HeroAction.PickUp(target.pos);
+            } else hero.curAction = new HeroAction.OpenChest(target.pos);
         } else if (!hero.rooted) {
             hero.curAction = new HeroAction.Move(
-                    BlastAutoPlay.firstStep(target.pos, safe, distances));
+                    BlastAutoPlay.firstStep(stand, safe, distances));
         } else return false;
         return true;
+    }
+
+    private static int adjacentStand(Level level, int target,
+                                     boolean[] safe, int[] distances) {
+        int best = -1;
+        for (int offset : PathFinder.NEIGHBOURS8) {
+            int cell = target + offset;
+            if (level.insideMap(cell) && safe[cell]
+                    && distances[cell] != Integer.MAX_VALUE
+                    && (best < 0 || distances[cell] < distances[best])) best = cell;
+        }
+        return best;
     }
 
     static int rank(Item item) {
