@@ -95,6 +95,41 @@ final class BlastAutoVault {
         return false;
     }
 
+    /**
+     * Find a route across temporarily active vents without walking into fire.
+     * A blocked first step tells the caller to wait and retry next turn.
+     */
+    static int nextFlameStep(Hero hero, Level level, int goal, boolean[] safe) {
+        if (!(level instanceof VaultLevel) || !level.insideMap(goal)) return -1;
+        VaultFlameTraps flames = (VaultFlameTraps) level.blobs.get(VaultFlameTraps.class);
+        if (flames == null || flames.cur == null || flames.cur.length != level.length())
+            return -1;
+
+        boolean[] traversable = safe.clone();
+        for (int cell = 0; cell < traversable.length; cell++) {
+            if (flames.cur[cell] > 0 && level.insideMap(cell) && level.passable[cell]
+                    && !level.pit[cell] && (level.visited[cell] || level.mapped[cell]
+                    || hero.fieldOfView[cell])
+                    && com.shatteredpixel.shatteredpixeldungeon.actors.Actor.findChar(cell) == null) {
+                traversable[cell] = true;
+            }
+        }
+        if (!traversable[goal]) return -1;
+        PathFinder.buildDistanceMap(goal, traversable);
+        int[] remaining = PathFinder.distance;
+        if (remaining[hero.pos] == Integer.MAX_VALUE) return -1;
+        int step = -1;
+        int shortest = remaining[hero.pos];
+        for (int offset : PathFinder.NEIGHBOURS8) {
+            int cell = hero.pos + offset;
+            if (!level.insideMap(cell) || !traversable[cell]
+                    || remaining[cell] >= shortest) continue;
+            shortest = remaining[cell];
+            step = cell;
+        }
+        return step;
+    }
+
     static boolean waitForFlames(Hero hero, Level level, boolean[] safe) {
         if (!(level instanceof VaultLevel)) return false;
         VaultFlameTraps flames = (VaultFlameTraps) level.blobs.get(VaultFlameTraps.class);
