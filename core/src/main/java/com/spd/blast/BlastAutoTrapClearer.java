@@ -39,6 +39,7 @@ import com.shatteredpixel.shatteredpixeldungeon.levels.traps.FlockTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.FrostTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.GeyserTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.GrimTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.GuardianTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.OozeTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.PoisonDartTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.ShockingTrap;
@@ -123,6 +124,8 @@ final class BlastAutoTrapClearer {
         if (type == TeleportationTrap.class || type == WarpingTrap.class
                 || type == GeyserTrap.class) return 2;
         if (type == ShockingTrap.class || type == FlockTrap.class) return 3;
+        // Guardian traps summon hostile statues and alert mobs, but have no impact radius.
+        if (type == GuardianTrap.class) return 1;
         // Ooze is applied to the trap and eight adjoining cells, without a lingering blob.
         if (type == OozeTrap.class || type == ChillingTrap.class) return 2;
         // Frost seeds freezing blobs as far as two connected floor cells from the trap.
