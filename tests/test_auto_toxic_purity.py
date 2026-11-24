@@ -19,6 +19,7 @@ class ToxicCatalystPurityTest(unittest.TestCase):
         self.assertNotIn("potion.isKnown() &&", TOXIC)
         self.assertIn("potion.execute(hero, Potion.AC_DRINK);", TOXIC)
         self.assertIn("if (!collectibleCatalyst(hero, heap))", TOXIC)
+        self.assertIn("if (safe[treasure] && distances[treasure] != Integer.MAX_VALUE)", TOXIC)
 
     def test_crossing_preserves_risk_and_duration_guards(self):
         self.assertIn("item instanceof TrinketCatalyst", TOXIC)
