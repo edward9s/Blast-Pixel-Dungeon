@@ -39,14 +39,13 @@ class AutoAlchemyTests(unittest.TestCase):
     def test_recipe_and_inventory_integrity(self):
         source = ALCHEMY.read_text(encoding="utf-8")
         self.assertIn("new MeatPie.Recipe()", source)
-        self.assertIn("PIE.testIngredients(ingredients)", source)
-        self.assertIn("Dungeon.energy < cost", source)
+        self.assertIn("recipe.testIngredients(ingredients)", source)
         self.assertIn("readyToolkit(hero)", source)
         self.assertIn("toolkit.canBrewNow(hero)", source)
-        self.assertIn("shouldUseToolkit(potKnown, Dungeon.energy, toolkit.availableEnergy(), cost)", source)
+        self.assertIn("shouldUseToolkit(potKnown, Dungeon.energy, portable, cost)", source)
         self.assertIn("if (useToolkit) cost = toolkit.consumeEnergy(cost)", source)
-        self.assertLess(source.index("Dungeon.energy < cost"),
-                        source.index("PIE.brew(ingredients)"))
+        self.assertLess(source.index("if (fuel == null) return false"),
+                        source.index("recipe.brew(ingredients)"))
         self.assertIn("ingredient.detachAll(hero.belongings.backpack)", source)
         self.assertIn("if (!result.collect()) Dungeon.level.drop(result, hero.pos)", source)
         self.assertIn("Dungeon.energy -= cost", source)
