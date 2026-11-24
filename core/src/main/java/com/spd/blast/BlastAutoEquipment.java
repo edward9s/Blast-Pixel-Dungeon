@@ -106,7 +106,8 @@ final class BlastAutoEquipment {
                 if (!(item instanceof MeleeWeapon) || isCursed(item)) continue;
                 MeleeWeapon other = (MeleeWeapon) item;
                 if (wearable && other.STRReq(other.trueLevel()) > strength) continue;
-                if (weaponAtLeastAsGood(other, weapon)) return false;
+                if (weaponAtLeastAsGood(other, weapon)
+                        || weaponOverwhelms(other, weapon)) return false;
             }
             return true;
         }
@@ -198,6 +199,18 @@ final class BlastAutoEquipment {
                 && superior.ACC >= inferior.ACC && superior.RCH >= inferior.RCH;
     }
 
+    /**
+     * At double the raw damage, the stronger weapon outweighs a reach-only
+     * advantage if its attack speed and accuracy are no worse. Other trade-offs
+     * still use the strict multi-stat comparison.
+     */
+    static boolean weaponOverwhelms(MeleeWeapon superior, MeleeWeapon inferior) {
+        return (long) weaponRating(superior) >= 2L * weaponRating(inferior)
+                && superior.augment.delayFactor(superior.DLY)
+                    <= inferior.augment.delayFactor(inferior.DLY)
+                && superior.ACC >= inferior.ACC;
+    }
+
     /** Evaluate independent weapon traits without inventing trade-off weights. */
     static boolean weaponDominates(MeleeWeapon superior, MeleeWeapon inferior) {
         if (!weaponAtLeastAsGood(superior, inferior)) return false;
@@ -211,7 +224,9 @@ final class BlastAutoEquipment {
     static boolean isRedundant(Item candidate, Item equipped) {
         if (isProtectedEquipment(candidate)) return false;
         if (candidate instanceof MeleeWeapon && equipped instanceof MeleeWeapon) {
-            return weaponDominates((MeleeWeapon) equipped, (MeleeWeapon) candidate);
+            MeleeWeapon worn = (MeleeWeapon) equipped;
+            MeleeWeapon spare = (MeleeWeapon) candidate;
+            return weaponDominates(worn, spare) || weaponOverwhelms(worn, spare);
         }
         if (candidate instanceof Armor && equipped instanceof Armor) {
             return armorRating((Armor) equipped) > armorRating((Armor) candidate);
@@ -375,8 +390,7 @@ final class BlastAutoEquipment {
         if (current instanceof MeleeWeapon) {
             if (availableAlchemize(hero) == null) {
                 retainedEquipment.add(current);
-            } else if (!isProtectedEquipment(current)
-                    && weaponDominates(best, (MeleeWeapon) current)
+            } else if (isRedundant(current, best)
                     && Shopkeeper.canSell(current)) {
                 replacedEquipment.addLast(current);
             }
