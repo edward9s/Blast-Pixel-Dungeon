@@ -1042,6 +1042,18 @@ public final class BlastAutoPlay {
             progress.intent(BlastAutoProgressGuard.Intent.ROAM);
             hero.curAction = new HeroAction.Move(step);
         } else {
+            int staging = BlastAutoVault.stagingCell(hero, Dungeon.level, safe, distances);
+            if (staging >= 0 && !hero.rooted) {
+                roaming.clearDestination();
+                if (staging == hero.pos) {
+                    debugDecision = "vault-wait";
+                    hero.spendAndNext(Actor.TICK);
+                    return true;
+                }
+                debugDecision = "vault-stage";
+                hero.curAction = new HeroAction.Move(firstStep(staging, safe, distances));
+                return false;
+            }
             debugDecision = "idle";
         }
         return false;
