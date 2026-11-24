@@ -3,6 +3,7 @@ package com.spd.blast;
 import com.shatteredpixel.shatteredpixeldungeon.items.armor.LeatherArmor;
 import com.shatteredpixel.shatteredpixeldungeon.items.BrokenSeal;
 import com.shatteredpixel.shatteredpixeldungeon.items.armor.glyphs.Camouflage;
+import com.shatteredpixel.shatteredpixeldungeon.items.armor.glyphs.Brimstone;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.Dagger;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.Shortsword;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.enchantments.Blazing;
@@ -86,6 +87,30 @@ public final class BlastAutoEquipmentTest {
                 "Inscribed armor must never be sold during strength cleanup");
         check(!BlastAutoEquipment.isUnwearableForSale(new DriedRose(), 0),
                 "Only weapons and armor are eligible for strength cleanup");
+
+        LeatherArmor oldInscribed = new LeatherArmor();
+        oldInscribed.inscribe(new Camouflage());
+        LeatherArmor newInscribed = new LeatherArmor();
+        newInscribed.inscribe(new Brimstone());
+        check(BlastAutoEquipment.hasGlyphConflict(oldInscribed, newInscribed),
+                "Different old/new armor glyphs must trigger inscription protection");
+        check(BlastAutoEquipment.keepOldArmor(oldInscribed, newInscribed),
+                "Different glyphs must preserve old armor instead of auto-selling it");
+
+        LeatherArmor uninscribed = new LeatherArmor();
+        check(!BlastAutoEquipment.hasGlyphConflict(oldInscribed, uninscribed),
+                "An empty destination glyph has no competing inscription");
+        check(BlastAutoEquipment.keepOldArmor(oldInscribed, uninscribed),
+                "An old glyph that cannot transfer must remain available to the player");
+
+        LeatherArmor sameInscription = new LeatherArmor();
+        sameInscription.inscribe(new Camouflage());
+        check(!BlastAutoEquipment.hasGlyphConflict(oldInscribed, sameInscription),
+                "Matching glyph types should not count as a conflict");
+        check(!BlastAutoEquipment.keepOldArmor(oldInscribed, sameInscription),
+                "Identical inscriptions do not prohibit sale of an inferior old armor");
+        check(!BlastAutoEquipment.keepOldArmor(uninscribed, newInscribed),
+                "Uninscribed old armor needs no glyph protection");
 
         System.out.println("BlastAutoEquipmentTest passed");
     }
