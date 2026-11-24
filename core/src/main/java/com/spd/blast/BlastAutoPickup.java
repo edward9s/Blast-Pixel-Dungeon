@@ -15,6 +15,11 @@ import com.shatteredpixel.shatteredpixeldungeon.items.Waterskin;
 import com.shatteredpixel.shatteredpixeldungeon.items.artifacts.DriedRose;
 import com.shatteredpixel.shatteredpixeldungeon.items.bags.Bag;
 import com.shatteredpixel.shatteredpixeldungeon.items.keys.Key;
+import com.shatteredpixel.shatteredpixeldungeon.items.rings.Ring;
+import com.shatteredpixel.shatteredpixeldungeon.items.rings.RingOfEnergy;
+import com.shatteredpixel.shatteredpixeldungeon.items.rings.RingOfHaste;
+import com.shatteredpixel.shatteredpixeldungeon.items.rings.RingOfSharpshooting;
+import com.shatteredpixel.shatteredpixeldungeon.items.rings.RingOfWealth;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
 
 import java.util.function.Predicate;
@@ -218,6 +223,12 @@ public final class BlastAutoPickup {
     }
 
     static boolean isPickupType(Item item, Predicate<Item> instantPickup) {
+        if (item instanceof Ring) {
+            return !item.cursed && (item instanceof RingOfWealth
+                    || item instanceof RingOfSharpshooting
+                    || item instanceof RingOfHaste
+                    || item instanceof RingOfEnergy);
+        }
         return item.stackable || instantPickup.test(item);
     }
 
