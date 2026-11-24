@@ -1,6 +1,7 @@
 package com.spd.blast;
 
 import com.shatteredpixel.shatteredpixeldungeon.items.armor.LeatherArmor;
+import com.shatteredpixel.shatteredpixeldungeon.items.BrokenSeal;
 import com.shatteredpixel.shatteredpixeldungeon.items.armor.glyphs.Camouflage;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.Dagger;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.Shortsword;
@@ -36,6 +37,16 @@ public final class BlastAutoEquipmentTest {
         check(BlastAutoEquipment.armorRating(upgradedArmor)
                         > BlastAutoEquipment.armorRating(basicArmor),
                 "Actual upgrades must affect armor selection without identification");
+
+        BrokenSeal seal = new BrokenSeal();
+        seal.level(1);
+        check(BlastAutoEquipment.armorRatingWithSeal(basicArmor, seal)
+                        == basicArmor.DRMin(basicArmor.trueLevel() + 1)
+                            + basicArmor.DRMax(basicArmor.trueLevel() + 1),
+                "A transferred upgraded seal must affect candidate armor rating");
+        check(BlastAutoEquipment.armorRatingWithSeal(basicArmor, null)
+                        == BlastAutoEquipment.armorRating(basicArmor),
+                "Armor without a seal uses its actual defensive rating");
 
         check(BlastAutoEquipment.canPickup(plain, false),
                 "Non-cursed equipment needs no Alchemize");
