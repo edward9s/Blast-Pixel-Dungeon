@@ -59,8 +59,10 @@ final class BlastAutoCrystalRooms {
             RegularLevel regular = (RegularLevel) level;
             CrystalPathRoom path = (CrystalPathRoom) regular.room(CrystalPathRoom.class);
             CrystalChoiceRoom choice = (CrystalChoiceRoom) regular.room(CrystalChoiceRoom.class);
-            if (path != null && remainingCrystalDoors(level, path) <= 3) room = path;
-            else if (choice != null && remainingCrystalDoors(level, choice) <= 1) room = choice;
+            if (path != null && remainingCrystalDoors(level, path) <= 3
+                    && hasUncollectedLoot(level, path)) room = path;
+            else if (choice != null && remainingCrystalDoors(level, choice) <= 1
+                    && hasUncollectedLoot(level, choice)) room = choice;
         }
         boolean pending = false;
         if (room != null && room.entrance() != null && Dungeon.branch == 0
@@ -68,13 +70,7 @@ final class BlastAutoCrystalRooms {
                 && (level.visited[level.pointToCell(room.entrance())]
                     || level.mapped[level.pointToCell(room.entrance())]
                     || hero.fieldOfView[level.pointToCell(room.entrance())])) {
-            for (Heap heap : level.heaps.valueList()) {
-                if (room.inside(level.cellToPoint(heap.pos))
-                        && heap.items.stream().anyMatch(item -> !staged.contains(item))) {
-                    pending = true;
-                    break;
-                }
-            }
+            pending = hasUncollectedLoot(level, room);
         }
         if (pending && !phaseActive) {
             phaseWasEnabled = BlastSettings.testFreeMovement();
@@ -87,6 +83,14 @@ final class BlastAutoCrystalRooms {
             resetPhase();
             BlastLog.debug("auto-crystal action=restore-phase");
         }
+    }
+
+    private static boolean hasUncollectedLoot(Level level, Room room) {
+        for (Heap heap : level.heaps.valueList()) {
+            if (room.inside(level.cellToPoint(heap.pos))
+                    && heap.items.stream().anyMatch(item -> !staged.contains(item))) return true;
+        }
+        return false;
     }
 
     /** The room starts with six locks and generates three crystal keys. */
@@ -103,6 +107,11 @@ final class BlastAutoCrystalRooms {
      * Collect every remaining prize, including prizes in unrevealed final rooms.
      * Staged equipment is ignored so it cannot be immediately picked up again.
      */
+    static boolean containsActive(int cell) {
+        return phaseActive && phaseLevel == Dungeon.level && phaseRoom != null
+                && phaseRoom.inside(Dungeon.level.cellToPoint(cell));
+    }
+
     static boolean isStaged(Item item) {
         return staged.contains(item);
     }
