@@ -205,6 +205,7 @@ public final class BlastAutoPlay {
         BlastAutoTrapClearer.reset();
         BlastAutoSpecialRooms.reset();
         BlastAutoCrystalRooms.resetPhase();
+        BlastAutoBlacksmith.reset();
         BlastAutoSacrifice.reset();
         BlastAutoFood.stopFeeding();
 
@@ -649,6 +650,7 @@ public final class BlastAutoPlay {
         hero.resting = false;
 
         BlastAutoCrystalRooms.updatePhase(hero);
+        BlastAutoBlacksmith.update();
         Blob[] hazards = BlastAutoEnvironment.activeHazards(Dungeon.level);
         boolean[] specialBarriers = BlastAutoEnvironment.activeSpecialBarriers(Dungeon.level);
         boolean[] safe = safeCells(hero, hazards, specialBarriers);
@@ -982,6 +984,15 @@ public final class BlastAutoPlay {
         if (BlastAutoPickup.chooseAction(hero, idleSafe, idleDistances,
                 BlastAutoPickupPolicy::isInstantPickup)) {
             progress.intent(BlastAutoProgressGuard.Intent.PICKUP);
+            return false;
+        }
+
+        // Mine known dark-gold veins after ordinary pickups, before roaming.
+        idleSafe = progress.safeFor(safe, hero.pos, BlastAutoProgressGuard.Intent.INTERACT);
+        idleDistances = navigationDistances(hero.pos, safe, distances, idleSafe);
+        debugDecision = "blacksmith-mine";
+        if (BlastAutoBlacksmith.mine(hero, idleSafe, idleDistances)) {
+            progress.intent(BlastAutoProgressGuard.Intent.INTERACT);
             return false;
         }
 
