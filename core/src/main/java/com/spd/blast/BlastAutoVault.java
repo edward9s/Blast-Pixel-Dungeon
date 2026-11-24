@@ -95,6 +95,19 @@ final class BlastAutoVault {
         return false;
     }
 
+    static boolean waitForFlames(Hero hero, Level level, boolean[] safe) {
+        if (!(level instanceof VaultLevel)) return false;
+        VaultFlameTraps flames = (VaultFlameTraps) level.blobs.get(VaultFlameTraps.class);
+        if (flames == null || flames.cur == null || !safe[hero.pos]) return false;
+        for (int offset : PathFinder.NEIGHBOURS8) {
+            int cell = hero.pos + offset;
+            if (!level.insideMap(cell) || safe[cell] || !level.passable[cell]
+                    || level.pit[cell] || flames.cur[cell] <= 0) continue;
+            return true;
+        }
+        return false;
+    }
+
     static boolean drinkPurity(Hero hero, Level level) {
         if (!(level instanceof RegularLevel) || hero.buff(BlobImmunity.class) != null
                 || hero.belongings.lostInventory()) return false;
