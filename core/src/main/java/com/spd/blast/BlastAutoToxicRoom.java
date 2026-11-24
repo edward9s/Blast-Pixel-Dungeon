@@ -158,6 +158,22 @@ final class BlastAutoToxicRoom {
         return PathFinder.distance.clone();
     }
 
+    /** Drink from the doorway, or a clean adjacent tile if gas reached it. */
+    private static int purityStand(Level level, ToxicGasRoom room, int door,
+                                   boolean[] safe, int[] distances) {
+        if (safe[door] && distances[door] != Integer.MAX_VALUE) return door;
+        int best = -1;
+        int shortest = Integer.MAX_VALUE;
+        for (int offset : PathFinder.NEIGHBOURS8) {
+            int cell = door + offset;
+            if (!level.insideMap(cell) || room.inside(level.cellToPoint(cell))
+                    || !safe[cell] || distances[cell] >= shortest) continue;
+            best = cell;
+            shortest = distances[cell];
+        }
+        return best;
+    }
+
     /** Budget for the trip, opening the chest, picking up loot, and returning. */
     static boolean enoughPurity(float duration, int forward, int backward,
                                 int interactions, float stepTime) {
@@ -182,7 +198,8 @@ final class BlastAutoToxicRoom {
             return BlastAutoSpecialRooms.Action.NONE;
         }
 
-        boolean[] route = purityRoute(hero, level, room, purityEntrance,
+        int door = level.pointToCell(room.entrance());
+        boolean[] route = purityRoute(hero, level, room, door,
                 safe, hazards, barriers);
         int[] forward = distancesFrom(hero.pos, route);
         int[] backward = distancesFrom(purityTreasure, route);
@@ -244,10 +261,10 @@ final class BlastAutoToxicRoom {
             return BlastAutoSpecialRooms.Action.NONE;
 
         int door = level.pointToCell(room.entrance());
-        if (!safe[door] || distances[door] == Integer.MAX_VALUE) 
-            return BlastAutoSpecialRooms.Action.NONE;
+        int stand = purityStand(level, room, door, safe, distances);
+        if (stand < 0) return BlastAutoSpecialRooms.Action.NONE;
         boolean[] route = purityRoute(hero, level, room, door, safe, hazards, barriers);
-        int[] toChest = distancesFrom(door, route);
+        int[] toChest = distancesFrom(stand, route);
         int[] back = distancesFrom(treasure, route);
         Heap heap = level.heaps.get(treasure);
         if (!collectibleCatalyst(hero, heap))
@@ -255,16 +272,16 @@ final class BlastAutoToxicRoom {
         int interactions = heap.type == Heap.Type.CHEST ? 2 : 1;
         float duration = immunity == null
                 ? BlobImmunity.DURATION - 1f : immunity.cooldown();
-        if (!enoughPurity(duration, toChest[treasure], back[door],
+        if (!enoughPurity(duration, toChest[treasure], back[stand],
                 interactions, Math.max(1f, 1f / hero.speed())))
             return BlastAutoSpecialRooms.Action.NONE;
 
-        if (hero.pos != door) {
+        if (hero.pos != stand) {
             return BlastAutoSpecialRooms.approachEntrance(
-                    hero, treasure, door, safe, distances);
+                    hero, treasure, stand, safe, distances);
         }
 
-        purityEntrance = door;
+        purityEntrance = stand;
         purityTreasure = treasure;
         attemptedPurityTreasure = treasure;
         if (immunity == null) {
