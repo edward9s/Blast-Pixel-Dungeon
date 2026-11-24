@@ -44,7 +44,7 @@ class AutoAlchemyTests(unittest.TestCase):
         self.assertIn("toolkit.canBrewNow(hero)", source)
         self.assertIn("shouldUseToolkit(potKnown, Dungeon.energy, portable, cost)", source)
         self.assertIn("if (useToolkit) cost = toolkit.consumeEnergy(cost)", source)
-        self.assertLess(source.index("if (fuel == null) return false"),
+        self.assertLess(source.index("if (fuel == null)"),
                         source.index("recipe.brew(ingredients)"))
         self.assertIn("ingredient.detachAll(hero.belongings.backpack)", source)
         self.assertIn("if (!result.collect()) Dungeon.level.drop(result, hero.pos)", source)
