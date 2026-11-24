@@ -22,6 +22,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroAction;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroClass;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Talent;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mimic;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.KindOfWeapon;
 import com.shatteredpixel.shatteredpixeldungeon.items.rings.RingOfAccuracy;
@@ -137,9 +138,10 @@ final class BlastAutoCombat {
     private static ArrayList<Mob> enemies(Hero hero) {
         ArrayList<Mob> targets = new ArrayList<>();
         for (Mob mob : Dungeon.level.mobs) {
-            if (!mob.isAlive() || mob.alignment != Char.Alignment.ENEMY
+            if (!mob.isAlive() || (mob.alignment != Char.Alignment.ENEMY && !(mob instanceof Mimic))
                     || mob.invisible > 0 || !hero.fieldOfView[mob.pos]
-                    || !BlastAutoPlay.isAwake(mob) || BlastAutoPlay.isAutoAttackExcluded(mob)
+                    || (!(mob instanceof Mimic) && !BlastAutoPlay.isAwake(mob))
+                    || BlastAutoPlay.isAutoAttackExcluded(mob)
                     || BlastAutoPlay.ignored(mob)
                     || hero.isCharmedBy(mob) || mob.isInvulnerable(Hero.class)) continue;
             targets.add(mob);
