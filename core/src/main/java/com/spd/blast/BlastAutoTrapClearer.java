@@ -545,6 +545,28 @@ final class BlastAutoTrapClearer {
                         Dungeon.hero, null);
     }
 
+    /**
+     * Prepare a door-side throw even when corridor detection returns no preferred side.
+     * The item holds the door open so later projectiles can reach the near-door trap.
+     */
+    private static int[] doorPreparation(Level level, int trapCell,
+                                         boolean[] safe, int[] distances) {
+        int[] directions = {-level.width(), 1, level.width(), -1};
+        int bestStand = -1;
+        int bestDoor = -1;
+        for (int side : directions) {
+            int door = closedDoor(level, trapCell, side);
+            if (door < 0 || level.distance(door, trapCell) > 2) continue;
+            int stand = doorStand(level, trapCell, side, 1, safe, distances);
+            if (stand >= 0 && (bestStand < 0
+                    || distances[stand] < distances[bestStand])) {
+                bestStand = stand;
+                bestDoor = door;
+            }
+        }
+        return new int[] {bestStand, bestDoor};
+    }
+
     private static int closedDoor(Level level, int trapCell, int side) {
         for (int steps = 1; steps <= MAX_THROW_DISTANCE; steps++) {
             int cell = trapCell + side * steps;
@@ -694,9 +716,16 @@ final class BlastAutoTrapClearer {
                             frost = stand >= 0;
                         }
                     }
-                    if (stand < 0 && side != 0) {
-                        stand = doorStand(level, cell, side, 1, safe, distances);
-                        if (stand >= 0) target = closedDoor(level, cell, side);
+                    if (stand < 0) {
+                        // A near-door trap may have no safe direct throw position.
+                        // Place a disposable item on the door first, from outside.
+                        int[] preparation = doorPreparation(level, cell, safe, distances);
+                        if (preparation[0] >= 0) {
+                            stand = preparation[0];
+                            target = preparation[1];
+                            frost = false;
+                            corrosion = false;
+                        }
                     }
                     if (stand < 0) reason = "no-safe-stand";
                     else if (aimedOnly && (stand != hero.pos || target != cell))
