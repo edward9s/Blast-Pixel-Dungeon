@@ -162,7 +162,7 @@ final class BlastAutoChasmRoom {
         int exit = level.pointToCell(room.entrance());
         boolean[] flight = flightMap(hero, room, safe, hazards, specialBarriers);
         int[] reach = distancesFrom(hero.pos, flight);
-        float perStep = Math.max(1f, 1f / hero.speed());
+        float perStep = 1f / hero.speed();
         PotionOfLevitation spare = hero.belongings.getItem(PotionOfLevitation.class);
         boolean last = spare == null || spare.quantity() == 0;
         int goal = target(hero, room, flight, reach, exit,
@@ -175,35 +175,36 @@ final class BlastAutoChasmRoom {
                 return BlastAutoSpecialRooms.Action.MOVE;
             }
         }
-        // No affordable objective: first seek the entrance if this is the last float.
-        int landing = -1, shortest = Integer.MAX_VALUE;
-        if (reach[exit] != Integer.MAX_VALUE
-                && !buff.detachesWithinDelay((reach[exit] + 2) * perStep)) {
+        // All rewards are collected: return to solid ground, never wait over a pit.
+        // A short remaining buff does not make the entrance an invalid destination.
+        int landing = -1;
+        if (reach[exit] != Integer.MAX_VALUE) {
             landing = exit;
         } else {
+            int shortest = Integer.MAX_VALUE;
             for (int cell = 0; cell < flight.length; cell++) {
                 if (!flight[cell] || level.pit[cell] || reach[cell] == Integer.MAX_VALUE
-                        || reach[cell] >= shortest
-                        || (cell != exit && !room.inside(level.cellToPoint(cell)))) continue;
+                        || reach[cell] >= shortest) continue;
                 shortest = reach[cell];
                 landing = cell;
             }
         }
-        if (landing < 0) return BlastAutoSpecialRooms.Action.NONE;
-        if (hero.pos != landing && !hero.rooted) {
+        if (landing < 0) {
+            // No known landing tile: do not deliberately burn levitation over a pit.
+            return BlastAutoSpecialRooms.Action.NONE;
+        }
+        if (hero.pos != landing) {
+            if (hero.rooted) return BlastAutoSpecialRooms.Action.NONE;
             hero.curAction = new HeroAction.Move(
                     BlastAutoPlay.firstStep(landing, flight, reach));
             return BlastAutoSpecialRooms.Action.MOVE;
         }
-        // Stay on solid ground until levitation ends or can be refreshed next turn.
-        if (landing == exit) {
-            activeEntrance = -1;
-            // Refresh the movement map next turn; the old map still permits chasms.
-            hero.spendAndNext(Actor.TICK);
-            return BlastAutoSpecialRooms.Action.USE;
+        if (level.pit[hero.pos]) {
+            throw new IllegalStateException("Chasm flight selected a pit as landing");
         }
-        hero.spendAndNext(Actor.TICK);
-        return BlastAutoSpecialRooms.Action.USE;
+        // End flight management on solid ground; regular auto-play can resume.
+        activeEntrance = -1;
+        return BlastAutoSpecialRooms.Action.NONE;
     }
 
     static BlastAutoSpecialRooms.Action chooseAction(Hero hero, boolean[] safe,
