@@ -49,7 +49,7 @@ final class BlastAutoAlchemy {
     private static final Recipe AQUA = new AquaBrew.Recipe();
     private static final Recipe CLOUDS = new ExoticPotion.PotionToExotic();
     private static final Recipe POTION = new Potion.SeedToPotion();
-    private static final Recipe SCROLL = new Scroll.StoneToScroll();
+    private static final Scroll.StoneToScroll SCROLL = new Scroll.StoneToScroll();
 
     private enum Restock {
         ALCHEMIZE("Alchemize"), AQUA("AquaBrew");
@@ -163,14 +163,15 @@ final class BlastAutoAlchemy {
         if (toolkit == null && (brewAlchemize(hero, potKnown, null, seeds, stones, POT_ALCHEMIZE_STOCK)
                 || brewAqua(hero, potKnown, null, seeds, POT_AQUA_STOCK))) return true;
 
-        ScrollHolder scrolls = hero.belongings.getItem(ScrollHolder.class);
-        if (hasSlot(scrolls)) {
-            for (boolean important : new boolean[]{true, false}) {
-                for (Runestone stone : stones) {
-                    if (stone.quantity() >= 2 && importantStone(stone) == important
-                            && brew(hero, potKnown, toolkit, seeds, SCROLL,
-                                    ingredients(stone, stone), 0)) return true;
-                }
+        boolean hasScrollHolder = hero.belongings.getItem(ScrollHolder.class) != null;
+        for (boolean important : new boolean[]{true, false}) {
+            for (Runestone stone : stones) {
+                if (stone.quantity() < 2 || importantStone(stone) != important
+                        || (!hasScrollHolder && !(stone instanceof StoneOfEnchantment))) continue;
+                ArrayList<Item> inputs = ingredients(stone, stone);
+                Scroll output = SCROLL.outputFor(inputs);
+                if (output != null && canStore(hero, output)
+                        && brew(hero, potKnown, toolkit, seeds, SCROLL, inputs, 0)) return true;
             }
         }
 
