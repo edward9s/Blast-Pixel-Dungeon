@@ -882,6 +882,17 @@ public final class BlastAutoPlay {
         debugDecision = "alchemy";
         if (BlastAutoAlchemy.brewIfPossible(hero, safe[hero.pos])) return true;
 
+        // Finish quenching toxic vents before unrelated loot or crystal-door
+        // interactions can draw the hero away from the gas room.
+        debugDecision = "toxic-vents";
+        BlastAutoSpecialRooms.Action toxicVents = BlastAutoToxicRoom.chooseAction(
+                hero, safe, distances, hazards, specialBarriers);
+        if (toxicVents != BlastAutoSpecialRooms.Action.NONE) {
+            roaming.clearDestination();
+            progress.intent(BlastAutoProgressGuard.Intent.INTERACT);
+            return toxicVents == BlastAutoSpecialRooms.Action.USE;
+        }
+
         // Collect reachable floor loot after visible enemies have been handled.
         idleSafe = progress.safeFor(safe, hero.pos, BlastAutoProgressGuard.Intent.PICKUP);
         idleDistances = navigationDistances(hero.pos, safe, distances, idleSafe);
