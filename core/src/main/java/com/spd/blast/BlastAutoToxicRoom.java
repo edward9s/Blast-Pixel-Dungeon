@@ -253,6 +253,9 @@ final class BlastAutoToxicRoom {
         int treasure = catalystTreasure(level, room);
         if (treasure < 0 || treasure == attemptedPurityTreasure)
             return BlastAutoSpecialRooms.Action.NONE;
+        // Let ordinary auto-pickup reach treasure without spending a potion.
+        if (safe[treasure] && distances[treasure] != Integer.MAX_VALUE)
+            return BlastAutoSpecialRooms.Action.NONE;
 
         BlobImmunity immunity = hero.buff(BlobImmunity.class);
         PotionOfPurity potion = hero.belongings.getItem(PotionOfPurity.class);
