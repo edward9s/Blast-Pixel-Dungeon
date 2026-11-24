@@ -114,12 +114,7 @@ public final class BlastAutoPickup {
 
         if (nearest < 0) return false;
         if (nearest == hero.pos) {
-            // Native pickup consumes the top item, so expose the eligible item first.
-            exposeForPickup(nearestHeap, nearestItem);
-            // Record the candidate; the native failure callback alone starts cooldown.
-            attemptedItem = nearestItem;
-            attemptedCell = nearest;
-            BlastAutoEquipment.onPickupScheduled(nearestItem);
+            preparePickup(hero, nearestHeap, nearestItem);
             hero.curAction = new HeroAction.PickUp(nearest);
         } else {
             hero.curAction = new HeroAction.Move(BlastAutoPlay.firstStep(nearest, safe, distances));
@@ -211,6 +206,19 @@ public final class BlastAutoPickup {
             if (eligible.test(item)) return item;
         }
         return null;
+    }
+
+    /** Keep native pickup callbacks consistent across ordinary and room looting. */
+    static void preparePickup(Hero hero, Heap heap, Item item) {
+        if (currentHero != hero || currentLevel != Dungeon.level) {
+            reset();
+            currentHero = hero;
+            currentLevel = Dungeon.level;
+        }
+        exposeForPickup(heap, item);
+        attemptedItem = item;
+        attemptedCell = heap.pos;
+        BlastAutoEquipment.onPickupScheduled(item);
     }
 
     /** Reorder only during automatic pickup; native doPickUp still owns the result. */
