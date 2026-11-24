@@ -68,15 +68,19 @@ public final class BlastAutoInteract {
         int stand = -1;
         int steps = Integer.MAX_VALUE;
         boolean chest = false;
+        int bestPriority = Integer.MIN_VALUE;
 
         for (Heap heap : level.heaps.valueList()) {
             if (!heap.seen || !canOpen(heap.type, goldenKeys, crystalKeys)) continue;
             int candidate = nearestStand(level, heap.pos, true, safe, distances);
-            if (candidate >= 0 && distances[candidate] < steps) {
+            int priority = BlastAutoCrystalRooms.priority(level, hero, heap.pos, true);
+            if (candidate >= 0 && BlastAutoCrystalRooms.replace(
+                    priority, bestPriority, distances[candidate], steps)) {
                 target = heap.pos;
                 stand = candidate;
                 steps = distances[candidate];
                 chest = true;
+                bestPriority = priority;
             }
         }
 
@@ -87,11 +91,14 @@ public final class BlastAutoInteract {
                     continue;
                 }
                 int candidate = nearestStand(level, cell, false, safe, distances);
-                if (candidate >= 0 && distances[candidate] < steps) {
+                int priority = BlastAutoCrystalRooms.priority(level, hero, cell, false);
+                if (candidate >= 0 && BlastAutoCrystalRooms.replace(
+                        priority, bestPriority, distances[candidate], steps)) {
                     target = cell;
                     stand = candidate;
                     steps = distances[candidate];
                     chest = false;
+                    bestPriority = priority;
                 }
             }
         }
