@@ -410,9 +410,27 @@ final class BlastAutoToxicRoom {
         for (Heap heap : loot) actions += roomActions(hero, heap);
         float duration = immunity == null
                 ? BlobImmunity.DURATION - 1f : immunity.cooldown();
-        if (!enoughPurity(duration, routeLength(steps, order), 0, actions,
-                Math.max(1f, 1f / hero.speed())))
-            return BlastAutoSpecialRooms.Action.NONE;
+        float stepTime = Math.max(1f, 1f / hero.speed());
+        if (!enoughPurity(duration, routeLength(steps, order), 0, actions, stepTime)) {
+            // If the full three-cache circuit is unusually long, recover the
+            // catalyst first and attempt the remaining caches with spare time.
+            // Never spend Purity unless that first pickup and retreat fit.
+            int catalystIndex = -1;
+            for (int i = 0; i < loot.length; i++) {
+                if (loot[i].pos == catalyst) catalystIndex = i;
+            }
+            if (catalystIndex < 0 || !enoughPurity(duration,
+                    steps[0][catalystIndex + 1], steps[catalystIndex + 1][0],
+                    roomActions(hero, loot[catalystIndex]), stepTime))
+                return BlastAutoSpecialRooms.Action.NONE;
+            int[] fallback = new int[order.length];
+            fallback[0] = catalystIndex;
+            int next = 1;
+            for (int target : order) {
+                if (target != catalystIndex) fallback[next++] = target;
+            }
+            order = fallback;
+        }
         if (hero.pos != stand) {
             return BlastAutoSpecialRooms.approachEntrance(
                     hero, catalyst, stand, safe, distances);
