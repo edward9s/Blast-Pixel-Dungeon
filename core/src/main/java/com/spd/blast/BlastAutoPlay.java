@@ -868,7 +868,8 @@ public final class BlastAutoPlay {
             return flightAction == BlastAutoSpecialRooms.Action.USE;
         }
 
-        // Strength potions, cursed-gear sales and equipment upgrades run only while idle.
+        // Strength potions, equipment upgrades, and ordinary gear cleanup run only while idle.
+        // Cursed gear is sold immediately from the native pickup-success callback.
         debugDecision = "equipment";
         if (BlastAutoEquipment.manage(hero)) return true;
 
