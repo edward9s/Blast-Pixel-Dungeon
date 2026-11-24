@@ -66,9 +66,12 @@ final class BlastAutoToxicRoom {
     private static boolean anySource(Level level, ToxicGasRoom room) {
         Blob seed = level.blobs.get(ToxicGasRoom.ToxicGasSeed.class);
         if (seed == null || seed.volume <= 0) return false;
-        for (Trap trap : level.traps.valueList()) {
-            if (room.inside(level.cellToPoint(trap.pos)) && activeVent(level, trap))
-                return true;
+        // The seed blob is authoritative: an undiscovered or already-triggered
+        // vent must not be mistaken for a quenched vent.
+        for (int y = room.top + 1; y < room.bottom; y++) {
+            for (int x = room.left + 1; x < room.right; x++) {
+                if (seed.cur[x + y * level.width()] > 0) return true;
+            }
         }
         return false;
     }
