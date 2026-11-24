@@ -990,6 +990,15 @@ public final class BlastAutoPlay {
             return toxicVents == BlastAutoSpecialRooms.Action.USE;
         }
 
+        // Complete the crystal-path room before ordinary pickup or roaming.
+        idleSafe = progress.safeFor(safe, hero.pos, BlastAutoProgressGuard.Intent.PICKUP);
+        idleDistances = navigationDistances(hero.pos, safe, distances, idleSafe);
+        debugDecision = "crystal-path";
+        if (BlastAutoCrystalRooms.collect(hero, idleSafe, idleDistances)) {
+            progress.intent(BlastAutoProgressGuard.Intent.PICKUP);
+            return hero.curAction == null;
+        }
+
         // Collect reachable floor loot after visible enemies have been handled.
         idleSafe = progress.safeFor(safe, hero.pos, BlastAutoProgressGuard.Intent.PICKUP);
         idleDistances = navigationDistances(hero.pos, safe, distances, idleSafe);
