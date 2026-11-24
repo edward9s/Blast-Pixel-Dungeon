@@ -14,6 +14,7 @@ import com.shatteredpixel.shatteredpixeldungeon.items.bombs.Bomb;
 import com.shatteredpixel.shatteredpixeldungeon.items.potions.PotionOfHealing;
 import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfIdentify;
 import com.shatteredpixel.shatteredpixeldungeon.items.stones.Runestone;
+import com.shatteredpixel.shatteredpixeldungeon.items.trinkets.TrinketCatalyst;
 import com.shatteredpixel.shatteredpixeldungeon.items.rings.Ring;
 import com.shatteredpixel.shatteredpixeldungeon.items.rings.RingOfEnergy;
 import com.shatteredpixel.shatteredpixeldungeon.items.rings.RingOfForce;
@@ -57,6 +58,24 @@ public final class BlastAutoPickupTest {
         check(true, new BlastPhasePotion());
         check(true, new BlastBombproofScroll());
         check(true, new Bomb());
+
+        // Magical Catalyst is a unique, non-stackable regular inventory item.
+        TrinketCatalyst catalyst = new TrinketCatalyst();
+        if (catalyst.stackable || !catalyst.unique) {
+            throw new AssertionError("Magical Catalyst no longer has its native item properties");
+        }
+        check(true, catalyst);
+        if (!BlastAutoPickup.isPickupType(catalyst, item -> false)
+                || BlastAutoPickup.bypassesBackpack(catalyst, BLAST_INSTANT)) {
+            throw new AssertionError("Magical Catalyst must require space in the backpack");
+        }
+        Heap catalystHeap = new Heap();
+        catalystHeap.items.add(new DriedRose());
+        catalystHeap.items.add(catalyst);
+        if (BlastAutoPickup.firstEligibleItem(catalystHeap,
+                item -> BlastAutoPickup.isPickupType(item, BLAST_INSTANT)) != catalyst) {
+            throw new AssertionError("Covered Magical Catalyst must remain collectible");
+        }
 
         // Only these four non-cursed ring classes are eligible for auto-pickup.
         for (Ring ring : new Ring[]{new RingOfWealth(), new RingOfSharpshooting(),
