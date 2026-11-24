@@ -14,6 +14,13 @@ import com.shatteredpixel.shatteredpixeldungeon.items.bombs.Bomb;
 import com.shatteredpixel.shatteredpixeldungeon.items.potions.PotionOfHealing;
 import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfIdentify;
 import com.shatteredpixel.shatteredpixeldungeon.items.stones.Runestone;
+import com.shatteredpixel.shatteredpixeldungeon.items.rings.Ring;
+import com.shatteredpixel.shatteredpixeldungeon.items.rings.RingOfEnergy;
+import com.shatteredpixel.shatteredpixeldungeon.items.rings.RingOfForce;
+import com.shatteredpixel.shatteredpixeldungeon.items.rings.RingOfHaste;
+import com.shatteredpixel.shatteredpixeldungeon.items.rings.RingOfMight;
+import com.shatteredpixel.shatteredpixeldungeon.items.rings.RingOfSharpshooting;
+import com.shatteredpixel.shatteredpixeldungeon.items.rings.RingOfWealth;
 import com.shatteredpixel.shatteredpixeldungeon.plants.Sungrass;
 
 import java.util.function.Predicate;
@@ -50,6 +57,26 @@ public final class BlastAutoPickupTest {
         check(true, new BlastPhasePotion());
         check(true, new BlastBombproofScroll());
         check(true, new Bomb());
+
+        // Only these four non-cursed ring classes are eligible for auto-pickup.
+        for (Ring ring : new Ring[]{new RingOfWealth(), new RingOfSharpshooting(),
+                new RingOfHaste(), new RingOfEnergy()}) {
+            check(true, ring);
+            ring.cursed = true;
+            check(false, ring);
+            // A broad instant-pickup predicate must not override the ring blacklist.
+            if (BlastAutoPickup.isPickupType(ring, item -> true)) {
+                throw new AssertionError("Cursed ring bypassed selection: "
+                        + ring.getClass().getName());
+            }
+        }
+        for (Ring ring : new Ring[]{new RingOfMight(), new RingOfForce()}) {
+            check(false, ring);
+            if (BlastAutoPickup.isPickupType(ring, item -> true)) {
+                throw new AssertionError("Unlisted ring bypassed selection: "
+                        + ring.getClass().getName());
+            }
+        }
 
         // A non-pickable item on top must not hide collectible loot below it.
         Heap heap = new Heap();
