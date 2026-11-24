@@ -28,6 +28,7 @@ class AutoToxicLootTest(unittest.TestCase):
         self.assertNotIn("purity.isKnown() &&", TOXIC)
         self.assertNotIn("!purity.isKnown()", TOXIC)
         self.assertIn("hero.buff(BlobImmunity.class) == null", TOXIC)
+        self.assertIn("closestRoomLoot(hero, level, room, PathFinder.distance) == null", TOXIC)
         self.assertIn("if (gas &&", TOXIC)
         self.assertIn("if (pending)", TOXIC)
 
