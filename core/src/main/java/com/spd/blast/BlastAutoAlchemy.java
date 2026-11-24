@@ -102,13 +102,16 @@ final class BlastAutoAlchemy {
                 && globalEnergy + toolkitEnergy >= cost;
     }
 
-    /** Craft at most once per actor turn. */
+    /** Perform at most one alchemy action per actor turn. */
     static boolean brewIfPossible(Hero hero, boolean safeHere) {
         if (!safeHere || BlastAutoPlay.hasVisibleEnemy(hero)) return false;
 
         boolean potKnown = knownPot(Dungeon.level);
         AlchemistsToolkit toolkit = readyToolkit(hero);
         if (!potKnown && toolkit == null) return false;
+
+        if (energize(hero, hero.belongings.getItem(BlastPhasePotion.class))
+                || energize(hero, hero.belongings.getItem(BlastBombproofScroll.class))) return true;
 
         ArrayList<Seed> seeds = hero.belongings.getAllItems(Seed.class);
         ArrayList<Runestone> stones = hero.belongings.getAllItems(Runestone.class);
@@ -171,6 +174,17 @@ final class BlastAutoAlchemy {
         }
 
         return false;
+    }
+
+    private static boolean energize(Hero hero, Item item) {
+        if (item == null || item.quantity() <= 0) return false;
+        int energy = item.energyVal();
+        item.detachAll(hero.belongings.backpack);
+        Dungeon.energy += energy;
+        BlastLog.debug("auto-alchemy action=energize item="
+                + item.getClass().getSimpleName() + " energy=" + energy);
+        hero.spendAndNext(Actor.TICK);
+        return true;
     }
 
     private static boolean hasSlot(Bag bag) {
