@@ -36,11 +36,16 @@ STONE_TO_SCROLL = """
 \t\t\treturn 6;
 \t\t}
 
+\t\t/** Concrete output for inventory checks, without identifying it. */
+\t\tpublic Scroll outputFor(ArrayList<Item> ingredients) {
+\t\t\tif (!testIngredients(ingredients)) return null;
+\t\t\treturn Reflection.newInstance(scrolls.get(ingredients.get(0).getClass()));
+\t\t}
+
 \t\t@Override
 \t\tpublic Item brew(ArrayList<Item> ingredients) {
-\t\t\tif (!testIngredients(ingredients)) return null;
-
-\t\t\tScroll scroll = Reflection.newInstance(scrolls.get(ingredients.get(0).getClass()));
+\t\t\tScroll scroll = outputFor(ingredients);
+\t\t\tif (scroll == null) return null;
 \t\t\tscroll.identify();
 \t\t\tfor (Item stone : ingredients) {
 \t\t\t\tstone.quantity(stone.quantity() - 1);
@@ -50,9 +55,8 @@ STONE_TO_SCROLL = """
 
 \t\t@Override
 \t\tpublic Item sampleOutput(ArrayList<Item> ingredients) {
-\t\t\tif (!testIngredients(ingredients)) return null;
-
-\t\t\tScroll scroll = Reflection.newInstance(scrolls.get(ingredients.get(0).getClass()));
+\t\t\tScroll scroll = outputFor(ingredients);
+\t\t\tif (scroll == null) return null;
 \t\t\treturn scroll.isKnown() ? scroll : new Scroll.PlaceHolder();
 \t\t}
 \t}
