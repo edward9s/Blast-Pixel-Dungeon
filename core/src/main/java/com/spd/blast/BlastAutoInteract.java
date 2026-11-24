@@ -1,6 +1,7 @@
 package com.spd.blast;
 
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.VaultTokenDoor;
@@ -75,6 +76,7 @@ public final class BlastAutoInteract {
                     if (!((VaultMirror) mob).autoCollect(hero))
                         throw new IllegalStateException("Vault mirror reward became unavailable");
                 }
+                hero.spendAndNext(Actor.TICK);
             } else {
                 hero.curAction = new HeroAction.Move(
                         BlastAutoPlay.firstStep(candidate, safe, distances));
