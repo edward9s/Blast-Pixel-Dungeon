@@ -48,6 +48,15 @@ public final class BlastAutoEquipmentTest {
                         == BlastAutoEquipment.armorRating(basicArmor),
                 "Armor without a seal uses its actual defensive rating");
 
+        int requiredWithoutSeal = basicArmor.STRReq(basicArmor.trueLevel());
+        int requiredWithSeal = basicArmor.STRReq(basicArmor.trueLevel() + 1);
+        check(BlastAutoEquipment.canWearArmor(basicArmor, requiredWithSeal, seal),
+                "Wearability must account for the level gained from a transferred seal");
+        check(BlastAutoEquipment.canWearArmor(basicArmor, requiredWithoutSeal, null),
+                "Wearability must use effective hero strength, including ring bonuses");
+        check(!BlastAutoEquipment.canWearArmor(basicArmor, requiredWithoutSeal - 1, null),
+                "Unmet actual strength requirements must reject armor");
+
         check(BlastAutoEquipment.canPickup(plain, false),
                 "Non-cursed equipment needs no Alchemize");
         plain.cursed = true;
