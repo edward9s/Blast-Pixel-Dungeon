@@ -1270,6 +1270,7 @@ public final class BlastAutoPlay {
         com.shatteredpixel.shatteredpixeldungeon.levels.rooms.secret.SecretChestChasmRoom chasmRoom =
                 BlastAutoChasmRoom.flightRoom(level, hero);
 
+        boolean[] vaultDanger = BlastAutoVault.imminent(hero, level);
         for (int cell = 0; cell < safe.length; cell++) {
             boolean known = level.visited[cell] || level.mapped[cell] || hero.fieldOfView[cell];
             boolean airborne = known && flightRoom != null
@@ -1284,7 +1285,8 @@ public final class BlastAutoPlay {
                     && !AutoPlayPlantSafety.isHarmful(level.plants.get(cell))
                     && (!BlastAutoEnvironment.hazardousAt(cell, hazards)
                         || (allowGas && BlastAutoEnvironment.gasOnlyAt(cell, hazards)))
-                    && !specialBarriers[cell];
+                    && !specialBarriers[cell]
+                    && !vaultDanger[cell];
         }
 
         // Inspect occupied cells only; per-cell Actor.findChar() is unnecessary.
@@ -1298,7 +1300,7 @@ public final class BlastAutoPlay {
                     && !AutoPlayPlantSafety.isHarmful(level.plants.get(cell))
                     && (!BlastAutoEnvironment.hazardousAt(cell, hazards)
                         || (allowGas && BlastAutoEnvironment.gasOnlyAt(cell, hazards)))
-                    && !specialBarriers[cell]) {
+                    && !specialBarriers[cell] && !vaultDanger[cell]) {
                 safe[cell] = true;
             } else {
                 safe[cell] = false;
