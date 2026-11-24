@@ -780,6 +780,11 @@ public final class BlastAutoPlay {
         if (sacrifice == BlastAutoSacrifice.Action.WAIT) return true;
         if (sacrifice == BlastAutoSacrifice.Action.QUEUED) return false;
 
+        if (BlastAutoBlacksmith.attackArmoredGeomancer(hero, safe, distances)) {
+            debugDecision = "blacksmith-geomancer";
+            return false;
+        }
+
         // Blast-specific tactics are isolated from the portable AI policy.
         debugDecision = "bomb";
         if (BlastAutoBombAI.actAgainstOtherEnemies(hero)) return true;
@@ -1277,7 +1282,10 @@ public final class BlastAutoPlay {
     static boolean isAutoAttackExcluded(Mob mob) {
         return mob instanceof NPC || mob instanceof DemonSpawner
                 || (Dungeon.level instanceof com.shatteredpixel.shatteredpixeldungeon.levels.MiningLevel
-                    && mob instanceof com.shatteredpixel.shatteredpixeldungeon.actors.mobs.CrystalSpire);
+                    && (mob instanceof com.shatteredpixel.shatteredpixeldungeon.actors.mobs.CrystalSpire
+                        || (mob instanceof com.shatteredpixel.shatteredpixeldungeon.actors.mobs.GnollGeomancer
+                            && (!BlastAutoBlacksmith.goldCollected()
+                                || mob.heroShouldInteract()))));
     }
 
     /** Sleeping enemies are deliberately left alone by automatic combat. */
