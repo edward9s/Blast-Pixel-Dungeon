@@ -167,7 +167,8 @@ final class BlastAutoEquipment {
         if (!best.doEquip(hero)) {
             throw new IllegalStateException("Eligible weapon upgrade failed to equip");
         }
-        if (current != null && Shopkeeper.canSell(current)) replacedEquipment.add(current);
+        if (current != null && availableAlchemize(hero) != null
+                && Shopkeeper.canSell(current)) replacedEquipment.addLast(current);
         return true;
     }
 
@@ -190,16 +191,17 @@ final class BlastAutoEquipment {
         if (!best.doEquip(hero)) {
             throw new IllegalStateException("Eligible armor upgrade failed to equip");
         }
-        if (current != null && Shopkeeper.canSell(current)) replacedEquipment.add(current);
+        if (current != null && availableAlchemize(hero) != null
+                && Shopkeeper.canSell(current)) replacedEquipment.addLast(current);
         return true;
     }
 
     /** One native item action at a time. */
     static boolean manage(Hero hero) {
         if (hero.belongings.lostInventory()) return false;
-        if (drinkStrength(hero)) return true;
-        if (sellCursedPickup(hero)) return true;
         if (sellReplaced(hero)) return true;
+        if (sellCursedPickup(hero)) return true;
+        if (drinkStrength(hero)) return true;
         return equipBetterWeapon(hero) || equipBetterArmor(hero);
     }
 }
