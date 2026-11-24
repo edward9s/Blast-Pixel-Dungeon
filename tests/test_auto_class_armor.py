@@ -68,7 +68,7 @@ class AutoClassArmorTests(unittest.TestCase):
         self.assertIn("classArmor.transferStatsFrom(hero, best);", equipment)
         self.assertIn("ClassArmor classArmor = hero.belongings.getItem(ClassArmor.class);",
                       equipment)
-        self.assertIn("wouldLoseProtectedClassGlyph(classArmor, best)", equipment)
+        self.assertIn("wouldLoseProtectedClassGlyph((ClassArmor) current, candidate)", equipment)
         self.assertIn("classArmor.charge != charge", equipment)
         self.assertIn("hero.armorAbility != ability", equipment)
         self.assertIn("hero.belongings.contains(best)", equipment)
