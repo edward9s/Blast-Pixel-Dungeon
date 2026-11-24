@@ -933,7 +933,7 @@ public final class BlastAutoPlay {
         debugDecision = "interact";
         if (BlastAutoInteract.chooseAction(hero, idleSafe, idleDistances)) {
             progress.intent(BlastAutoProgressGuard.Intent.INTERACT);
-            return false;
+            return hero.curAction == null;
         }
 
         // Open prepared tombs; spawned wraiths go to the existing combat AI.
