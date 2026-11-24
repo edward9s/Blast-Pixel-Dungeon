@@ -6,6 +6,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Talent;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.Shopkeeper;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
+import com.shatteredpixel.shatteredpixeldungeon.items.BrokenSeal;
 import com.shatteredpixel.shatteredpixeldungeon.items.KindOfWeapon;
 import com.shatteredpixel.shatteredpixeldungeon.items.armor.Armor;
 import com.shatteredpixel.shatteredpixeldungeon.items.potions.Potion;
@@ -78,8 +79,18 @@ final class BlastAutoEquipment {
     }
 
     static int armorRating(Armor armor) {
-        int level = armor.trueLevel();
+        return armorRatingAtLevel(armor, armor.trueLevel());
+    }
+
+    private static int armorRatingAtLevel(Armor armor, int level) {
         return armor.DRMin(level) + armor.DRMax(level);
+    }
+
+    /** A transferred upgraded warrior seal increases the destination armor's level. */
+    static int armorRatingWithSeal(Armor armor, BrokenSeal seal) {
+        int level = armor.trueLevel();
+        if (seal != null && seal.level() > 0) level++;
+        return armorRatingAtLevel(armor, level);
     }
 
     private static boolean canEquip(Hero hero, MeleeWeapon weapon) {
@@ -216,24 +227,60 @@ final class BlastAutoEquipment {
         return true;
     }
 
+    /** Transfer the seal before equipping to avoid the native yes/no dialog. */
+    private static boolean equipArmorWithSeal(Hero hero, Armor current, Armor next) {
+        BrokenSeal seal = current == null ? null : current.checkSeal();
+        if (seal == null) return next.doEquip(hero);
+        if (next.checkSeal() != null) {
+            throw new IllegalStateException("Cannot transfer warrior seal onto sealed armor");
+        }
+
+        Armor.Glyph originalSealGlyph = seal.getGlyph();
+        Armor.Glyph originalNextGlyph = next.glyph;
+        if (current.detachSeal() != seal) {
+            throw new IllegalStateException("Warrior seal detached unexpectedly");
+        }
+
+        // When two different glyphs conflict, keep the new armor's inscription.
+        if (originalNextGlyph != null && originalSealGlyph != null
+                && originalNextGlyph.getClass() != originalSealGlyph.getClass()) {
+            seal.setGlyph(null);
+        }
+        next.affixSeal(seal);
+        if (next.doEquip(hero)) return true;
+
+        // A failed equip must restore both pieces of armor and the original seal glyph.
+        if (next.detachSeal() != seal) {
+            throw new IllegalStateException("Could not restore seal after failed equip");
+        }
+        next.inscribe(originalNextGlyph);
+        seal.setGlyph(originalSealGlyph);
+        current.affixSeal(seal);
+        return false;
+    }
+
     private static boolean equipBetterArmor(Hero hero) {
         Armor current = hero.belongings.armor();
-        // Native warrior-seal transfer requires a decision dialog; preserve it.
-        if (current != null && (isCursed(current) || current.checkSeal() != null)) return false;
+        if (current != null && isCursed(current)) return false;
+        BrokenSeal seal = current == null ? null : current.checkSeal();
         int currentRating = current == null ? Integer.MIN_VALUE : armorRating(current);
         Armor best = null;
         int bestRating = currentRating;
         for (Armor candidate : hero.belongings.getAllItems(Armor.class)) {
-            if (candidate.isEquipped(hero) || !canEquip(hero, candidate)) continue;
-            int rating = armorRating(candidate);
+            if (candidate.isEquipped(hero) || !canEquip(hero, candidate)
+                    || (seal != null && candidate.checkSeal() != null)) continue;
+            int rating = armorRatingWithSeal(candidate, seal);
             if (rating > bestRating) {
                 best = candidate;
                 bestRating = rating;
             }
         }
         if (best == null) return false;
-        if (!best.doEquip(hero)) {
+        if (!equipArmorWithSeal(hero, current, best)) {
             throw new IllegalStateException("Eligible armor upgrade failed to equip");
+        }
+        if (seal != null && best.checkSeal() != seal) {
+            throw new IllegalStateException("Warrior seal was not attached to replacement armor");
         }
         if (current != null && availableAlchemize(hero) != null
                 && Shopkeeper.canSell(current)) replacedEquipment.addLast(current);
