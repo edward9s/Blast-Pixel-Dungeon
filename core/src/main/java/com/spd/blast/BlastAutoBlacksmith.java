@@ -19,6 +19,8 @@ import com.watabou.utils.PathFinder;
 final class BlastAutoBlacksmith {
     private static boolean enabledPhase;
     private static boolean previousPhase;
+    private static boolean enabledDemolition;
+    private static boolean previousDemolition;
 
     private BlastAutoBlacksmith() {}
 
@@ -29,7 +31,25 @@ final class BlastAutoBlacksmith {
             previousPhase = BlastSettings.testFreeMovement();
             enabledPhase = true;
             BlastSettings.setTestFreeMovement(true);
-        } else if (!active && enabledPhase) {
+        }
+        boolean guardian = false;
+        if (active && Blacksmith.Quest.Type() == Blacksmith.Quest.CRYSTAL) {
+            for (Mob mob : Dungeon.level.mobs) {
+                if (mob instanceof CrystalGuardian && mob.isAlive()) {
+                    guardian = true;
+                    break;
+                }
+            }
+        }
+        if (guardian && !enabledDemolition) {
+            previousDemolition = BlastSettings.testDemolition();
+            enabledDemolition = true;
+            BlastSettings.setTestDemolition(true);
+        } else if (!guardian && enabledDemolition) {
+            BlastSettings.setTestDemolition(previousDemolition);
+            enabledDemolition = false;
+        }
+        if (!active && enabledPhase) {
             BlastSettings.setTestFreeMovement(previousPhase);
             enabledPhase = false;
         }
@@ -38,6 +58,8 @@ final class BlastAutoBlacksmith {
     static void reset() {
         if (enabledPhase) BlastSettings.setTestFreeMovement(previousPhase);
         enabledPhase = false;
+        if (enabledDemolition) BlastSettings.setTestDemolition(previousDemolition);
+        enabledDemolition = false;
     }
 
     static boolean mine(Hero hero, boolean[] safe, int[] distances) {
@@ -78,12 +100,13 @@ final class BlastAutoBlacksmith {
             if (level.map[cell] == Terrain.WALL_DECO) return false;
         }
         for (Heap heap : level.heaps.valueList()) {
-            if (heap.type != Heap.Type.HEAP && heap.type != Heap.Type.FOR_SALE)
+            if (heap.peek() instanceof com.shatteredpixel.shatteredpixeldungeon.items.quest.DarkGold)
                 return false;
         }
         for (Mob mob : level.mobs) {
             if (mob instanceof CrystalGuardian && mob.isAlive()) return false;
         }
+        if (Blacksmith.Quest.Type() != Blacksmith.Quest.CRYSTAL) return false;
         for (Mob mob : level.mobs) {
             if (!(mob instanceof CrystalSpire) || !mob.isAlive()) continue;
             int stand = -1;
@@ -96,6 +119,10 @@ final class BlastAutoBlacksmith {
                 steps = distances[cell];
             }
             if (stand < 0) return false;
+            if (enabledDemolition) {
+                BlastSettings.setTestDemolition(previousDemolition);
+                enabledDemolition = false;
+            }
             hero.curAction = hero.pos == stand
                     ? new HeroAction.Interact(mob)
                     : new HeroAction.Move(BlastAutoPlay.firstStep(stand, safe, distances));
