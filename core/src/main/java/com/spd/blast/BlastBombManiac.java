@@ -282,6 +282,19 @@ public final class BlastBombManiac extends Buff {
         return autoThrowAndDetonate(destination, 0);
     }
 
+    public boolean blastAutoDemolishChest(int destination) {
+        if (!BlastSettings.testRemoteThrow()) return false;
+        return throwAt(destination, true, 0, true);
+    }
+
+    public boolean blastAutoDemolishChestNearby() {
+        if (BlastSettings.testRemoteThrow()) return false;
+        Bomb bomb = placeBomb(true, 0);
+        if (bomb == null) return false;
+        detonateAutoBomb(bomb, true);
+        return true;
+    }
+
     private boolean autoThrowAndDetonate(int destination, int bombIndex) {
         if (!BlastSettings.testAutoPlay() || !BlastSettings.testRemoteThrow()
                 || BlastRemoteBomb.isTimedMode()) {
@@ -299,6 +312,11 @@ public final class BlastBombManiac extends Buff {
     }
 
     private boolean throwAt(int destination, boolean autoDetonate, int bombIndex) {
+        return throwAt(destination, autoDetonate, bombIndex, false);
+    }
+
+    private boolean throwAt(int destination, boolean autoDetonate, int bombIndex,
+                            boolean demolishChest) {
         final Hero hero = Dungeon.hero;
         final boolean timed = BlastRemoteBomb.isTimedMode();
         if (!aimedThrowEnabled() || hero == null
@@ -335,7 +353,7 @@ public final class BlastBombManiac extends Buff {
                     }
                 }
                 bomb.blastThrowLit(cell);
-                if (autoDetonate) detonateAutoBomb(bomb);
+                if (autoDetonate) detonateAutoBomb(bomb, demolishChest);
                 // Automated attacks must advance time even when remote throws are free.
                 hero.spendAndNext(autoDetonate ? 1f : timed ? 1f : 0f);
             }
@@ -351,6 +369,10 @@ public final class BlastBombManiac extends Buff {
 
     /** Detonate only the newly deployed bomb, preserving older remote fuses. */
     private static void detonateAutoBomb(Bomb bomb) {
+        detonateAutoBomb(bomb, false);
+    }
+
+    private static void detonateAutoBomb(Bomb bomb, boolean demolishChest) {
         if (!(bomb.fuse instanceof BlastRemoteBomb.RemoteFuse)) {
             throw new IllegalStateException("Automatic bomb has no remote fuse");
         }
@@ -358,8 +380,14 @@ public final class BlastBombManiac extends Buff {
         if (!fuse.isArmed(bomb)) {
             throw new IllegalStateException("Automatic bomb remote fuse is not armed");
         }
-        if (!fuse.detonateIfPresent(Dungeon.level)) {
-            throw new IllegalStateException("Automatic bomb was not deployed");
+        boolean originalDemolition = BlastSettings.testDemolition();
+        if (demolishChest) BlastSettings.setTestDemolition(true);
+        try {
+            if (!fuse.detonateIfPresent(Dungeon.level)) {
+                throw new IllegalStateException("Automatic bomb was not deployed");
+            }
+        } finally {
+            if (demolishChest) BlastSettings.setTestDemolition(originalDemolition);
         }
     }
 
