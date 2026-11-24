@@ -23,6 +23,8 @@ class ToxicCatalystPurityTest(unittest.TestCase):
         self.assertIn("Heap.Type.SKELETON", TOXIC)
         self.assertIn("int[] order = shortestOrder(steps);", TOXIC)
         self.assertIn("for (Heap heap : loot) actions += roomActions(hero, heap);", TOXIC)
+        self.assertIn("int[] fallback = new int[order.length];", TOXIC)
+        self.assertIn("purityTargets[i] = loot[order[i]].pos;", TOXIC)
 
     def test_crossing_preserves_risk_and_duration_guards(self):
         self.assertIn("item instanceof TrinketCatalyst", TOXIC)
@@ -37,7 +39,7 @@ class ToxicCatalystPurityTest(unittest.TestCase):
         self.assertIn("new HeroAction.PickUp(target)", TOXIC)
         self.assertIn("purityTargets = new int[order.length];", TOXIC)
         self.assertIn("purityIndex++", TOXIC)
-        self.assertIn("attemptedPurityTreasure = treasure;", TOXIC)
+        self.assertIn("attemptedPurityTreasure = catalyst;", TOXIC)
 
     def test_retreat_order_and_reset(self):
         runner = AUTO.index("BlastAutoToxicRoom.continuePurityRun(")
