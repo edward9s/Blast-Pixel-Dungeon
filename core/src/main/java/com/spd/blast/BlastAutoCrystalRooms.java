@@ -63,7 +63,7 @@ final class BlastAutoCrystalRooms {
                     || hero.fieldOfView[level.pointToCell(room.entrance())])) {
             for (Heap heap : level.heaps.valueList()) {
                 if (room.inside(level.cellToPoint(heap.pos))
-                        && heap.peek() != null) {
+                        && heap.items.stream().anyMatch(item -> !staged.contains(item))) {
                     pending = true;
                     break;
                 }
@@ -95,6 +95,10 @@ final class BlastAutoCrystalRooms {
      * Collect every remaining prize, including prizes in unrevealed final rooms.
      * Staged equipment is ignored so it cannot be immediately picked up again.
      */
+    static boolean isStaged(Item item) {
+        return staged.contains(item);
+    }
+
     static boolean collect(Hero hero, boolean[] safe, int[] distances) {
         if (!phaseActive || phaseLevel != Dungeon.level) return false;
         Level level = Dungeon.level;
@@ -140,9 +144,7 @@ final class BlastAutoCrystalRooms {
             }
             if (!fitsBag) required++;
         }
-        int free = hero.belongings.backpack.capacity()
-                - hero.belongings.backpack.items.size();
-        int toDrop = Math.max(0, required - free);
+        int toDrop = required;
         if (toDrop > 0) {
             Item candidate = null;
             for (Item item : hero.belongings.backpack) {
@@ -156,7 +158,7 @@ final class BlastAutoCrystalRooms {
                 staged.add(candidate);
                 BlastLog.debug("auto-crystal action=stage item="
                         + candidate.getClass().getSimpleName()
-                        + " required=" + required + " free=" + free);
+                        + " required=" + required);
                 candidate.doDrop(hero);
                 return true;
             }
