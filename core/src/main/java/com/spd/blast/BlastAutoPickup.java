@@ -14,15 +14,17 @@ import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.Waterskin;
 import com.shatteredpixel.shatteredpixeldungeon.items.artifacts.DriedRose;
 import com.shatteredpixel.shatteredpixeldungeon.items.bags.Bag;
+import com.shatteredpixel.shatteredpixeldungeon.items.bombs.Bomb;
 import com.shatteredpixel.shatteredpixeldungeon.items.keys.Key;
 import com.shatteredpixel.shatteredpixeldungeon.items.potions.PotionOfStrength;
-import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfUpgrade;
 import com.shatteredpixel.shatteredpixeldungeon.items.rings.Ring;
 import com.shatteredpixel.shatteredpixeldungeon.items.rings.RingOfEnergy;
 import com.shatteredpixel.shatteredpixeldungeon.items.rings.RingOfHaste;
 import com.shatteredpixel.shatteredpixeldungeon.items.rings.RingOfSharpshooting;
 import com.shatteredpixel.shatteredpixeldungeon.items.rings.RingOfWealth;
+import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfUpgrade;
 import com.shatteredpixel.shatteredpixeldungeon.items.trinkets.TrinketCatalyst;
+import com.shatteredpixel.shatteredpixeldungeon.items.wands.Wand;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
 
 import java.util.IdentityHashMap;
@@ -189,7 +191,12 @@ public final class BlastAutoPickup {
         int cell = selected.pos;
         Item item = selectedItem;
         String status;
-        if (BlastAutoTrapClearer.holdingDoorOpen(cell)) status = "door-held";
+        if (BlastAutoTrapClearer.holdingDoorOpen(cell)
+                || BlastAutoToxicRoom.holdingDoorOpen(cell)) status = "door-held";
+        else if (uncollectibleBomb(item)) status = "lit-bomb";
+        else if (item instanceof Wand && item.cursed) status = "cursed-wand";
+        else if (item instanceof Wand && !BlastAutoCombat.supportsWand((Wand) item))
+            status = "unsupported-wand";
         else if (BlastAutoEquipment.blocksCursedPickup(hero, item)) status = "cursed";
         else if (!isPickupType(item, instantPickup)
                 && !BlastAutoEquipment.canPickup(hero, item)) status = "type";
@@ -209,6 +216,10 @@ public final class BlastAutoPickup {
         else status = "ready";
         String type = item instanceof Gold ? "Gold" : item.getClass().getSimpleName();
         String result = type + "@" + cell + " status=" + status;
+        if ("type".equals(status) || "cursed".equals(status)) {
+            String reason = BlastAutoEquipment.pickupRejection(hero, item);
+            if (reason != null) return result + " " + reason + " " + inventoryCapacity(hero);
+        }
         if ("full".equals(status) || "lost-inventory".equals(status)) {
             return result + " " + inventoryCapacity(hero);
         }
@@ -261,7 +272,13 @@ public final class BlastAutoPickup {
         if (heap.sprite != null) heap.sprite.view(heap).place(heap.pos);
     }
 
+    private static boolean uncollectibleBomb(Item item) {
+        return item instanceof BlastDeathBomb || (item instanceof Bomb && ((Bomb) item).fuse != null);
+    }
+
     static boolean isPickupType(Item item, Predicate<Item> instantPickup) {
+        if (item instanceof Bomb || item instanceof BlastDeathBomb) return !uncollectibleBomb(item);
+        if (item instanceof Wand) return !item.cursed && BlastAutoCombat.supportsWand((Wand) item);
         if (item instanceof Ring) {
             return !item.cursed && (item instanceof RingOfWealth
                     || item instanceof RingOfSharpshooting
@@ -283,7 +300,9 @@ public final class BlastAutoPickup {
     }
 
     static boolean canCollect(Hero hero, Item item, Predicate<Item> instantPickup) {
-        if (retries.containsKey(item) || BlastAutoEquipment.blocksCursedPickup(hero, item)) return false;
+        if (retries.containsKey(item) || uncollectibleBomb(item)
+                || (item instanceof Wand && item.cursed)
+                || BlastAutoEquipment.blocksCursedPickup(hero, item)) return false;
         if (item instanceof DriedRose.Petal) {
             return canUpgradeRose(hero.belongings.getItem(DriedRose.class));
         }
@@ -299,6 +318,12 @@ public final class BlastAutoPickup {
             return shieldCap > 0 && (barrier == null || barrier.shielding() < shieldCap);
         }
 
+        if (item instanceof Bomb.DoubleBomb) {
+            // The native pickup gives ordinary Bomb items, not a DoubleBomb stack.
+            Bomb bomb = new Bomb();
+            bomb.blastSetManiacCharge(((Bomb) item).blastManiacCharge());
+            item = bomb;
+        }
         Bag backpack = hero.belongings.backpack;
         if (backpack.canHold(item)) return true;
         for (Item held : backpack) {

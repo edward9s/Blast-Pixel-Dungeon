@@ -253,6 +253,14 @@ final class BlastAutoCombat {
         return best;
     }
 
+    static boolean supportsWand(Wand wand) {
+        return wand instanceof WandOfCorrosion
+                || (wand instanceof DamageWand && (wand instanceof WandOfMagicMissile
+                    || wand instanceof WandOfFrost || wand instanceof WandOfPrismaticLight
+                    || wand instanceof WandOfBlastWave || wand instanceof WandOfLightning
+                    || wand instanceof WandOfDisintegration || wand instanceof WandOfTransfusion));
+    }
+
     private static Choice evaluateWand(Hero hero, Mob target, Wand wand, Choice best) {
         if (wand == null || !wand.blastAutoCanZap(hero)) return best;
 
@@ -263,12 +271,8 @@ final class BlastAutoCombat {
             aim = QuickSlotButton.autoAim(target, wand);
             // Conservative estimate of two damage ticks, not the whole gas lifetime.
             damage = 2f * Math.max(1, 2 + wand.buffedLvl());
-        } else if (wand instanceof DamageWand && (wand instanceof WandOfMagicMissile
-                || wand instanceof WandOfFrost || wand instanceof WandOfPrismaticLight
-                || wand instanceof WandOfBlastWave
-                || wand instanceof WandOfLightning || wand instanceof WandOfDisintegration
-                || (wand instanceof WandOfTransfusion
-                    && target.properties().contains(Char.Property.UNDEAD)))) {
+        } else if (supportsWand(wand) && (!(wand instanceof WandOfTransfusion)
+                || target.properties().contains(Char.Property.UNDEAD))) {
             DamageWand direct = (DamageWand) wand;
             damage = (direct.min() + direct.max()) / 2f;
             WandEmpower empower = hero.buff(WandEmpower.class);

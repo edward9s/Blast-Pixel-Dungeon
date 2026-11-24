@@ -154,6 +154,25 @@ final class BlastAutoEquipment {
         return isRedundant(item, equipped);
     }
 
+    /** Explain the two failed routes for floor gear already rejected by pickup(). */
+    static String pickupRejection(Hero hero, Item item) {
+        if (!(item instanceof MeleeWeapon || item instanceof Armor)) return null;
+        String sale;
+        if (hero.belongings.lostInventory()) sale = "lost-inventory";
+        else if (availableAlchemize(hero) == null) sale = "no-usable-alchemize";
+        else if (!Shopkeeper.canSell(item)) sale = "cannot-sell";
+        else sale = "not-redundant-vs-equipped";
+        String reason = "keep=" + (isCursed(item) ? "cursed" : "owned-equal-or-better")
+                + " sell=" + sale;
+        if (item instanceof Armor) {
+            Armor worn = hero.belongings.armor();
+            BrokenSeal seal = worn == null ? null : worn.checkSeal();
+            reason += " defense=" + armorRatingWithSeal((Armor) item, seal)
+                    + " equipped-defense=" + (worn == null ? "-" : armorRating(worn));
+        }
+        return reason;
+    }
+
     /** Mark the exact auto-selected item before native pickup begins. */
     static void onPickupScheduled(Hero hero, Item item) {
         pendingSale = pickup(hero, item) == Pickup.SELL ? item : null;
@@ -313,6 +332,7 @@ final class BlastAutoEquipment {
         spell.detach(hero.belongings.backpack);
         Sample.INSTANCE.play(Assets.Sounds.TELEPORT);
         Catalog.countUse(Alchemize.class);
+        BlastLog.debug("auto-gear action=sell item=" + item.getClass().getSimpleName());
         // Match Alchemize's native one-in-eight scroll talent chance.
         if (Random.Float() < 1f / 8f) {
             Talent.onScrollUsed(hero, hero.pos, 1f, Alchemize.class);
@@ -415,6 +435,7 @@ final class BlastAutoEquipment {
         if (!best.doEquip(hero)) {
             throw new IllegalStateException("Eligible weapon upgrade failed to equip");
         }
+        BlastLog.debug("auto-gear action=equip item=" + best.getClass().getSimpleName());
         if (current instanceof MeleeWeapon && availableAlchemize(hero) != null
                 && isRedundant(current, best) && Shopkeeper.canSell(current)) {
             replacedEquipment.addLast(current);
@@ -515,12 +536,14 @@ final class BlastAutoEquipment {
                     || hero.armorAbility != ability || hero.belongings.contains(best)) {
                 throw new IllegalStateException("Hero armor ability transfer was incomplete");
             }
+            BlastLog.debug("auto-gear action=transfer-armor item=" + best.getClass().getSimpleName());
             hero.spendAndNext(com.shatteredpixel.shatteredpixeldungeon.actors.Actor.TICK);
             return true;
         }
         if (!equipArmorWithSeal(hero, current, best)) {
             throw new IllegalStateException("Eligible armor upgrade failed to equip");
         }
+        BlastLog.debug("auto-gear action=equip item=" + best.getClass().getSimpleName());
         if (seal != null && best.checkSeal() != seal) {
             throw new IllegalStateException("Warrior seal was not attached to replacement armor");
         }

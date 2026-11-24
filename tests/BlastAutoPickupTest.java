@@ -22,6 +22,8 @@ import com.shatteredpixel.shatteredpixeldungeon.items.rings.RingOfHaste;
 import com.shatteredpixel.shatteredpixeldungeon.items.rings.RingOfMight;
 import com.shatteredpixel.shatteredpixeldungeon.items.rings.RingOfSharpshooting;
 import com.shatteredpixel.shatteredpixeldungeon.items.rings.RingOfWealth;
+import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfFireblast;
+import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfMagicMissile;
 import com.shatteredpixel.shatteredpixeldungeon.plants.Sungrass;
 
 import java.util.function.Predicate;
@@ -57,7 +59,19 @@ public final class BlastAutoPickupTest {
         check(true, new Runestone.PlaceHolder());
         check(true, new BlastPhasePotion());
         check(true, new BlastBombproofScroll());
-        check(true, new Bomb());
+        Bomb bomb = new Bomb();
+        check(true, bomb);
+        check(true, new Bomb.DoubleBomb());
+        bomb.fuse = new Bomb.Fuse();
+        check(false, bomb);
+        check(false, new BlastDeathBomb());
+
+        WandOfMagicMissile wand = new WandOfMagicMissile();
+        wand.curCharges = 0;
+        check(true, wand);
+        wand.cursed = true;
+        check(false, wand);
+        check(false, new WandOfFireblast());
 
         // Magical Catalyst is a unique, non-stackable regular inventory item.
         TrinketCatalyst catalyst = new TrinketCatalyst();
