@@ -30,7 +30,7 @@ class NativeAutoPickupTests(unittest.TestCase):
         action = PICKUP.split("public static boolean chooseAction(", 1)[1].split(
             "static String nearbyDiagnostic(", 1
         )[0]
-        self.assertIn("firstEligibleItem(heap, candidate ->", action)
+        self.assertIn("for (Item item : heap.items)", action)
         self.assertIn("preparePickup(hero, nearestHeap, nearestItem);", action)
         self.assertIn("hero.curAction = new HeroAction.PickUp(nearest);", action)
         self.assertLess(action.index("if (nearest == hero.pos)"),

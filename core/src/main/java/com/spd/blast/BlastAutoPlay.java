@@ -780,6 +780,16 @@ public final class BlastAutoPlay {
         if (sentryRun != BlastAutoSpecialRooms.Action.NONE)
             return sentryRun == BlastAutoSpecialRooms.Action.USE;
 
+        // Finish a levitating crossing before ordinary idle tasks consume its duration.
+        debugDecision = "special-flight";
+        BlastAutoSpecialRooms.Action flightAction =
+                BlastAutoSpecialRooms.continueFlight(
+                        hero, safe, distances, hazards, specialBarriers);
+        if (flightAction != BlastAutoSpecialRooms.Action.NONE) {
+            roaming.clearDestination();
+            return flightAction == BlastAutoSpecialRooms.Action.USE;
+        }
+
         // Wait for delayed summons, then let existing indestructible combat handle them.
         debugDecision = "summoning-wait";
         if (BlastAutoSummoningRoom.awaitWave(hero)) return true;
@@ -966,16 +976,6 @@ public final class BlastAutoPlay {
         if (resumeInterruptedTravel(hero, idleSafe, idleDistances)) {
             progress.intent(BlastAutoProgressGuard.Intent.TRAVEL);
             return false;
-        }
-
-        // Finish a levitating crossing before ordinary idle tasks consume its duration.
-        debugDecision = "special-flight";
-        BlastAutoSpecialRooms.Action flightAction =
-                BlastAutoSpecialRooms.continueFlight(
-                        hero, safe, distances, hazards, specialBarriers);
-        if (flightAction != BlastAutoSpecialRooms.Action.NONE) {
-            roaming.clearDestination();
-            return flightAction == BlastAutoSpecialRooms.Action.USE;
         }
 
         // Synchronized vault flames require blob immunity before entering.

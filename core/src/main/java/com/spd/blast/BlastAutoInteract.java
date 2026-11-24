@@ -122,7 +122,8 @@ public final class BlastAutoInteract {
         int bestPriority = Integer.MIN_VALUE;
 
         for (Heap heap : level.heaps.valueList()) {
-            if (!heap.seen || !canOpen(heap.type, goldenKeys, crystalKeys)) continue;
+            if (!heap.seen || !canOpen(heap.type, goldenKeys, crystalKeys)
+                    || !BlastAutoPickup.hasCollectibleLoot(hero, heap)) continue;
             int candidate = nearestStand(level, heap.pos, true, safe, distances);
             int priority = BlastAutoCrystalRooms.priority(level, hero, heap.pos, true);
             if (candidate >= 0 && BlastAutoCrystalRooms.replace(
@@ -185,7 +186,7 @@ public final class BlastAutoInteract {
                 chest = heap;
             }
         }
-        if (remaining != 1 || chest == null
+        if (remaining != 1 || !BlastAutoPickup.hasCollectibleLoot(hero, chest)
                 || !(chest.seen || hero.fieldOfView[chest.pos]
                         || level.visited[chest.pos] || level.mapped[chest.pos])) return false;
         BlastBombManiac maniac = BlastBombManiac.current();

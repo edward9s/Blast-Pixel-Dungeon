@@ -42,10 +42,23 @@ class SpecialRoomObjectivesTest(unittest.TestCase):
     def test_other_entrance_tasks_use_the_same_guard(self):
         sentry = source("BlastAutoSentryRoom.java")
         special = source("BlastAutoSpecialRooms.java")
-        self.assertIn("if (treasure == null) return BlastAutoSpecialRooms.Action.NONE;", sentry)
+        self.assertIn("if (!BlastAutoPickup.hasCollectibleLoot(hero, treasure)) return BlastAutoSpecialRooms.Action.NONE;", sentry)
         self.assertIn("hero, treasure.pos, exit, safe, distances", sentry)
         self.assertIn("return approachEntrance(hero, chest.pos, exit, safe, distances);", special)
-        self.assertIn("if (chest == null) return Action.NONE;", special)
+        self.assertIn("if (!BlastAutoPickup.hasCollectibleLoot(hero, chest)) return Action.NONE;", special)
+
+    def test_active_crossing_precedes_optional_tasks(self):
+        code = source("BlastAutoPlay.java")
+        escape = code.index('debugDecision = "trap-retreat"')
+        haste = code.index("BlastAutoSentryRoom.continueRun(")
+        flight = code.index("BlastAutoSpecialRooms.continueFlight(")
+        self.assertLess(escape, haste)
+        self.assertLess(escape, flight)
+        for task in ("BlastAutoCrystalRooms.collect(", "resumeInterruptedTravel(hero,",
+                     "BlastAutoEquipment.manage(", "BlastAutoAlchemy.brewIfPossible(",
+                     "BlastAutoPickup.chooseAction("):
+            self.assertLess(haste, code.index(task, haste))
+            self.assertLess(flight, code.index(task, haste))
 
     def test_live_hazards_keep_their_separate_retreat_rules(self):
         self.assertIn("hero.pos != exit && travel[exit]", source("BlastAutoSentryRoom.java"))

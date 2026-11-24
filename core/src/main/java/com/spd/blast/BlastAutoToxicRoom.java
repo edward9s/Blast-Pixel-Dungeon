@@ -108,11 +108,16 @@ final class BlastAutoToxicRoom {
                                 BlastAutoPickupPolicy::isInstantPickup));
     }
 
+    private static boolean pendingLoot(Hero hero, Heap heap) {
+        if (!pendingContainer(heap.type, true)) return false;
+        return heap.type == Heap.Type.HEAP ? collectibleItem(hero, heap) != null
+                : BlastAutoPickup.hasCollectibleLoot(hero, heap);
+    }
+
     private static boolean hasRoomLoot(Hero hero, Level level, ToxicGasRoom room) {
         for (Heap heap : level.heaps.valueList()) {
             if (!heap.isEmpty() && room.inside(level.cellToPoint(heap.pos))
-                    && pendingContainer(heap.type,
-                            heap.type == Heap.Type.HEAP && collectibleItem(hero, heap) != null))
+                    && pendingLoot(hero, heap))
                 return true;
         }
         return false;
@@ -156,8 +161,7 @@ final class BlastAutoToxicRoom {
         for (Heap heap : level.heaps.valueList()) {
             if (heap.isEmpty() || !level.insideMap(heap.pos)
                     || !room.inside(level.cellToPoint(heap.pos))
-                    || !pendingContainer(heap.type, heap.type == Heap.Type.HEAP
-                        && collectibleItem(hero, heap) != null)) continue;
+                    || !pendingLoot(hero, heap)) continue;
             if (distances[heap.pos] < shortest) {
                 closest = heap;
                 shortest = distances[heap.pos];
@@ -343,7 +347,7 @@ final class BlastAutoToxicRoom {
 
         // Flood a live vent if possible; otherwise enter to collect the room loot.
         // The usual identification requirement does not apply to Purity here.
-        if (sourceActive && hasAqua) {
+        if (pending && sourceActive && hasAqua) {
             BlastAutoAqua.Action action = BlastAutoAqua.chooseAction(
                     hero, safe, distances, room, -1, hazards, specialBarriers);
             if (action == BlastAutoAqua.Action.MOVE)
@@ -378,7 +382,7 @@ final class BlastAutoToxicRoom {
                     hero, level, room, safe, hazards, specialBarriers);
             if (collect != BlastAutoSpecialRooms.Action.NONE) return collect;
         }
-        if (!holdDoor(sourceActive, hasAqua, gas))
+        if ((!pending && sourceActive) || !holdDoor(sourceActive, hasAqua, gas))
             return BlastAutoSpecialRooms.Action.NONE;
 
         int door = level.pointToCell(room.entrance());

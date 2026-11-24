@@ -115,7 +115,8 @@ final class BlastAutoChasmRoom {
                     || level.pit[heap.pos] || Actor.findChar(heap.pos) != null
                     && heap.pos != hero.pos) continue;
             boolean key = isKey(heap);
-            boolean chest = heap.type == Heap.Type.LOCKED_CHEST && keys > 0;
+            boolean chest = heap.type == Heap.Type.LOCKED_CHEST && keys > 0
+                    && BlastAutoPickup.hasCollectibleLoot(hero, heap);
             boolean loot = eligibleLoot(hero, heap) != null;
             if (!key && !chest && !loot) continue;
             // Keys are always useful, even when a newly discovered chest is still locked.

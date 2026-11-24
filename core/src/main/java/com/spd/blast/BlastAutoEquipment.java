@@ -75,6 +75,16 @@ final class BlastAutoEquipment {
         return pickup(hero, item) != Pickup.SKIP;
     }
 
+    /** Save the last backpack slot unless the gear can be equipped, sold, or is valuable. */
+    static boolean useLastSlot(Hero hero, Item item) {
+        if (!(item instanceof MeleeWeapon || item instanceof Armor)) return true;
+        if (pickup(hero, item) == Pickup.SELL || isProtectedEquipment(item)) return true;
+        if (item instanceof MeleeWeapon) {
+            return betterWeapon(hero, (MeleeWeapon) item, hero.belongings.weapon());
+        }
+        return betterArmor(hero, (Armor) item, hero.belongings.armor());
+    }
+
     private static Pickup pickup(Hero hero, Item item) {
         if (!(item instanceof MeleeWeapon || item instanceof Armor)) return Pickup.SKIP;
         boolean canSell = !hero.belongings.lostInventory() && availableAlchemize(hero) != null
@@ -383,26 +393,23 @@ final class BlastAutoEquipment {
         return false;
     }
 
+    private static boolean betterWeapon(Hero hero, MeleeWeapon candidate, KindOfWeapon current) {
+        if (!canEquip(hero, candidate)) return false;
+        if (current == null) return true;
+        if (!(current instanceof MeleeWeapon) || isCursed(current)) return false;
+        MeleeWeapon worn = (MeleeWeapon) current;
+        int rating = weaponRating(candidate);
+        int currentRating = weaponRating(worn);
+        return rating > currentRating || (rating == currentRating && weaponDominates(candidate, worn));
+    }
+
     private static boolean equipBetterWeapon(Hero hero) {
         KindOfWeapon current = hero.belongings.weapon();
-        if (current != null && (!(current instanceof MeleeWeapon) || isCursed(current))) {
-            return false;
-        }
-        int currentRating = current == null ? Integer.MIN_VALUE
-                : weaponRating((MeleeWeapon) current);
         MeleeWeapon best = null;
-        int bestRating = currentRating;
         for (MeleeWeapon candidate : hero.belongings.getAllItems(MeleeWeapon.class)) {
-            if (candidate.isEquipped(hero) || !canEquip(hero, candidate)) continue;
-            int rating = weaponRating(candidate);
-            MeleeWeapon reference = best != null ? best
-                    : current instanceof MeleeWeapon ? (MeleeWeapon) current : null;
-            if (rating > bestRating
-                    || (rating == bestRating && reference != null
-                        && weaponDominates(candidate, reference))) {
-                best = candidate;
-                bestRating = rating;
-            }
+            if (candidate.isEquipped(hero)
+                    || !betterWeapon(hero, candidate, best != null ? best : current)) continue;
+            best = candidate;
         }
         if (best == null) return false;
         if (!best.doEquip(hero)) {
@@ -455,6 +462,17 @@ final class BlastAutoEquipment {
         return false;
     }
 
+    private static boolean betterArmor(Hero hero, Armor candidate, Armor current) {
+        BrokenSeal seal = current == null ? null : current.checkSeal();
+        return !(candidate instanceof ClassArmor)
+                && canWearArmor(candidate, hero.STR(), seal)
+                && (current == null || !isCursed(current))
+                && (seal == null || candidate.checkSeal() == null)
+                && (!(current instanceof ClassArmor)
+                    || !wouldLoseProtectedClassGlyph((ClassArmor) current, candidate))
+                && (current == null || armorRatingWithSeal(candidate, seal) > armorRating(current));
+    }
+
     private static boolean equipBetterArmor(Hero hero) {
         Armor current = hero.belongings.armor();
         if (current != null && isCursed(current)) return false;
@@ -479,11 +497,7 @@ final class BlastAutoEquipment {
         Armor best = null;
         int bestRating = currentRating;
         for (Armor candidate : hero.belongings.getAllItems(Armor.class)) {
-            if (candidate.isEquipped(hero) || candidate instanceof ClassArmor
-                    || !canWearArmor(candidate, hero.STR(), seal)
-                    || (seal != null && candidate.checkSeal() != null)
-                    || (current instanceof ClassArmor
-                        && wouldLoseProtectedClassGlyph((ClassArmor) current, candidate))) continue;
+            if (candidate.isEquipped(hero) || !betterArmor(hero, candidate, current)) continue;
             int rating = armorRatingWithSeal(candidate, seal);
             if (rating > bestRating) {
                 best = candidate;
