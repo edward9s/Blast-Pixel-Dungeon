@@ -58,7 +58,7 @@ final class BlastAutoCrystalRooms {
             return chest ? 10 + chestRank(level.heaps.get(target)) : 0;
         }
         if (room instanceof CrystalPathRoom && !chest) {
-            return pathDoorPriority(level, room, target);
+            return pathDoorPriority(level, (CrystalPathRoom) room, target);
         }
         if (room instanceof CrystalChoiceRoom && !chest) {
             Item item = rewardBeyondDoor(level, room, target);
