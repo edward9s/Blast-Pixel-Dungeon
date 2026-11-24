@@ -272,7 +272,7 @@ final class BlastAutoEquipment {
                 || superior.ACC > inferior.ACC || superior.RCH > inferior.RCH;
     }
 
-    /** Only clearly inferior, unprotected backup gear can be cleaned up. */
+    /** Keep protected gear; ordinary spare armor can be sold even at equal defense. */
     static boolean isRedundant(Item candidate, Item equipped) {
         if (isProtectedEquipment(candidate)) return false;
         if (candidate instanceof MeleeWeapon && equipped instanceof MeleeWeapon) {
@@ -281,7 +281,7 @@ final class BlastAutoEquipment {
             return weaponDominates(worn, spare) || weaponOverwhelms(worn, spare);
         }
         if (candidate instanceof Armor && equipped instanceof Armor) {
-            return armorRating((Armor) equipped) > armorRating((Armor) candidate);
+            return armorRating((Armor) equipped) >= armorRating((Armor) candidate);
         }
         return false;
     }

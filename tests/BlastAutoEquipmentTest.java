@@ -211,6 +211,12 @@ public final class BlastAutoEquipmentTest {
 
         LeatherArmor inferiorArmor = new LeatherArmor();
         LeatherArmor superiorArmor = new LeatherArmor();
+        LeatherArmor equalArmor = new LeatherArmor();
+        check(BlastAutoEquipment.isRedundant(equalArmor, inferiorArmor),
+                "Ordinary spare armor with equal defense should be eligible for cleanup");
+        equalArmor.augment = Armor.Augment.EVASION;
+        check(!BlastAutoEquipment.isRedundant(equalArmor, inferiorArmor),
+                "Equal-defense augmented armor should be preserved");
         superiorArmor.level(4);
         check(BlastAutoEquipment.isRedundant(inferiorArmor, superiorArmor),
                 "Inferior unprotected armor should be eligible for cleanup");
