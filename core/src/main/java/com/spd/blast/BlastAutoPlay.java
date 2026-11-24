@@ -996,6 +996,12 @@ public final class BlastAutoPlay {
             return false;
         }
 
+        if (BlastAutoBlacksmith.attackBoss(hero, idleSafe, idleDistances)) {
+            debugDecision = "blacksmith-boss";
+            progress.intent(BlastAutoProgressGuard.Intent.INTERACT);
+            return false;
+        }
+
         // Use native actions to open visible containers and keyed doors.
         idleSafe = progress.safeFor(safe, hero.pos, BlastAutoProgressGuard.Intent.INTERACT);
         idleDistances = navigationDistances(hero.pos, safe, distances, idleSafe);
@@ -1269,7 +1275,10 @@ public final class BlastAutoPlay {
 
     /** Exclude service NPCs and demon spawners from all automatic attacks. */
     static boolean isAutoAttackExcluded(Mob mob) {
-        return mob instanceof NPC || mob instanceof DemonSpawner;
+        return mob instanceof NPC || mob instanceof DemonSpawner
+                || (Dungeon.level instanceof com.shatteredpixel.shatteredpixeldungeon.levels.MiningLevel
+                    && (mob instanceof com.shatteredpixel.shatteredpixeldungeon.actors.mobs.CrystalSpire
+                        || mob instanceof com.shatteredpixel.shatteredpixeldungeon.actors.mobs.GnollGeomancer));
     }
 
     /** Sleeping enemies are deliberately left alone by automatic combat. */
