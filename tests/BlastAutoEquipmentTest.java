@@ -21,6 +21,11 @@ import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.Dagger;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.Shortsword;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.enchantments.Blazing;
 import com.shatteredpixel.shatteredpixeldungeon.items.artifacts.DriedRose;
+import com.shatteredpixel.shatteredpixeldungeon.items.Item;
+import com.shatteredpixel.shatteredpixeldungeon.items.armor.MailArmor;
+
+import java.util.Arrays;
+import java.util.Collections;
 
 /** Automatic equipment checks true upgrade levels even for unidentified gear. */
 public final class BlastAutoEquipmentTest {
@@ -194,6 +199,74 @@ public final class BlastAutoEquipmentTest {
                 "Valued glyph stays protected even when a replacement has the same glyph");
         check(!BlastAutoEquipment.isProtectedEquipment(uninscribed),
                 "Uninscribed old armor does not require special protection");
+
+        // Without Alchemize, redundant floor equipment must not fill the backpack.
+        Dagger wornWeapon = new Dagger();
+        wornWeapon.level(5);
+        Dagger weakFloorWeapon = new Dagger();
+        check(!BlastAutoEquipment.worthPickingWithoutAlchemize(weakFloorWeapon,
+                        Collections.<Item>singletonList(wornWeapon), null, 12),
+                "Never collect a dominated low-tier weapon without Alchemize");
+        check(!BlastAutoEquipment.worthPickingWithoutAlchemize(weakFloorWeapon,
+                        Collections.<Item>singletonList(new Dagger()), null, 12),
+                "Identical weapon duplicates must be rejected");
+        Dagger strongerFloorWeapon = new Dagger();
+        strongerFloorWeapon.level(6);
+        check(BlastAutoEquipment.worthPickingWithoutAlchemize(strongerFloorWeapon,
+                        Collections.<Item>singletonList(wornWeapon), null, 12),
+                "Genuine weapon upgrades must still be collectible");
+        check(BlastAutoEquipment.worthPickingWithoutAlchemize(weakFloorWeapon,
+                        Collections.<Item>emptyList(), null, 12),
+                "The first available weapon remains collectible");
+
+        Dagger fasterFloorWeapon = new Dagger();
+        fasterFloorWeapon.DLY = 0.5f;
+        check(BlastAutoEquipment.worthPickingWithoutAlchemize(fasterFloorWeapon,
+                        Collections.<Item>singletonList(wornWeapon), null, 12),
+                "A faster but weaker weapon is a valid tactical alternative");
+        Dagger cursedFloorWeapon = new Dagger();
+        cursedFloorWeapon.enchant(new Grim());
+        cursedFloorWeapon.cursed = true;
+        check(!BlastAutoEquipment.worthPickingWithoutAlchemize(cursedFloorWeapon,
+                        Collections.<Item>emptyList(), null, 12),
+                "Cursed weapons remain excluded even with valuable enchantments");
+        Dagger rareFloorWeapon = new Dagger();
+        rareFloorWeapon.enchant(new Grim());
+        check(BlastAutoEquipment.worthPickingWithoutAlchemize(rareFloorWeapon,
+                        Collections.<Item>singletonList(wornWeapon), null, 12),
+                "Valuable enchantments still justify picking weaker weapons");
+
+        LeatherArmor wornArmor = new LeatherArmor();
+        wornArmor.level(5);
+        LeatherArmor weakFloorArmor = new LeatherArmor();
+        check(!BlastAutoEquipment.worthPickingWithoutAlchemize(weakFloorArmor,
+                        Collections.<Item>singletonList(wornArmor), wornArmor, 12),
+                "Never collect inferior armor when a superior one is equipped");
+        check(!BlastAutoEquipment.worthPickingWithoutAlchemize(weakFloorArmor,
+                        Collections.<Item>singletonList(new LeatherArmor()), null, 12),
+                "Identical armor duplicates must be rejected");
+        LeatherArmor strongerFloorArmor = new LeatherArmor();
+        strongerFloorArmor.level(6);
+        check(BlastAutoEquipment.worthPickingWithoutAlchemize(strongerFloorArmor,
+                        Collections.<Item>singletonList(wornArmor), wornArmor, 12),
+                "Genuine armor upgrades remain collectible");
+        weakFloorArmor.inscribe(new Camouflage());
+        check(BlastAutoEquipment.worthPickingWithoutAlchemize(weakFloorArmor,
+                        Collections.<Item>singletonList(wornArmor), wornArmor, 12),
+                "Valuable armor glyphs must survive pickup filtering");
+        weakFloorArmor.cursed = true;
+        check(!BlastAutoEquipment.worthPickingWithoutAlchemize(weakFloorArmor,
+                        Collections.<Item>singletonList(wornArmor), wornArmor, 12),
+                "Cursed armor must never pass the no-Alchemize selection");
+
+        MailArmor tooHeavyArmor = new MailArmor();
+        LeatherArmor wearableFloorArmor = new LeatherArmor();
+        int wearableStrength = wearableFloorArmor.STRReq(wearableFloorArmor.trueLevel());
+        check(tooHeavyArmor.STRReq(tooHeavyArmor.trueLevel()) > wearableStrength,
+                "The ownership comparison requires a genuinely unwearable reference");
+        check(BlastAutoEquipment.worthPickingWithoutAlchemize(wearableFloorArmor,
+                        Arrays.<Item>asList(tooHeavyArmor), null, wearableStrength),
+                "A heavy future upgrade must not hide the only wearable armor");
 
         System.out.println("BlastAutoEquipmentTest passed");
     }

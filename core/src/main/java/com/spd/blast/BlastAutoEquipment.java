@@ -77,14 +77,57 @@ final class BlastAutoEquipment {
 
     static boolean canPickup(Hero hero, Item item) {
         if (!(item instanceof MeleeWeapon || item instanceof Armor)) return false;
-        return canPickup(item, !hero.belongings.lostInventory()
-                && availableAlchemize(hero) != null);
+        boolean alchemizeAvailable = !hero.belongings.lostInventory()
+                && availableAlchemize(hero) != null;
+        return canPickup(item, alchemizeAvailable)
+                && (alchemizeAvailable || worthPickingWithoutAlchemize(
+                        item, hero.belongings, hero.belongings.armor(), hero.STR()));
     }
 
     /** A cursed item is collected only when it can be sold using Alchemize. */
     static boolean canPickup(Item item, boolean alchemizeAvailable) {
         if (!(item instanceof MeleeWeapon || item instanceof Armor)) return false;
         return !isCursed(item) || (alchemizeAvailable && Shopkeeper.canSell(item));
+    }
+
+    /**
+     * Without Alchemize, only collect valuable effects or equipment that adds a
+     * real option beyond the gear already worn or carried. A currently wearable
+     * candidate is not blocked by an unusably heavy item in the backpack.
+     */
+    static boolean worthPickingWithoutAlchemize(Item candidate, Iterable<Item> owned,
+                                                 Armor equippedArmor, int strength) {
+        if (isCursed(candidate)) return false;
+        if (isProtectedEquipment(candidate)) return true;
+        if (candidate instanceof MeleeWeapon) {
+            MeleeWeapon weapon = (MeleeWeapon) candidate;
+            boolean wearable = weapon.STRReq(weapon.trueLevel()) <= strength;
+            for (Item item : owned) {
+                if (!(item instanceof MeleeWeapon) || isCursed(item)) continue;
+                MeleeWeapon other = (MeleeWeapon) item;
+                if (wearable && other.STRReq(other.trueLevel()) > strength) continue;
+                if (weaponAtLeastAsGood(other, weapon)) return false;
+            }
+            return true;
+        }
+        if (candidate instanceof Armor) {
+            Armor armor = (Armor) candidate;
+            BrokenSeal seal = equippedArmor == null ? null : equippedArmor.checkSeal();
+            boolean wearable = canWearArmor(armor, strength, seal);
+            int rating = armorRatingWithSeal(armor, seal);
+            for (Item item : owned) {
+                if (!(item instanceof Armor) || isCursed(item)) continue;
+                Armor other = (Armor) item;
+                BrokenSeal otherSeal = other == equippedArmor || other.checkSeal() != null
+                        ? null : seal;
+                if (wearable && !canWearArmor(other, strength, otherSeal)) continue;
+                int otherRating = other == equippedArmor
+                        ? armorRating(other) : armorRatingWithSeal(other, otherSeal);
+                if (otherRating >= rating) return false;
+            }
+            return true;
+        }
+        return false;
     }
 
     /** Mark the exact auto-selected item before native pickup begins. */
@@ -147,17 +190,21 @@ final class BlastAutoEquipment {
                 && current.glyph.getClass() != replacement.glyph.getClass();
     }
 
+    /** Equal equipment also dominates a floor pickup; never hoard duplicates. */
+    private static boolean weaponAtLeastAsGood(MeleeWeapon superior, MeleeWeapon inferior) {
+        return weaponRating(superior) >= weaponRating(inferior)
+                && superior.augment.delayFactor(superior.DLY)
+                    <= inferior.augment.delayFactor(inferior.DLY)
+                && superior.ACC >= inferior.ACC && superior.RCH >= inferior.RCH;
+    }
+
     /** Evaluate independent weapon traits without inventing trade-off weights. */
     static boolean weaponDominates(MeleeWeapon superior, MeleeWeapon inferior) {
-        int power = weaponRating(superior);
-        int otherPower = weaponRating(inferior);
-        float delay = superior.augment.delayFactor(superior.DLY);
-        float otherDelay = inferior.augment.delayFactor(inferior.DLY);
-        return power >= otherPower
-                && delay <= otherDelay && superior.ACC >= inferior.ACC
-                && superior.RCH >= inferior.RCH
-                && (power > otherPower || delay < otherDelay || superior.ACC > inferior.ACC
-                    || superior.RCH > inferior.RCH);
+        if (!weaponAtLeastAsGood(superior, inferior)) return false;
+        return weaponRating(superior) > weaponRating(inferior)
+                || superior.augment.delayFactor(superior.DLY)
+                    < inferior.augment.delayFactor(inferior.DLY)
+                || superior.ACC > inferior.ACC || superior.RCH > inferior.RCH;
     }
 
     /** Only clearly inferior, unprotected backup gear can be cleaned up. */
