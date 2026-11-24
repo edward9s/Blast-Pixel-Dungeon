@@ -7,6 +7,8 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Buff;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroAction;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
+import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
+import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.bombs.Bomb;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
 import com.shatteredpixel.shatteredpixeldungeon.levels.RegularLevel;
@@ -68,6 +70,37 @@ final class BlastAutoBarricade {
         return true;
     }
 
+    static boolean risksLoot(Heap heap, boolean demolition) {
+        for (Item item : heap.items) {
+            if (demolition && BlastDemolition.destroysKey(item)) return true;
+            if (heap.type == Heap.Type.HEAP && BlastBombHeap.destroysLooseItem(item)) return true;
+            // A chain reaction can reach loot beyond our initial blast.
+            if (BlastBombHeap.isContainer(heap) && BlastBombHeap.isExposedBomb(item)) return true;
+        }
+        return false;
+    }
+
+    private static boolean canClear(Level level, int[] web, boolean[] blast,
+                                    int target, int origin, boolean protectedHero) {
+        if (!canDetonate(blast, target, origin, protectedHero)) return false;
+        if (web == null) return true;
+
+        boolean hitsWeb = false;
+        for (int cell = 0; cell < blast.length; cell++) {
+            if (blast[cell] && web[cell] > 0) {
+                hitsWeb = true;
+                break;
+            }
+        }
+        if (!hitsWeb) return true;
+
+        boolean demolition = BlastSettings.testDemolition();
+        for (Heap heap : level.heaps.valueList()) {
+            if (blast[heap.pos] && risksLoot(heap, demolition)) return false;
+        }
+        return true;
+    }
+
     /** Rooting bypasses normal idle tasks; clear adjacent webs without trying to move. */
     static Action clearAdjacentWeb(Hero hero) {
         Level level = Dungeon.level;
@@ -91,7 +124,7 @@ final class BlastAutoBarricade {
                     ? BlastBombTrajectory.throwPos(hero.pos, target) : hero.pos;
             if (!level.insideMap(center) || level.pit[center]) continue;
             boolean[] blast = remoteThrow ? ordinaryBomb.blastWarningCells(center) : localBlast;
-            if (!canDetonate(blast, target, hero.pos, true)) continue;
+            if (!canClear(level, web, blast, target, hero.pos, true)) continue;
             if (remoteThrow) {
                 return maniac.blastAutoThrowOrdinaryAndDetonate(target)
                         ? Action.DETONATE : Action.NONE;
@@ -137,7 +170,7 @@ final class BlastAutoBarricade {
                 int landing = BlastBombTrajectory.throwPos(hero.pos, cell);
                 if (!level.insideMap(landing) || level.pit[landing]) continue;
                 boolean[] blast = ordinaryBomb.blastWarningCells(landing);
-                if (!canDetonate(blast, cell, hero.pos, protectedHero)) continue;
+                if (!canClear(level, web, blast, cell, hero.pos, protectedHero)) continue;
                 int distance = level.distance(hero.pos, cell);
                 if (distance < nearest) {
                     nearest = distance;
@@ -171,7 +204,7 @@ final class BlastAutoBarricade {
                 int center = remoteThrow ? BlastBombTrajectory.throwPos(stand, cell) : stand;
                 if (!level.insideMap(center) || level.pit[center]) continue;
                 boolean[] blast = ordinaryBomb.blastWarningCells(center);
-                if (!canDetonate(blast, cell, stand, true)) continue;
+                if (!canClear(level, web, blast, cell, stand, true)) continue;
                 bestStand = stand;
                 bestSteps = distances[stand];
             }

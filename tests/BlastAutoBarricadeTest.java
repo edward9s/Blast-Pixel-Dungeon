@@ -1,5 +1,9 @@
 package com.spd.blast;
 
+import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
+import com.shatteredpixel.shatteredpixeldungeon.items.armor.LeatherArmor;
+import com.shatteredpixel.shatteredpixeldungeon.items.keys.GoldenKey;
+import com.shatteredpixel.shatteredpixeldungeon.items.keys.WornKey;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
 
 /** Headless checks for barricade explosion targeting and hero safety. */
@@ -27,6 +31,24 @@ public final class BlastAutoBarricadeTest {
                 "a web overlay is removable even on otherwise protected terrain");
         check(true, (Terrain.flags[Terrain.BOOKSHELF] & Terrain.FLAMABLE) != 0,
                 "native ordinary bombs can destroy bookshelf terrain");
+
+        Heap loot = new Heap();
+        loot.items.add(new LeatherArmor());
+        check(false, BlastAutoBarricade.risksLoot(loot, false),
+                "blast-proof armor does not prevent clearing webs");
+        loot.items.add(new BlastHastePickup());
+        check(true, BlastAutoBarricade.risksLoot(loot, false),
+                "ground haste pickup must be protected");
+        loot.type = Heap.Type.CHEST;
+        check(false, BlastAutoBarricade.risksLoot(loot, false),
+                "a single explosion opens a chest without destroying its contents");
+        loot.items.add(new GoldenKey(1));
+        check(true, BlastAutoBarricade.risksLoot(loot, true),
+                "demolition can destroy ordinary keys even inside containers");
+        loot.items.clear();
+        loot.items.add(new WornKey(5));
+        check(false, BlastAutoBarricade.risksLoot(loot, true),
+                "boss progression keys remain protected");
 
         boolean[] footprint = {false, true, true, false};
         check(true, BlastAutoBarricade.reachesSafely(footprint, 2, 0, false),

@@ -1,5 +1,6 @@
 package com.spd.blast;
 
+import com.shatteredpixel.shatteredpixeldungeon.items.EquipableItem;
 import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.bombs.Bomb;
@@ -7,6 +8,12 @@ import com.shatteredpixel.shatteredpixeldungeon.items.bombs.Bomb;
 /** Store armed Bomb Maniac bombs in container cells without changing loot order. */
 public final class BlastBombHeap {
     private BlastBombHeap() {}
+
+    /** Shared with the native Heap.explode path for loose items. */
+    public static boolean destroysLooseItem(Item item) {
+        return item instanceof BlastPickup
+                || (!item.unique && !item.isUpgradable() && !(item instanceof EquipableItem));
+    }
 
     /** Only deployed, ignited Bomb Maniac bombs bypass locked-chest drop redirection. */
     public static boolean isExposedBomb(Item item) {
