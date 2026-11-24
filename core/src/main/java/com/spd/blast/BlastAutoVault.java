@@ -2,6 +2,11 @@ package com.spd.blast;
 
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.VaultFlameTraps;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.BlobImmunity;
+import com.shatteredpixel.shatteredpixeldungeon.items.potions.Potion;
+import com.shatteredpixel.shatteredpixeldungeon.items.potions.PotionOfPurity;
+import com.shatteredpixel.shatteredpixeldungeon.levels.RegularLevel;
+import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.quest.vault.treasure.VaultFlamesTreasureRoom;
 import com.watabou.utils.PathFinder;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.VaultLaser;
@@ -21,7 +26,7 @@ final class BlastAutoVault {
      */
     static int stagingCell(Hero hero, Level level, boolean[] safe, int[] distances) {
         if (!(level instanceof VaultLevel)) return -1;
-        boolean[] danger = imminent(level);
+        boolean[] danger = imminent(hero, level);
         int best = -1;
         int shortest = Integer.MAX_VALUE;
         for (int cell = 0; cell < danger.length; cell++) {
@@ -50,7 +55,21 @@ final class BlastAutoVault {
         return best;
     }
 
-    static boolean[] imminent(Level level) {
+    static boolean drinkPurity(Hero hero, Level level) {
+        if (!(level instanceof RegularLevel) || hero.buff(BlobImmunity.class) != null
+                || hero.belongings.lostInventory()) return false;
+        VaultFlamesTreasureRoom room = (VaultFlamesTreasureRoom)
+                ((RegularLevel) level).room(VaultFlamesTreasureRoom.class);
+        if (room == null || room.entrance() == null) return false;
+        int entrance = level.pointToCell(room.entrance());
+        if (level.distance(hero.pos, entrance) > 1) return false;
+        PotionOfPurity potion = hero.belongings.getItem(PotionOfPurity.class);
+        if (potion == null || potion.quantity() <= 0 || !potion.isKnown()) return false;
+        potion.execute(hero, Potion.AC_DRINK);
+        return true;
+    }
+
+    static boolean[] imminent(Hero hero, Level level) {
         boolean[] danger = new boolean[level.length()];
         if (!(level instanceof VaultLevel)) return danger;
 
@@ -63,10 +82,10 @@ final class BlastAutoVault {
                     || flames.curCooldowns.length != danger.length)))
                 throw new IllegalStateException("Invalid vault flame grid");
             for (int cell = 0; cell < danger.length; cell++) {
-                if (flames.cur[cell] > 0) danger[cell] = true;
-                if (flames.afterTriggerCooldowns != null
-                        && flames.afterTriggerCooldowns[cell] >= 0
-                        && flames.curCooldowns[cell] <= 1) danger[cell] = true;
+                // The current small flame becomes a damaging large flame after the move.
+                // An unlit vent only produces its harmless warning flame next turn.
+                if (hero.buff(BlobImmunity.class) == null && flames.cur[cell] > 0)
+                    danger[cell] = true;
             }
         }
 
