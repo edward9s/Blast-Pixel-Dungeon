@@ -64,6 +64,10 @@ public final class BlastDemolition {
         heap.explode();
     }
 
+    static boolean destroysKey(Item item) {
+        return item instanceof Key && !(item instanceof WornKey);
+    }
+
     public static BlastDemolition prepare(Bomb bomb, int center) {
         if (!BlastSettings.testDemolition()) return null;
         Level level = Dungeon.level;
@@ -79,7 +83,7 @@ public final class BlastDemolition {
                 // Keys are normally unique and explosion-proof. WornKey is the
                 // fifth-floor progression key and must retain that protection.
                 for (Item item : heap.items.toArray(new Item[0])) {
-                    if (item instanceof Key && !(item instanceof WornKey)) heap.remove(item);
+                    if (destroysKey(item)) heap.remove(item);
                 }
             }
             Char ch = Actor.findChar(cell);

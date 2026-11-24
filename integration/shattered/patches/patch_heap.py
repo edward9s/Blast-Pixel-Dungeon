@@ -47,6 +47,12 @@ def patch(path: Path) -> None:
         "\t\t\t\t}\n\n\t\t\t\t"
         + explode, 1)
 
+    protection = "if (item.unique || item.isUpgradable() || item instanceof EquipableItem){"
+    if source.count(protection) != 1:
+        raise SystemExit("Heap.explode: expected one loose-item protection check")
+    source = source.replace(protection,
+        "if (!com.spd.blast.BlastBombHeap.destroysLooseItem(item)){", 1)
+
     # Bombs sharing a closed chest remain exposed to fire and chain explosions.
     for method in ("burn", "explode"):
         entry = f"\tpublic void {method}() {{\n\t\thidden = false;"
