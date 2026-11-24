@@ -20,6 +20,7 @@ import com.shatteredpixel.shatteredpixeldungeon.items.rings.RingOfEnergy;
 import com.shatteredpixel.shatteredpixeldungeon.items.rings.RingOfHaste;
 import com.shatteredpixel.shatteredpixeldungeon.items.rings.RingOfSharpshooting;
 import com.shatteredpixel.shatteredpixeldungeon.items.rings.RingOfWealth;
+import com.shatteredpixel.shatteredpixeldungeon.items.trinkets.TrinketCatalyst;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
 
 import java.util.function.Predicate;
@@ -229,7 +230,7 @@ public final class BlastAutoPickup {
                     || item instanceof RingOfHaste
                     || item instanceof RingOfEnergy);
         }
-        return item.stackable || instantPickup.test(item);
+        return item instanceof TrinketCatalyst || item.stackable || instantPickup.test(item);
     }
 
     /** These items are consumed on pickup without entering the backpack. */
