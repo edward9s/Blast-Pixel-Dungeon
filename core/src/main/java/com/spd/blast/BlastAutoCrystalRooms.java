@@ -8,8 +8,10 @@ import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.artifacts.*;
 import com.shatteredpixel.shatteredpixeldungeon.items.potions.PotionOfExperience;
+import com.shatteredpixel.shatteredpixeldungeon.items.potions.exotic.PotionOfDivineInspiration;
 import com.shatteredpixel.shatteredpixeldungeon.items.rings.*;
 import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfTransmutation;
+import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.exotic.ScrollOfMetamorphosis;
 import com.shatteredpixel.shatteredpixeldungeon.items.wands.*;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
 import com.shatteredpixel.shatteredpixeldungeon.levels.RegularLevel;
@@ -44,6 +46,7 @@ final class BlastAutoCrystalRooms {
         boolean pending = false;
         if (room != null && room.entrance() != null && Dungeon.branch == 0
                 && Notes.keyCount(new CrystalKey(Dungeon.depth)) == 0
+                && remainingCrystalDoors(level, room) <= 3
                 && (level.visited[level.pointToCell(room.entrance())]
                     || level.mapped[level.pointToCell(room.entrance())]
                     || hero.fieldOfView[level.pointToCell(room.entrance())])) {
@@ -65,6 +68,16 @@ final class BlastAutoCrystalRooms {
             resetPhase();
             BlastLog.debug("auto-crystal action=restore-phase");
         }
+    }
+
+    /** The room starts with six locks and generates three crystal keys. */
+    private static int remainingCrystalDoors(Level level, CrystalPathRoom room) {
+        int remaining = 0;
+        for (int cell = 0; cell < level.length(); cell++) {
+            if (level.map[cell] == Terrain.CRYSTAL_DOOR
+                    && room.inside(level.cellToPoint(cell))) remaining++;
+        }
+        return remaining;
     }
 
     static int rank(Item item) {
@@ -152,8 +165,10 @@ final class BlastAutoCrystalRooms {
             if (!room.inside(level.cellToPoint(heap.pos)) || heap.peek() == null
                     || cost[heap.pos] == Integer.MAX_VALUE) continue;
             Item item = heap.peek();
-            int value = item instanceof ScrollOfTransmutation ? 30
-                    : item instanceof PotionOfExperience ? 20 : 10;
+            int value = item instanceof ScrollOfTransmutation
+                    || item instanceof ScrollOfMetamorphosis ? 30
+                    : item instanceof PotionOfExperience
+                    || item instanceof PotionOfDivineInspiration ? 20 : 10;
             int firstDoor = -1;
             int requiredKeys = 0;
             for (int cell = heap.pos; cell != start && cell >= 0; cell = previous[cell]) {
