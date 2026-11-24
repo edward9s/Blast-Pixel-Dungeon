@@ -1281,7 +1281,7 @@ public final class BlastAutoPlay {
         com.shatteredpixel.shatteredpixeldungeon.levels.rooms.secret.SecretChestChasmRoom chasmRoom =
                 BlastAutoChasmRoom.flightRoom(level, hero);
 
-        boolean[] vaultDanger = BlastAutoVault.imminent(hero, level);
+        boolean[] vaultDanger = BlastAutoVault.imminent(level);
         for (int cell = 0; cell < safe.length; cell++) {
             boolean known = level.visited[cell] || level.mapped[cell] || hero.fieldOfView[cell];
             boolean airborne = known && flightRoom != null
