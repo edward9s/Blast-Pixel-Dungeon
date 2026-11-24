@@ -40,10 +40,19 @@ public final class BlastAutoPickup {
         retryTurns = 0;
     }
 
+    /** Sell auto-picked cursed equipment as part of the successful native pickup. */
+    public static void onPickupSuccess(Hero hero, Item item, int cell) {
+        if (hero == currentHero && Dungeon.level == currentLevel
+                && item == attemptedItem && cell == attemptedCell) {
+            BlastAutoEquipment.onPickupCompleted(hero, item);
+        }
+    }
+
     /** Only native pickup failure starts a retry cooldown. */
     public static void onPickupFailure(Hero hero, Item item, int cell) {
         if (hero == currentHero && Dungeon.level == currentLevel
                 && item == attemptedItem && cell == attemptedCell) {
+            BlastAutoEquipment.onPickupFailed(item);
             retryTurns = RETRY_TURNS;
         }
     }
@@ -83,7 +92,8 @@ public final class BlastAutoPickup {
                     || !safe[cell] || distances[cell] == Integer.MAX_VALUE) continue;
 
             Item item = firstEligibleItem(heap, candidate ->
-                    isPickupType(candidate, instantPickup)
+                    (isPickupType(candidate, instantPickup)
+                            || BlastAutoEquipment.canPickup(hero, candidate))
                     && canCollect(hero, candidate, instantPickup)
                     && !(retryTurns > 0 && candidate == attemptedItem
                             && cell == attemptedCell));
@@ -103,6 +113,7 @@ public final class BlastAutoPickup {
             // Record the candidate; the native failure callback alone starts cooldown.
             attemptedItem = nearestItem;
             attemptedCell = nearest;
+            BlastAutoEquipment.onPickupScheduled(nearestItem);
             hero.curAction = new HeroAction.PickUp(nearest);
         } else {
             hero.curAction = new HeroAction.Move(BlastAutoPlay.firstStep(nearest, safe, distances));
@@ -131,7 +142,8 @@ public final class BlastAutoPickup {
             int distance = level.distance(hero.pos, cell);
             if (distance > 2) continue;
             Item candidate = firstEligibleItem(heap, item ->
-                    isPickupType(item, instantPickup)
+                    (isPickupType(item, instantPickup)
+                            || BlastAutoEquipment.canPickup(hero, item))
                     && canCollect(hero, item, instantPickup));
             if (candidate == null) candidate = heap.peek();
             if (selected == null
@@ -149,7 +161,8 @@ public final class BlastAutoPickup {
         Item item = selectedItem;
         String status;
         if (BlastAutoTrapClearer.holdingDoorOpen(cell)) status = "door-held";
-        else if (!isPickupType(item, instantPickup)) status = "type";
+        else if (!isPickupType(item, instantPickup)
+                && !BlastAutoEquipment.canPickup(hero, item)) status = "type";
         else if (!canCollect(hero, item, instantPickup)) {
             if (item instanceof DriedRose.Petal) status = "rose-unavailable";
             else if (item instanceof Dewdrop) status = "dew-full";
