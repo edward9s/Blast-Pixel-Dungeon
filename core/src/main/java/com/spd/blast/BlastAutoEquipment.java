@@ -82,6 +82,12 @@ final class BlastAutoEquipment {
         return armorRatingAtLevel(armor, armor.trueLevel());
     }
 
+    /** Different inscriptions are both valuable; do not sell the old armor. */
+    static boolean hasGlyphConflict(Armor current, Armor replacement) {
+        return current != null && current.glyph != null && replacement.glyph != null
+                && current.glyph.getClass() != replacement.glyph.getClass();
+    }
+
     private static int armorRatingAtLevel(Armor armor, int level) {
         return armor.DRMin(level) + armor.DRMax(level);
     }
@@ -240,16 +246,20 @@ final class BlastAutoEquipment {
 
         Armor.Glyph originalSealGlyph = seal.getGlyph();
         Armor.Glyph originalNextGlyph = next.glyph;
+        boolean preserveOldGlyph = hasGlyphConflict(current, next);
+
+        // Detaching a seal may erase its old armor's inscription when runic
+        // transference is unlocked. Clear the seal's glyph FIRST on conflict.
+        if (preserveOldGlyph) seal.setGlyph(null);
         if (current.detachSeal() != seal) {
             throw new IllegalStateException("Warrior seal detached unexpectedly");
         }
 
-        // When two different glyphs conflict, keep the new armor's inscription.
-        if (originalNextGlyph != null && originalSealGlyph != null
-                && originalNextGlyph.getClass() != originalSealGlyph.getClass()) {
-            seal.setGlyph(null);
-        }
         next.affixSeal(seal);
+        if (preserveOldGlyph) {
+            // Keep the destination glyph and record it on the transferred seal.
+            next.inscribe(originalNextGlyph);
+        }
         if (next.doEquip(hero)) return true;
 
         // A failed equip must restore both pieces of armor and the original seal glyph.
@@ -280,13 +290,15 @@ final class BlastAutoEquipment {
             }
         }
         if (best == null) return false;
+        boolean preserveOldArmor = hasGlyphConflict(current, best);
         if (!equipArmorWithSeal(hero, current, best)) {
             throw new IllegalStateException("Eligible armor upgrade failed to equip");
         }
         if (seal != null && best.checkSeal() != seal) {
             throw new IllegalStateException("Warrior seal was not attached to replacement armor");
         }
-        if (current != null && availableAlchemize(hero) != null
+        // A distinct old inscription is worth keeping even with Alchemize available.
+        if (current != null && !preserveOldArmor && availableAlchemize(hero) != null
                 && Shopkeeper.canSell(current)) replacedEquipment.addLast(current);
         return true;
     }
