@@ -141,20 +141,45 @@ final class BlastAutoCrystalRooms {
 
         // Reserve all missing ordinary inventory slots before approaching the prizes.
         int required = 0;
+        ArrayList<Item> unstacked = new ArrayList<>();
         for (Item item : prizes) {
-            if (BlastAutoPickup.bypassesBackpack(item, BlastAutoPickupPolicy::isInstantPickup)
-                    || hero.belongings.backpack.canHold(item)) continue;
-            boolean fitsBag = false;
-            for (Item held : hero.belongings.backpack) {
-                if (held instanceof Bag && ((Bag) held).canHold(item)) {
-                    fitsBag = true;
-                    break;
+            if (BlastAutoPickup.bypassesBackpack(item, BlastAutoPickupPolicy::isInstantPickup))
+                continue;
+            boolean merged = false;
+            if (item.stackable) {
+                for (Item held : hero.belongings) {
+                    if (held.isSimilar(item)) {
+                        merged = true;
+                        break;
+                    }
+                }
+                for (Item earlier : unstacked) {
+                    if (earlier.isSimilar(item)) {
+                        merged = true;
+                        break;
+                    }
                 }
             }
-            if (!fitsBag) required++;
+            if (merged) continue;
+            unstacked.add(item);
+            required++;
         }
         int free = Math.max(0, hero.belongings.backpack.capacity()
                 - hero.belongings.backpack.items.size());
+        // Reserve existing specialized bag slots for compatible prizes.
+        for (Item held : hero.belongings.backpack) {
+            if (!(held instanceof Bag)) continue;
+            Bag bag = (Bag) held;
+            int slots = Math.max(0, bag.capacity() - bag.items.size());
+            for (Item item : new ArrayList<>(unstacked)) {
+                if (slots == 0) break;
+                if (bag.canHold(item)) {
+                    unstacked.remove(item);
+                    required--;
+                    slots--;
+                }
+            }
+        }
         int toDrop = Math.max(0, required - free);
         if (toDrop > 0) {
             Item candidate = null;
