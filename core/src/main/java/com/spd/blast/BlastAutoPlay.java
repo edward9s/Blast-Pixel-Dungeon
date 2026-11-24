@@ -657,6 +657,15 @@ public final class BlastAutoPlay {
         progress.refreshHazards(Dungeon.level.length(),
                 cell -> BlastAutoEnvironment.hazardousAt(cell, hazards)
                         || specialBarriers[cell]);
+
+        // An active Purity crossing must run before ordinary gas retreat, which
+        // otherwise treats protected toxic tiles as dangerous.
+        debugDecision = "toxic-purity-run";
+        BlastAutoSpecialRooms.Action purityRun = BlastAutoToxicRoom.continuePurityRun(
+                hero, safe, hazards, specialBarriers);
+        if (purityRun != BlastAutoSpecialRooms.Action.NONE)
+            return purityRun == BlastAutoSpecialRooms.Action.USE;
+
         int toxicRetreat = BlastAutoTrapClearer.gasRetreatStep(hero, safe);
 
         // Persistent test invulnerability allows attacking before leaving gas.
