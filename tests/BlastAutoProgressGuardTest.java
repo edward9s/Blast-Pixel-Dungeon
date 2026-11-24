@@ -58,6 +58,14 @@ public final class BlastAutoProgressGuardTest {
         for (int i = 0; i < 12; i++) cycle.observe(23);
         check(true, open(cycle, safe, roam, 24), "cycle block expires");
 
+        BlastAutoProgressGuard sameTask = new BlastAutoProgressGuard();
+        for (int i = 0; i < 2; i++) {
+            move(sameTask, 23, 24, pickup);
+            move(sameTask, 24, 23, pickup);
+        }
+        check(false, open(sameTask, safe, pickup, 24), "same-task cycle blocks pickup");
+        check(true, open(sameTask, safe, roam, 24), "same-task cycle leaves roaming open");
+
         BlastAutoProgressGuard triple = new BlastAutoProgressGuard();
         for (int i = 0; i < 2; i++) {
             move(triple, 23, 24, harvest);

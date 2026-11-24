@@ -635,11 +635,18 @@ public final class BlastAutoPlay {
     public static boolean chooseAction(Hero hero) {
         resetForLevel(hero);
         progress.observe(hero.pos);
+        BlastAutoPickup.advanceRetries();
         boolean started = chooseActionOnce(hero);
         HeroAction action = hero.curAction;
-        progress.record(hero.pos, action instanceof HeroAction.Move ? action.dst : -1);
+        if (!(action instanceof HeroAction.PickUp)) {
+            progress.record(hero.pos, action instanceof HeroAction.Move ? action.dst : -1);
+        }
         logNearbyLoot(hero, action, started);
         return started;
+    }
+
+    static void onPickupProgress() {
+        progress.clearHistory();
     }
 
     private static boolean chooseActionOnce(Hero hero) {
@@ -940,21 +947,22 @@ public final class BlastAutoPlay {
         }
 
         // Each idle task sees only its own failed steps; hazardous retreats affect all.
-        boolean[] idleSafe = progress.safeFor(safe, hero.pos,
-                BlastAutoProgressGuard.Intent.TRAVEL);
-        int[] idleDistances = navigationDistances(hero.pos, safe, distances, idleSafe);
-
         // Complete the crystal-path room before ordinary pickup or roaming.
-        idleSafe = progress.safeFor(safe, hero.pos, BlastAutoProgressGuard.Intent.PICKUP);
-        idleDistances = navigationDistances(hero.pos, safe, distances, idleSafe);
+        boolean[] crystalSafe = BlastAutoCrystalRooms.hasRoute()
+                ? safeCells(hero, hazards, specialBarriers, false, true) : safe;
+        boolean[] idleSafe = progress.safeFor(
+                crystalSafe, hero.pos, BlastAutoProgressGuard.Intent.CRYSTAL);
+        int[] idleDistances = navigationDistances(hero.pos, safe, distances, idleSafe);
         debugDecision = "crystal-path";
         if (BlastAutoCrystalRooms.collect(hero, idleSafe, idleDistances)) {
-            progress.intent(BlastAutoProgressGuard.Intent.PICKUP);
+            progress.intent(BlastAutoProgressGuard.Intent.CRYSTAL);
             return hero.curAction == null;
         }
 
         // Resume interrupted player travel after tactical combat and before idle tasks.
         debugDecision = "manual-route";
+        idleSafe = progress.safeFor(safe, hero.pos, BlastAutoProgressGuard.Intent.TRAVEL);
+        idleDistances = navigationDistances(hero.pos, safe, distances, idleSafe);
         if (resumeInterruptedTravel(hero, idleSafe, idleDistances)) {
             progress.intent(BlastAutoProgressGuard.Intent.TRAVEL);
             return false;
@@ -975,7 +983,7 @@ public final class BlastAutoPlay {
         if (BlastAutoVault.drinkPurity(hero, Dungeon.level)) return true;
 
         // Strength potions, equipment upgrades, and ordinary gear cleanup run only while idle.
-        // Cursed gear is sold immediately from the native pickup-success callback.
+        // Equipment picked up for sale is handled by the native pickup-success callback.
         debugDecision = "equipment";
         if (BlastAutoEquipment.manage(hero)) return true;
 
@@ -1417,6 +1425,11 @@ public final class BlastAutoPlay {
 
     private static boolean[] safeCells(Hero hero, Blob[] hazards, boolean[] specialBarriers,
                                        boolean allowGas) {
+        return safeCells(hero, hazards, specialBarriers, allowGas, false);
+    }
+
+    private static boolean[] safeCells(Hero hero, Blob[] hazards, boolean[] specialBarriers,
+                                       boolean allowGas, boolean crystalRoute) {
         Level level = Dungeon.level;
         boolean[] safe = Dungeon.findPassable(hero, level.passable, hero.fieldOfView, true).clone();
         boolean phaseEnabled = BlastMovement.enabled();
@@ -1427,13 +1440,15 @@ public final class BlastAutoPlay {
 
         boolean[] vaultDanger = BlastAutoVault.imminent(hero, level);
         for (int cell = 0; cell < safe.length; cell++) {
+            boolean crystal = crystalRoute && BlastAutoCrystalRooms.containsActive(cell);
             boolean known = level.visited[cell] || level.mapped[cell] || hero.fieldOfView[cell]
-                    || BlastAutoCrystalRooms.containsActive(cell);
+                    || crystal;
             boolean airborne = known && flightRoom != null
                     && BlastAutoSpecialRooms.flightTile(level, flightRoom, cell);
             airborne |= chasmRoom != null && BlastAutoChasmRoom.flightTile(level, chasmRoom, cell);
             boolean traversable = safe[cell]
                     || (phaseEnabled && known && BlastMovement.canPhase(cell))
+                    || (crystal && level.map[cell] == Terrain.CRYSTAL_DOOR)
                     || airborne;
             safe[cell] = (known || airborne) && level.insideMap(cell) && traversable
                     && (!level.pit[cell] || airborne)

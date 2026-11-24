@@ -23,6 +23,7 @@ import com.shatteredpixel.shatteredpixeldungeon.items.rings.RingOfWealth;
 import com.shatteredpixel.shatteredpixeldungeon.items.trinkets.TrinketCatalyst;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
 
+import java.util.IdentityHashMap;
 import java.util.function.Predicate;
 
 /** Portable SPD floor-loot policy; Blast-specific bombs live elsewhere. */
@@ -34,7 +35,7 @@ public final class BlastAutoPickup {
     private static Level currentLevel;
     private static Item attemptedItem;
     private static int attemptedCell = -1;
-    private static int retryTurns;
+    private static final IdentityHashMap<Item, Integer> retries = new IdentityHashMap<>();
 
     private BlastAutoPickup() {}
 
@@ -43,13 +44,16 @@ public final class BlastAutoPickup {
         currentLevel = null;
         attemptedItem = null;
         attemptedCell = -1;
-        retryTurns = 0;
+        retries.clear();
     }
 
-    /** Sell auto-picked cursed equipment as part of the successful native pickup. */
+    /** Sell equipment picked up for sale as part of the successful native pickup. */
     public static void onPickupSuccess(Hero hero, Item item, int cell) {
         if (hero == currentHero && Dungeon.level == currentLevel
                 && item == attemptedItem && cell == attemptedCell) {
+            attemptedItem = null;
+            attemptedCell = -1;
+            BlastAutoPlay.onPickupProgress();
             BlastAutoEquipment.onPickupCompleted(hero, item);
         }
     }
@@ -59,8 +63,15 @@ public final class BlastAutoPickup {
         if (hero == currentHero && Dungeon.level == currentLevel
                 && item == attemptedItem && cell == attemptedCell) {
             BlastAutoEquipment.onPickupFailed(item);
-            retryTurns = RETRY_TURNS;
+            attemptedItem = null;
+            attemptedCell = -1;
+            retries.put(item, RETRY_TURNS);
         }
+    }
+
+    static void advanceRetries() {
+        retries.replaceAll((item, turns) -> turns - 1);
+        retries.values().removeIf(turns -> turns <= 0);
     }
 
     static boolean knownLoot(boolean seen, boolean visible) {
@@ -82,7 +93,6 @@ public final class BlastAutoPickup {
         if (safe.length != level.length() || distances.length != level.length()) {
             throw new IllegalArgumentException("Invalid auto-pickup distance map");
         }
-        if (retryTurns > 0) retryTurns--;
 
         int nearest = -1;
         int shortest = Integer.MAX_VALUE;
@@ -101,9 +111,7 @@ public final class BlastAutoPickup {
                     !BlastAutoCrystalRooms.isStaged(candidate)
                     && (isPickupType(candidate, instantPickup)
                             || BlastAutoEquipment.canPickup(hero, candidate))
-                    && canCollect(hero, candidate, instantPickup)
-                    && !(retryTurns > 0 && candidate == attemptedItem
-                            && cell == attemptedCell));
+                    && canCollect(hero, candidate, instantPickup));
             if (item == null) continue;
             if (distances[cell] < shortest) {
                 nearest = cell;
@@ -166,6 +174,7 @@ public final class BlastAutoPickup {
         else if (BlastAutoEquipment.blocksCursedPickup(hero, item)) status = "cursed";
         else if (!isPickupType(item, instantPickup)
                 && !BlastAutoEquipment.canPickup(hero, item)) status = "type";
+        else if (retries.containsKey(item)) status = "cooldown";
         else if (!canCollect(hero, item, instantPickup)) {
             if (item instanceof DriedRose.Petal) status = "rose-unavailable";
             else if (item instanceof Dewdrop) status = "dew-full";
@@ -176,9 +185,7 @@ public final class BlastAutoPickup {
         else if (!safe[cell]) status = "unsafe";
         else if (!pickupSafe[cell]) status = "blocked";
         else if (distances[cell] == Integer.MAX_VALUE) status = "unreachable";
-        else if (retryTurns > 0 && item == attemptedItem && cell == attemptedCell) {
-            status = "cooldown";
-        } else status = "ready";
+        else status = "ready";
         String type = item instanceof Gold ? "Gold" : item.getClass().getSimpleName();
         String result = type + "@" + cell + " status=" + status;
         if ("full".equals(status) || "lost-inventory".equals(status)) {
@@ -220,7 +227,7 @@ public final class BlastAutoPickup {
         exposeForPickup(heap, item);
         attemptedItem = item;
         attemptedCell = heap.pos;
-        BlastAutoEquipment.onPickupScheduled(item);
+        BlastAutoEquipment.onPickupScheduled(hero, item);
     }
 
     /** Reorder only during automatic pickup; native doPickUp still owns the result. */
@@ -255,7 +262,7 @@ public final class BlastAutoPickup {
     }
 
     static boolean canCollect(Hero hero, Item item, Predicate<Item> instantPickup) {
-        if (BlastAutoEquipment.blocksCursedPickup(hero, item)) return false;
+        if (retries.containsKey(item) || BlastAutoEquipment.blocksCursedPickup(hero, item)) return false;
         if (item instanceof DriedRose.Petal) {
             return canUpgradeRose(hero.belongings.getItem(DriedRose.class));
         }

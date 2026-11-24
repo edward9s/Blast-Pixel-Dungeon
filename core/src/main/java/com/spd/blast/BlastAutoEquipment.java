@@ -34,28 +34,21 @@ import com.watabou.noosa.audio.Sample;
 import com.watabou.utils.Random;
 
 import java.util.ArrayDeque;
-import java.util.Collections;
-import java.util.IdentityHashMap;
-import java.util.Set;
 
 /** Idle equipment maintenance, restricted to melee weapons and armor. */
 final class BlastAutoEquipment {
 
     private static final ThreadLocal<Boolean> automaticItemUse = new ThreadLocal<>();
     private static final ArrayDeque<Item> replacedEquipment = new ArrayDeque<>();
-    // Equipment replaced when Alchemize was unavailable is never sold retroactively.
-    private static final Set<Item> retainedEquipment =
-            Collections.newSetFromMap(new IdentityHashMap<Item, Boolean>());
-    private static Item pendingCursedPickup;
+    private static Item pendingSale;
     private static boolean pendingStrengthCleanup;
 
     private BlastAutoEquipment() {}
 
     static void reset() {
-        pendingCursedPickup = null;
+        pendingSale = null;
         pendingStrengthCleanup = false;
         replacedEquipment.clear();
-        retainedEquipment.clear();
     }
 
     static boolean isUsingAutomatically() {
@@ -76,13 +69,20 @@ final class BlastAutoEquipment {
         return spell != null && spell.quantity() > 0 ? spell : null;
     }
 
+    private enum Pickup { SKIP, KEEP, SELL }
+
     static boolean canPickup(Hero hero, Item item) {
-        if (!(item instanceof MeleeWeapon || item instanceof Armor)) return false;
-        boolean alchemizeAvailable = !hero.belongings.lostInventory()
-                && availableAlchemize(hero) != null;
-        return canPickup(item, alchemizeAvailable)
-                && (alchemizeAvailable || worthPickingWithoutAlchemize(
-                        item, hero.belongings, hero.belongings.armor(), hero.STR()));
+        return pickup(hero, item) != Pickup.SKIP;
+    }
+
+    private static Pickup pickup(Hero hero, Item item) {
+        if (!(item instanceof MeleeWeapon || item instanceof Armor)) return Pickup.SKIP;
+        boolean canSell = !hero.belongings.lostInventory() && availableAlchemize(hero) != null
+                && Shopkeeper.canSell(item);
+        if (isCursed(item)) return canSell ? Pickup.SELL : Pickup.SKIP;
+        if (worthPickingWithoutAlchemize(
+                item, hero.belongings, hero.belongings.armor(), hero.STR())) return Pickup.KEEP;
+        return canSell && isSaleCandidate(hero, item) ? Pickup.SELL : Pickup.SKIP;
     }
 
     static boolean blocksCursedPickup(Hero hero, Item item) {
@@ -138,21 +138,27 @@ final class BlastAutoEquipment {
         return false;
     }
 
+    private static boolean isSaleCandidate(Hero hero, Item item) {
+        Item equipped = item instanceof MeleeWeapon ? hero.belongings.weapon()
+                : item instanceof Armor ? hero.belongings.armor() : null;
+        return isRedundant(item, equipped);
+    }
+
     /** Mark the exact auto-selected item before native pickup begins. */
-    static void onPickupScheduled(Item item) {
-        pendingCursedPickup = isCursed(item) ? item : null;
+    static void onPickupScheduled(Hero hero, Item item) {
+        pendingSale = pickup(hero, item) == Pickup.SELL ? item : null;
     }
 
     static void onPickupFailed(Item item) {
-        if (pendingCursedPickup == item) pendingCursedPickup = null;
+        if (pendingSale == item) pendingSale = null;
     }
 
     /** Sell in Hero.actPickUp's success branch, without waiting for another AI turn. */
     static void onPickupCompleted(Hero hero, Item item) {
-        if (pendingCursedPickup != item) return;
-        pendingCursedPickup = null;
+        if (pendingSale != item) return;
+        pendingSale = null;
         if (!sellWithAlchemize(hero, item)) {
-            throw new IllegalStateException("Automatically collected cursed gear could not be sold");
+            throw new IllegalStateException("Equipment collected for sale could not be sold");
         }
     }
 
@@ -325,7 +331,7 @@ final class BlastAutoEquipment {
         while (!replacedEquipment.isEmpty()) {
             Item item = replacedEquipment.peekFirst();
             if (!hero.belongings.contains(item) || item.isEquipped(hero)
-                    || isProtectedEquipment(item) || retainedEquipment.contains(item)
+                    || isProtectedEquipment(item)
                     || !Shopkeeper.canSell(item)) {
                 replacedEquipment.removeFirst();
                 continue;
@@ -352,7 +358,6 @@ final class BlastAutoEquipment {
         }
         for (Item item : hero.belongings.getAllItems(Item.class)) {
             if (!isUnwearableForSale(item, hero.STR())
-                    || retainedEquipment.contains(item)
                     || item.isEquipped(hero) || !Shopkeeper.canSell(item)) continue;
             if (!sellWithAlchemize(hero, item)) {
                 throw new IllegalStateException("Unwearable equipment could not be sold");
@@ -366,7 +371,7 @@ final class BlastAutoEquipment {
     private static boolean sellRedundant(Hero hero) {
         if (availableAlchemize(hero) == null) return false;
         for (Item item : hero.belongings.getAllItems(Item.class)) {
-            if (retainedEquipment.contains(item) || item.isEquipped(hero)) continue;
+            if (item.isEquipped(hero)) continue;
             Item equipped = item instanceof MeleeWeapon ? hero.belongings.weapon()
                     : item instanceof Armor ? hero.belongings.armor() : null;
             if (!isRedundant(item, equipped) || !Shopkeeper.canSell(item)) continue;
@@ -403,14 +408,9 @@ final class BlastAutoEquipment {
         if (!best.doEquip(hero)) {
             throw new IllegalStateException("Eligible weapon upgrade failed to equip");
         }
-        retainedEquipment.remove(best);
-        if (current instanceof MeleeWeapon) {
-            if (availableAlchemize(hero) == null) {
-                retainedEquipment.add(current);
-            } else if (isRedundant(current, best)
-                    && Shopkeeper.canSell(current)) {
-                replacedEquipment.addLast(current);
-            }
+        if (current instanceof MeleeWeapon && availableAlchemize(hero) != null
+                && isRedundant(current, best) && Shopkeeper.canSell(current)) {
+            replacedEquipment.addLast(current);
         }
         return true;
     }
@@ -471,7 +471,6 @@ final class BlastAutoEquipment {
                 if (!equipArmorWithSeal(hero, current, classArmor)) {
                     throw new IllegalStateException("Could not restore hero ability armor");
                 }
-                retainedEquipment.remove(classArmor);
                 return true;
             }
         }
@@ -511,14 +510,9 @@ final class BlastAutoEquipment {
         if (seal != null && best.checkSeal() != seal) {
             throw new IllegalStateException("Warrior seal was not attached to replacement armor");
         }
-        retainedEquipment.remove(best);
-        if (current != null) {
-            if (availableAlchemize(hero) == null) {
-                retainedEquipment.add(current);
-            } else if (!isProtectedEquipment(current)
-                    && Shopkeeper.canSell(current)) {
-                replacedEquipment.addLast(current);
-            }
+        if (current != null && availableAlchemize(hero) != null
+                && !isProtectedEquipment(current) && Shopkeeper.canSell(current)) {
+            replacedEquipment.addLast(current);
         }
         return true;
     }

@@ -23,6 +23,7 @@ public final class BlastMovement {
     }
 
     public static boolean canPhase(int cell) {
+        if (BlastAutoCrystalRooms.canCrossDoor(Dungeon.hero, cell)) return true;
         if (!enabled() || Dungeon.level == null) {
             return false;
         }
