@@ -126,6 +126,43 @@ final class BlastAutoCrystalRooms {
         return best;
     }
 
+    /** Inspect the reward directly behind a crystal-choice door. */
+    private static Item rewardBeyondDoor(Level level, Room room, int door) {
+        boolean[] visited = new boolean[level.length()];
+        java.util.ArrayDeque<Integer> queue = new java.util.ArrayDeque<>();
+        for (int offset : PathFinder.NEIGHBOURS4) {
+            int cell = door + offset;
+            if (level.insideMap(cell) && room.inside(level.cellToPoint(cell))
+                    && level.map[cell] == Terrain.EMPTY_SP) {
+                queue.add(cell);
+                visited[cell] = true;
+            }
+        }
+        Item best = null;
+        int bestRank = -1;
+        while (!queue.isEmpty()) {
+            int cell = queue.removeFirst();
+            Heap heap = level.heaps.get(cell);
+            if (heap != null && heap.peek() != null) {
+                Item item = heap.peek();
+                int value = rank(item);
+                if (value > bestRank) {
+                    bestRank = value;
+                    best = item;
+                }
+            }
+            for (int offset : PathFinder.NEIGHBOURS4) {
+                int next = cell + offset;
+                if (!level.insideMap(next) || visited[next]
+                        || !room.inside(level.cellToPoint(next))
+                        || level.solid[next] || level.map[next] == Terrain.CRYSTAL_DOOR) continue;
+                visited[next] = true;
+                queue.add(next);
+            }
+        }
+        return best;
+    }
+
     static boolean replace(int priority, int bestPriority, int steps, int bestSteps) {
         return priority > bestPriority || (priority == bestPriority
                 && (steps < bestSteps || (steps == bestSteps && Random.Int(2) == 0)));
