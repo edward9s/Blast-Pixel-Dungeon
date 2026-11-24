@@ -34,7 +34,7 @@ import java.util.Arrays;
 /** Scores the three ordinary crystal-choice puzzles without changing their rewards. */
 final class BlastAutoCrystalRooms {
     private static Level phaseLevel;
-    private static Room phaseRoom;
+    private static SpecialRoom phaseRoom;
     private static boolean phaseWasEnabled;
     private static boolean phaseActive;
     private static final Set<Item> staged = Collections.newSetFromMap(
@@ -54,7 +54,7 @@ final class BlastAutoCrystalRooms {
     static void updatePhase(Hero hero) {
         Level level = Dungeon.level;
         if (phaseActive && phaseLevel != level) resetPhase();
-        Room room = null;
+        SpecialRoom room = null;
         if (level instanceof RegularLevel) {
             RegularLevel regular = (RegularLevel) level;
             CrystalPathRoom path = (CrystalPathRoom) regular.room(CrystalPathRoom.class);
