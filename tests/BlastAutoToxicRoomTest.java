@@ -44,6 +44,23 @@ public final class BlastAutoToxicRoomTest {
                 "native bombs destroy closed flammable doors");
         check((Terrain.flags[Terrain.OPEN_DOOR] & Terrain.FLAMABLE) != 0,
                 "native bombs destroy open flammable doors");
+        // An unidentified Potion of Purity grants 20 turns of toxic-gas
+        // immunity; budget both the unopened chest and the return to the door.
+        check(BlastAutoToxicRoom.enoughPurity(19f, 5, 5, 2, 1f),
+                "a short round trip, opening chest and pickup fits within immunity");
+        check(!BlastAutoToxicRoom.enoughPurity(19f, 9, 9, 2, 1f),
+                "do not drink Purity when it expires before the round trip ends");
+        check(!BlastAutoToxicRoom.enoughPurity(12f, 4, 4, 2, 1f),
+                "a nearly expired immunity must cause retreat");
+        check(!BlastAutoToxicRoom.enoughPurity(20f, Integer.MAX_VALUE, 2, 2, 1f),
+                "an unreachable chest must never consume Purity");
+        check(!BlastAutoToxicRoom.enoughPurity(20f, 2, Integer.MAX_VALUE, 2, 1f),
+                "an unsafe return route must never consume Purity");
+        check(!BlastAutoToxicRoom.enoughPurity(20f, 4, 4, 0, 1f),
+                "the expected pickup action must be included in the time budget");
+        check(!BlastAutoToxicRoom.enoughPurity(20f, 4, 4, 2, 0f),
+                "invalid movement speed must be rejected");
+
         System.out.println("BlastAutoToxicRoomTest passed");
     }
 }
