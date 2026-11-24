@@ -7,7 +7,7 @@ import com.shatteredpixel.shatteredpixeldungeon.items.artifacts.*;
 import com.shatteredpixel.shatteredpixeldungeon.items.potions.PotionOfExperience;
 import com.shatteredpixel.shatteredpixeldungeon.items.rings.*;
 import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfTransmutation;
-import com.shatteredpixel.shatteredpixeldungeon.items.wands.Wand;
+import com.shatteredpixel.shatteredpixeldungeon.items.wands.*;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
 import com.shatteredpixel.shatteredpixeldungeon.levels.RegularLevel;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
@@ -29,7 +29,10 @@ final class BlastAutoCrystalRooms {
                 || item instanceof TimekeepersHourglass || item instanceof MasterThievesArmband
                 || item instanceof AlchemistsToolkit || item instanceof SkeletonKey
                 || item instanceof DriedRose || item instanceof UnstableSpellbook) return 2;
-        if (item instanceof Wand) return 1;
+        if (item instanceof WandOfCorrosion || item instanceof WandOfMagicMissile
+                || item instanceof WandOfFrost || item instanceof WandOfPrismaticLight
+                || item instanceof WandOfBlastWave || item instanceof WandOfLightning
+                || item instanceof WandOfDisintegration || item instanceof WandOfTransfusion) return 1;
         return 0;
     }
 
