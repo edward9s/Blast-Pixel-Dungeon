@@ -519,11 +519,12 @@ final class BlastAutoTrapClearer {
         int door = -1;
         for (int steps = 1; steps <= MAX_THROW_DISTANCE; steps++) {
             int cell = trapCell + side * steps;
-            if (!level.insideMap(cell) || !level.passable[cell] || !safe[cell]) break;
+            if (!level.insideMap(cell)) break;
             if (level.map[cell] == Terrain.DOOR) {
                 door = cell;
                 break;
             }
+            if (!level.passable[cell] || !safe[cell]) break;
         }
         if (door < 0) return -1;
 
@@ -531,8 +532,10 @@ final class BlastAutoTrapClearer {
         int shortest = Integer.MAX_VALUE;
         for (int steps = minimum; steps <= MAX_THROW_DISTANCE; steps++) {
             int stand = trapCell + side * steps;
-            if (!level.insideMap(stand) || !level.passable[stand] || !safe[stand]) break;
-            if (stand == door || level.map[stand] == Terrain.DOOR
+            if (!level.insideMap(stand)) break;
+            if (stand == door) continue;
+            if (!level.passable[stand] || !safe[stand]) break;
+            if (level.map[stand] == Terrain.DOOR
                     || distances[stand] == Integer.MAX_VALUE || distances[stand] >= shortest) continue;
             if (new Ballistica(stand, door, Ballistica.PROJECTILE).collisionPos != door) {
                 continue;
@@ -570,8 +573,9 @@ final class BlastAutoTrapClearer {
     private static int closedDoor(Level level, int trapCell, int side) {
         for (int steps = 1; steps <= MAX_THROW_DISTANCE; steps++) {
             int cell = trapCell + side * steps;
-            if (!level.insideMap(cell) || !level.passable[cell]) break;
+            if (!level.insideMap(cell)) break;
             if (level.map[cell] == Terrain.DOOR) return cell;
+            if (!level.passable[cell]) break;
         }
         return -1;
     }
