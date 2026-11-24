@@ -1,6 +1,7 @@
 package com.spd.blast;
 
 import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
+import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
 
 /** Deterministic checks for the permanent toxic-room vent and doorway policy. */
 public final class BlastAutoToxicRoomTest {
@@ -44,6 +45,21 @@ public final class BlastAutoToxicRoomTest {
                 "native bombs destroy closed flammable doors");
         check((Terrain.flags[Terrain.OPEN_DOOR] & Terrain.FLAMABLE) != 0,
                 "native bombs destroy open flammable doors");
+        // All unopened room caches need opening, even without collectible
+        // contents; opened heaps are visited only when loot can be picked up.
+        check(BlastAutoToxicRoom.pendingContainer(Heap.Type.CHEST, false),
+                "A closed chest should trigger toxic-room looting");
+        check(BlastAutoToxicRoom.pendingContainer(Heap.Type.SKELETON, false),
+                "A skeleton pile should trigger toxic-room looting");
+        check(BlastAutoToxicRoom.pendingContainer(Heap.Type.REMAINS, false),
+                "Remains should be handled like a skeleton pile");
+        check(BlastAutoToxicRoom.pendingContainer(Heap.Type.HEAP, true),
+                "Collectible items left on the floor should trigger looting");
+        check(!BlastAutoToxicRoom.pendingContainer(Heap.Type.HEAP, false),
+                "Rejected items must not trigger endless toxic-room visits");
+        check(!BlastAutoToxicRoom.pendingContainer(Heap.Type.LOCKED_CHEST, true),
+                "Locked treasure is outside this ordinary chest policy");
+
         System.out.println("BlastAutoToxicRoomTest passed");
     }
 }

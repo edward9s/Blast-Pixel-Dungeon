@@ -2,6 +2,8 @@ package com.spd.blast;
 
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
+import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.BlobImmunity;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.Blob;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.ToxicGas;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
@@ -9,6 +11,8 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroAction;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
 import com.shatteredpixel.shatteredpixeldungeon.items.bombs.Bomb;
+import com.shatteredpixel.shatteredpixeldungeon.items.potions.Potion;
+import com.shatteredpixel.shatteredpixeldungeon.items.potions.PotionOfPurity;
 import com.shatteredpixel.shatteredpixeldungeon.items.potions.brews.AquaBrew;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
 import com.shatteredpixel.shatteredpixeldungeon.levels.RegularLevel;
@@ -16,6 +20,7 @@ import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
 import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.special.ToxicGasRoom;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.Trap;
 import com.shatteredpixel.shatteredpixeldungeon.mechanics.Ballistica;
+import com.watabou.utils.PathFinder;
 
 /** Quench permanent gas vents, then keep the toxic-room entrance ventilated. */
 final class BlastAutoToxicRoom {
@@ -85,6 +90,128 @@ final class BlastAutoToxicRoom {
             }
         }
         return false;
+    }
+
+    /** An unopened cache or an eligible loose item is worth entering for. */
+    static boolean pendingContainer(Heap.Type type, boolean collectible) {
+        return type == Heap.Type.CHEST || type == Heap.Type.SKELETON
+                || type == Heap.Type.REMAINS
+                || (type == Heap.Type.HEAP && collectible);
+    }
+
+    private static Item collectibleItem(Hero hero, Heap heap) {
+        return BlastAutoPickup.firstEligibleItem(heap,
+                item -> (BlastAutoPickup.isPickupType(item,
+                            BlastAutoPickupPolicy::isInstantPickup)
+                        || BlastAutoEquipment.canPickup(hero, item))
+                        && BlastAutoPickup.canCollect(hero, item,
+                                BlastAutoPickupPolicy::isInstantPickup));
+    }
+
+    private static boolean hasRoomLoot(Hero hero, Level level, ToxicGasRoom room) {
+        for (Heap heap : level.heaps.valueList()) {
+            if (!heap.isEmpty() && room.inside(level.cellToPoint(heap.pos))
+                    && pendingContainer(heap.type,
+                            heap.type == Heap.Type.HEAP && collectibleItem(hero, heap) != null))
+                return true;
+        }
+        return false;
+    }
+
+    /** Permit toxic gas in this one room; keep all other movement restrictions. */
+    private static boolean[] lootRoute(Hero hero, Level level, ToxicGasRoom room,
+                                        boolean[] safe, Blob[] hazards, boolean[] barriers) {
+        boolean[] route = safe.clone();
+        int door = level.pointToCell(room.entrance());
+        for (int y = room.top; y <= room.bottom; y++) {
+            for (int x = room.left; x <= room.right; x++) {
+                int cell = x + y * level.width();
+                if (!level.insideMap(cell) || (cell != door
+                        && !room.inside(level.cellToPoint(cell)))) continue;
+                if (!level.passable[cell] || level.pit[cell]
+                        || (level.solid[cell] && level.map[cell] != Terrain.DOOR)
+                        || barriers[cell] || !BlastAutoPlay.isTrapSafe(level.traps.get(cell))
+                        || AutoPlayPlantSafety.isHarmful(level.plants.get(cell))) continue;
+                boolean otherHazard = false;
+                for (Blob hazard : hazards) {
+                    if (hazard == null) break;
+                    if (hazard.cur[cell] > 0 && !(hazard instanceof ToxicGas)) {
+                        otherHazard = true;
+                        break;
+                    }
+                }
+                if (!otherHazard) {
+                    Char occupant = Actor.findChar(cell);
+                    if (occupant == null || occupant == hero) route[cell] = true;
+                }
+            }
+        }
+        return route;
+    }
+
+    private static Heap closestRoomLoot(Hero hero, Level level,
+                                         ToxicGasRoom room, int[] distances) {
+        Heap closest = null;
+        int shortest = Integer.MAX_VALUE;
+        for (Heap heap : level.heaps.valueList()) {
+            if (heap.isEmpty() || !level.insideMap(heap.pos)
+                    || !room.inside(level.cellToPoint(heap.pos))
+                    || !pendingContainer(heap.type, heap.type == Heap.Type.HEAP
+                        && collectibleItem(hero, heap) != null)) continue;
+            if (distances[heap.pos] < shortest) {
+                closest = heap;
+                shortest = distances[heap.pos];
+            }
+        }
+        return closest;
+    }
+
+    /** Use native OpenChest and PickUp actions until no eligible loot remains. */
+    private static BlastAutoSpecialRooms.Action collectRoom(Hero hero, Level level,
+            ToxicGasRoom room, boolean[] safe, Blob[] hazards, boolean[] barriers) {
+        boolean[] route = lootRoute(hero, level, room, safe, hazards, barriers);
+        PathFinder.buildDistanceMap(hero.pos, route);
+        int[] distances = PathFinder.distance;
+        Heap closest = closestRoomLoot(hero, level, room, distances);
+        if (closest == null) return BlastAutoSpecialRooms.Action.NONE;
+        int target = closest.pos;
+        if (closest.type != Heap.Type.HEAP
+                && (hero.pos == target || level.adjacent(hero.pos, target))) {
+            hero.curAction = new HeroAction.OpenChest(target);
+        } else if (hero.pos == target) {
+            Item item = collectibleItem(hero, closest);
+            if (item == null) return BlastAutoSpecialRooms.Action.NONE;
+            BlastAutoPickup.preparePickup(hero, closest, item);
+            hero.curAction = new HeroAction.PickUp(target);
+        } else if (!hero.rooted) {
+            hero.curAction = new HeroAction.Move(BlastAutoPlay.firstStep(target, route, distances));
+        } else {
+            return BlastAutoSpecialRooms.Action.NONE;
+        }
+        return BlastAutoSpecialRooms.Action.MOVE;
+    }
+
+    /** Called before generic gas escape, only while physically inside the room. */
+    static BlastAutoSpecialRooms.Action continueLoot(Hero hero, boolean[] safe,
+            Blob[] hazards, boolean[] barriers) {
+        Level level = Dungeon.level;
+        ToxicGasRoom room = knownRoom(level);
+        if (room == null || !room.inside(level.cellToPoint(hero.pos))
+                || hero.belongings.lostInventory()) return BlastAutoSpecialRooms.Action.NONE;
+        return collectRoom(hero, level, room, safe, hazards, barriers);
+    }
+
+    /** Drink by the doorway, avoiding consumption before a long approach. */
+    private static int drinkStand(Level level, ToxicGasRoom room, boolean[] safe,
+                                   int[] distances) {
+        int door = level.pointToCell(room.entrance());
+        if (safe[door] && distances[door] != Integer.MAX_VALUE) return door;
+        for (int offset : PathFinder.NEIGHBOURS4) {
+            int cell = door + offset;
+            if (level.insideMap(cell) && !room.inside(level.cellToPoint(cell))
+                    && safe[cell] && distances[cell] != Integer.MAX_VALUE) return cell;
+        }
+        return -1;
     }
 
     /** A floor heap wedges an open door and is retrieved after the gas clears. */
@@ -212,7 +339,10 @@ final class BlastAutoToxicRoom {
         boolean gas = gasInside(level, room);
         AquaBrew aqua = hero.belongings.getItem(AquaBrew.class);
         boolean hasAqua = aqua != null && aqua.quantity() > 0;
+        boolean pending = hasRoomLoot(hero, level, room);
 
+        // Flood a live vent if possible; otherwise enter to collect the room loot.
+        // The usual identification requirement does not apply to Purity here.
         if (sourceActive && hasAqua) {
             BlastAutoAqua.Action action = BlastAutoAqua.chooseAction(
                     hero, safe, distances, room, -1, hazards, specialBarriers);
@@ -220,6 +350,33 @@ final class BlastAutoToxicRoom {
                 return BlastAutoSpecialRooms.Action.MOVE;
             if (action == BlastAutoAqua.Action.THROW)
                 return BlastAutoSpecialRooms.Action.USE;
+        }
+        if (pending) {
+            PotionOfPurity purity = hero.belongings.getItem(PotionOfPurity.class);
+            if (gas && hero.buff(BlobImmunity.class) == null
+                    && purity != null && purity.quantity() > 0) {
+                int stand = drinkStand(level, room, safe, distances);
+                if (stand >= 0) {
+                    boolean[] crossing = lootRoute(
+                            hero, level, room, safe, hazards, specialBarriers);
+                    PathFinder.buildDistanceMap(stand, crossing);
+                    if (closestRoomLoot(hero, level, room, PathFinder.distance) == null)
+                        return BlastAutoSpecialRooms.Action.NONE;
+                    if (hero.pos != stand && !hero.rooted) {
+                        hero.curAction = new HeroAction.Move(
+                                BlastAutoPlay.firstStep(stand, safe, distances));
+                        return BlastAutoSpecialRooms.Action.MOVE;
+                    }
+                    if (hero.pos == stand) {
+                        BlastLog.debug("auto-toxic action=drink-purity known=" + purity.isKnown());
+                        purity.execute(hero, Potion.AC_DRINK);
+                        return BlastAutoSpecialRooms.Action.USE;
+                    }
+                }
+            }
+            BlastAutoSpecialRooms.Action collect = collectRoom(
+                    hero, level, room, safe, hazards, specialBarriers);
+            if (collect != BlastAutoSpecialRooms.Action.NONE) return collect;
         }
         if (!holdDoor(sourceActive, hasAqua, gas))
             return BlastAutoSpecialRooms.Action.NONE;

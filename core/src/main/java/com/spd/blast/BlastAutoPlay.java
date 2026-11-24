@@ -657,6 +657,14 @@ public final class BlastAutoPlay {
         progress.refreshHazards(Dungeon.level.length(),
                 cell -> BlastAutoEnvironment.hazardousAt(cell, hazards)
                         || specialBarriers[cell]);
+
+        // Finish toxic-room loot even without protection; generic gas retreat
+        // must not interrupt a deliberate crossing.
+        debugDecision = "toxic-room-loot";
+        BlastAutoSpecialRooms.Action toxicLoot = BlastAutoToxicRoom.continueLoot(
+                hero, safe, hazards, specialBarriers);
+        if (toxicLoot != BlastAutoSpecialRooms.Action.NONE) return false;
+
         int toxicRetreat = BlastAutoTrapClearer.gasRetreatStep(hero, safe);
 
         // Persistent test invulnerability allows attacking before leaving gas.
