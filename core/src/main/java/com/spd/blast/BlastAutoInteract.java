@@ -19,8 +19,6 @@ import com.watabou.utils.PathFinder;
 
 /** Automated native interactions with discovered containers and keyed doors. */
 public final class BlastAutoInteract {
-    private static int lastVaultInteraction = -1;
-
     private BlastAutoInteract() {}
 
     static boolean canOpen(Heap.Type type, int goldenKeys, int crystalKeys) {
@@ -66,13 +64,17 @@ public final class BlastAutoInteract {
                     && hero.belongings.getItem(DwarfToken.class).quantity() >= 10;
             ready |= mob instanceof VaultMirror && ((VaultMirror) mob).reward != null;
             if (!ready || !mob.isAlive() || !hero.fieldOfView[mob.pos]
-                    || mob.id() == lastVaultInteraction) continue;
+) continue;
             int candidate = nearestStand(level, mob.pos, false, safe, distances);
             if (candidate < 0) continue;
             if (hero.pos == candidate) {
-                // Native dialog still requires the player to confirm the reward.
-                lastVaultInteraction = mob.id();
-                hero.curAction = new HeroAction.Interact(mob);
+                if (mob instanceof VaultTokenDoor) {
+                    if (!((VaultTokenDoor) mob).autoUnlock(hero))
+                        throw new IllegalStateException("Vault token door became unavailable");
+                } else {
+                    if (!((VaultMirror) mob).autoCollect(hero))
+                        throw new IllegalStateException("Vault mirror reward became unavailable");
+                }
             } else {
                 hero.curAction = new HeroAction.Move(
                         BlastAutoPlay.firstStep(candidate, safe, distances));
