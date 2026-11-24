@@ -488,9 +488,12 @@ final class BlastAutoEquipment {
             ClassArmor classArmor = (ClassArmor) current;
             if (wouldLoseProtectedClassGlyph(classArmor, best)) return false;
             float charge = classArmor.charge;
+            com.shatteredpixel.shatteredpixeldungeon.actors.hero.abilities.ArmorAbility ability =
+                    hero.armorAbility;
             classArmor.transferStatsFrom(hero, best);
-            if (hero.belongings.armor() != classArmor || classArmor.charge != charge) {
-                throw new IllegalStateException("Hero ability armor or its charge was lost");
+            if (hero.belongings.armor() != classArmor || classArmor.charge != charge
+                    || hero.armorAbility != ability || hero.belongings.contains(best)) {
+                throw new IllegalStateException("Hero armor ability transfer was incomplete");
             }
             hero.spendAndNext(com.shatteredpixel.shatteredpixeldungeon.actors.Actor.TICK);
             return true;
