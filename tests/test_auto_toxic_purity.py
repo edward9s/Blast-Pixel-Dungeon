@@ -18,8 +18,11 @@ class ToxicCatalystPurityTest(unittest.TestCase):
         self.assertNotIn("!potion.isKnown()", TOXIC)
         self.assertNotIn("potion.isKnown() &&", TOXIC)
         self.assertIn("potion.execute(hero, Potion.AC_DRINK);", TOXIC)
-        self.assertIn("if (!collectibleCatalyst(hero, heap))", TOXIC)
-        self.assertIn("if (safe[treasure] && distances[treasure] != Integer.MAX_VALUE)", TOXIC)
+        self.assertIn("!collectibleCatalyst(hero, level.heaps.get(catalyst))", TOXIC)
+        self.assertIn("if (allSafe) return BlastAutoSpecialRooms.Action.NONE;", TOXIC)
+        self.assertIn("Heap.Type.SKELETON", TOXIC)
+        self.assertIn("int[] order = shortestOrder(steps);", TOXIC)
+        self.assertIn("for (Heap heap : loot) actions += roomActions(hero, heap);", TOXIC)
 
     def test_crossing_preserves_risk_and_duration_guards(self):
         self.assertIn("item instanceof TrinketCatalyst", TOXIC)
@@ -30,8 +33,10 @@ class ToxicCatalystPurityTest(unittest.TestCase):
         self.assertIn("Actor.findChar(cell)", TOXIC)
         self.assertIn("enoughPurity(immunity.cooldown()", TOXIC)
         self.assertIn("int stand = purityStand(level, room, door, safe, distances);", TOXIC)
-        self.assertIn("new HeroAction.OpenChest(purityTreasure)", TOXIC)
-        self.assertIn("new HeroAction.PickUp(purityTreasure)", TOXIC)
+        self.assertIn("new HeroAction.OpenChest(target)", TOXIC)
+        self.assertIn("new HeroAction.PickUp(target)", TOXIC)
+        self.assertIn("purityTargets = new int[order.length];", TOXIC)
+        self.assertIn("purityIndex++", TOXIC)
         self.assertIn("attemptedPurityTreasure = treasure;", TOXIC)
 
     def test_retreat_order_and_reset(self):
@@ -41,7 +46,8 @@ class ToxicCatalystPurityTest(unittest.TestCase):
         self.assertIn("BlastAutoToxicRoom.reset();", ROOMS)
         self.assertIn("BlastAutoToxicRoom.chooseAction(", AUTO)
         self.assertIn("purityEntrance = -1;", TOXIC)
-        self.assertIn("purityTreasure = -1;", TOXIC)
+        self.assertIn("purityTargets = new int[0];", TOXIC)
+        self.assertIn("purityIndex = 0;", TOXIC)
 
 
 if __name__ == "__main__":
