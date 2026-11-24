@@ -18,7 +18,6 @@ NATIVE_TRANSFER = (
     + "\t" * 8 + "}\n"
     + "\t" * 8 + "level(armor.trueLevel());\n"
     + "\t" * 8 + "tier = armor.tier;\n"
-    + "\t" * 8 + "charge = charge;\n"
     + "\n"
 )
 
