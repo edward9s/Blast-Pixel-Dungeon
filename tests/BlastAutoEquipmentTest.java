@@ -18,6 +18,9 @@ import com.shatteredpixel.shatteredpixeldungeon.items.weapon.enchantments.Vampir
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.enchantments.Venomous;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.enchantments.Vorpal;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.Dagger;
+import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.Glaive;
+import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.Greatsword;
+import com.shatteredpixel.shatteredpixeldungeon.items.weapon.enchantments.Crystal;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.Shortsword;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.enchantments.Blazing;
 import com.shatteredpixel.shatteredpixeldungeon.items.artifacts.DriedRose;
@@ -165,6 +168,45 @@ public final class BlastAutoEquipmentTest {
                 "Faster attacks should protect an otherwise weaker weapon");
         check(!BlastAutoEquipment.isRedundant(privileged, superiorWeapon),
                 "Augmented weapon cannot be marked redundant");
+
+        // A +0 glaive's extra reach must not preserve it against a +14
+        // crystal-enchanted greatsword with overwhelmingly higher damage.
+        Greatsword dominantGreatsword = new Greatsword();
+        dominantGreatsword.level(14);
+        dominantGreatsword.enchant(new Crystal());
+        Glaive obsoleteGlaive = new Glaive();
+        check(!BlastAutoEquipment.weaponDominates(dominantGreatsword, obsoleteGlaive),
+                "The original strict comparison must recognize the glaive's longer reach");
+        check(BlastAutoEquipment.weaponOverwhelms(dominantGreatsword, obsoleteGlaive),
+                "A +14 greatsword must overwhelmingly outclass a +0 glaive");
+        check(BlastAutoEquipment.isRedundant(obsoleteGlaive, dominantGreatsword),
+                "Unenchanted +0 glaive should be sold with Alchemize");
+        check(!BlastAutoEquipment.worthPickingWithoutAlchemize(obsoleteGlaive,
+                        Collections.<Item>singletonList(dominantGreatsword), null, 20),
+                "Without Alchemize, do not hoard a +0 glaive with a +14 greatsword");
+
+        Greatsword comparableGreatsword = new Greatsword();
+        comparableGreatsword.level(3);
+        check(!BlastAutoEquipment.weaponOverwhelms(comparableGreatsword, obsoleteGlaive),
+                "A modest damage advantage must not discard a reach alternative");
+        check(!BlastAutoEquipment.isRedundant(obsoleteGlaive, comparableGreatsword),
+                "Reach advantage is still worth keeping when damage is comparable");
+
+        obsoleteGlaive.DLY = 0.5f;
+        check(!BlastAutoEquipment.isRedundant(obsoleteGlaive, dominantGreatsword),
+                "A genuinely faster long-reach weapon still has tactical value");
+        obsoleteGlaive.DLY = 1.5f;
+        obsoleteGlaive.ACC = 2f;
+        check(!BlastAutoEquipment.isRedundant(obsoleteGlaive, dominantGreatsword),
+                "A more accurate long-reach weapon should remain a backup");
+        obsoleteGlaive.ACC = 1f;
+        obsoleteGlaive.enchant(new Grim());
+        check(!BlastAutoEquipment.isRedundant(obsoleteGlaive, dominantGreatsword),
+                "Protected weapon enchantments override numeric obsolescence");
+        obsoleteGlaive.enchant(null);
+        obsoleteGlaive.augment = Weapon.Augment.DAMAGE;
+        check(!BlastAutoEquipment.isRedundant(obsoleteGlaive, dominantGreatsword),
+                "Stone-augmented weapons must not be sold automatically");
 
         LeatherArmor inferiorArmor = new LeatherArmor();
         LeatherArmor superiorArmor = new LeatherArmor();
