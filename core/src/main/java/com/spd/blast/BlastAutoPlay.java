@@ -55,6 +55,7 @@ public final class BlastAutoPlay {
     private static String lastLootTrace;
     private static int repeatedLootTrace;
     private static volatile boolean manualAction;
+    private static int pausedVaultDestination = -1;
     private static volatile int interruptedDestination = -1;
     private static int blockedTravelTurns;
     private static volatile Hero manualConfirmationHero;
@@ -192,6 +193,7 @@ public final class BlastAutoPlay {
         repeatedLootTrace = 0;
         manualAction = false;
         manualConfirmationHero = null;
+        pausedVaultDestination = -1;
         clearInterruptedTravel();
         pendingManualInput.set(null);
         waitingForInput = false;
@@ -395,15 +397,19 @@ public final class BlastAutoPlay {
             return true;
         }
         ManualCell cell = (ManualCell) input;
+        pausedVaultDestination = -1;
         // Route map-click travel through the same one-step hazard checks as auto-play.
         // Native Hero.getCloser() otherwise caches an unsafe path across flame cycles.
-        if (!isPaused()
-                && Dungeon.level instanceof com.shatteredpixel.shatteredpixeldungeon.levels.VaultLevel
+        if (Dungeon.level instanceof com.shatteredpixel.shatteredpixeldungeon.levels.VaultLevel
                 && cell.destination != hero.pos
                 && com.shatteredpixel.shatteredpixeldungeon.actors.Actor.findChar(cell.destination) == null
                 && Dungeon.level.passable[cell.destination]) {
-            interruptedDestination = cell.destination;
-            blockedTravelTurns = 0;
+            if (isPaused()) {
+                pausedVaultDestination = cell.destination;
+            } else {
+                interruptedDestination = cell.destination;
+                blockedTravelTurns = 0;
+            }
             manualAction = false;
             manualConfirmationHero = null;
             hero.curAction = null;
@@ -445,6 +451,43 @@ public final class BlastAutoPlay {
             throw new IllegalArgumentException("Cannot restore pause without a hero");
         }
         pausedHero = paused ? hero : null;
+    }
+
+    /** Execute only a player-requested vault route while auto-play is paused. */
+    public static boolean performPausedVaultTravel(Hero hero) {
+        if (!isPaused() || pausedVaultDestination < 0) return false;
+        Level level = Dungeon.level;
+        if (!(level instanceof com.shatteredpixel.shatteredpixeldungeon.levels.VaultLevel)
+                || !level.insideMap(pausedVaultDestination)) {
+            pausedVaultDestination = -1;
+            return false;
+        }
+        if (hero.pos == pausedVaultDestination) {
+            pausedVaultDestination = -1;
+            return false;
+        }
+        Blob[] hazards = BlastAutoEnvironment.activeHazards(level);
+        boolean[] safe = safeCells(hero, hazards,
+                BlastAutoEnvironment.activeSpecialBarriers(level));
+        PathFinder.buildDistanceMap(hero.pos, safe);
+        int[] distances = PathFinder.distance.clone();
+        if (safe[pausedVaultDestination]
+                && distances[pausedVaultDestination] != Integer.MAX_VALUE) {
+            hero.curAction = new HeroAction.Move(
+                    firstStep(pausedVaultDestination, safe, distances));
+            return false;
+        }
+        int step = BlastAutoVault.nextFlameStep(hero, level, pausedVaultDestination, safe);
+        if (step >= 0) {
+            if (safe[step]) {
+                hero.curAction = new HeroAction.Move(step);
+                return false;
+            }
+            hero.spendAndNext(Actor.TICK);
+            return true;
+        }
+        pausedVaultDestination = -1;
+        return false;
     }
 
     /** Pause is scoped to the current hero and does not change the enabled setting. */
