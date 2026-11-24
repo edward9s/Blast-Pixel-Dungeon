@@ -397,7 +397,8 @@ public final class BlastAutoPlay {
         ManualCell cell = (ManualCell) input;
         // Route map-click travel through the same one-step hazard checks as auto-play.
         // Native Hero.getCloser() otherwise caches an unsafe path across flame cycles.
-        if (Dungeon.level instanceof com.shatteredpixel.shatteredpixeldungeon.levels.VaultLevel
+        if (!isPaused()
+                && Dungeon.level instanceof com.shatteredpixel.shatteredpixeldungeon.levels.VaultLevel
                 && cell.destination != hero.pos
                 && com.shatteredpixel.shatteredpixeldungeon.actors.Actor.findChar(cell.destination) == null
                 && Dungeon.level.passable[cell.destination]) {
