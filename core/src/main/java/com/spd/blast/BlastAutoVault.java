@@ -55,6 +55,46 @@ final class BlastAutoVault {
         return best;
     }
 
+    /**
+     * A laser's current ray blocks only the next action. Wait on a safe tile
+     * when the ray prevents reaching otherwise traversable known floor.
+     */
+    static boolean waitForLaser(Hero hero, Level level, boolean[] safe,
+                                int[] distances) {
+        if (!(level instanceof VaultLevel) || !safe[hero.pos]) return false;
+        boolean[] blocked = new boolean[level.length()];
+        boolean firing = false;
+        for (Mob mob : level.mobs) {
+            if (!(mob instanceof VaultLaser) || !mob.isAlive()) continue;
+            VaultLaser laser = (VaultLaser) mob;
+            if (laser.curCooldown > 1) continue;
+            if (laser.laserDirs == null || laser.laserDirs.length == 0
+                    || laser.laserDirIdx < 0 || laser.laserDirIdx >= laser.laserDirs.length)
+                throw new IllegalStateException("Invalid vault laser sequence");
+            Ballistica beam = new Ballistica(laser.pos,
+                    laser.laserDirs[laser.laserDirIdx], Ballistica.STOP_SOLID);
+            for (int cell : beam.subPath(1, beam.dist)) blocked[cell] = true;
+            firing = true;
+        }
+        if (!firing) return false;
+
+        // A ray must actually separate the hero from a known, passable goal.
+        // Do not wait merely because an unrelated laser fires elsewhere.
+        boolean[] open = safe.clone();
+        for (int cell = 0; cell < open.length; cell++) {
+            if (blocked[cell] && !level.solid[cell] && !level.pit[cell]
+                    && (level.visited[cell] || level.mapped[cell] || hero.fieldOfView[cell])
+                    && level.passable[cell]) open[cell] = true;
+        }
+        PathFinder.buildDistanceMap(hero.pos, open);
+        for (int cell = 0; cell < open.length; cell++) {
+            if (!blocked[cell] || !open[cell] || distances[cell] != Integer.MAX_VALUE
+                    || PathFinder.distance[cell] == Integer.MAX_VALUE) continue;
+            return true;
+        }
+        return false;
+    }
+
     static boolean drinkPurity(Hero hero, Level level) {
         if (!(level instanceof RegularLevel) || hero.buff(BlobImmunity.class) != null
                 || hero.belongings.lostInventory()) return false;
