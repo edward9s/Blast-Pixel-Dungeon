@@ -284,6 +284,12 @@ public final class BlastAutoPlay {
             hero.curAction = new HeroAction.Move(firstStep(interruptedDestination, safe, distances));
             return true;
         }
+        // A periodic flame corridor needs a turn to change phase. Keep the clicked
+        // destination while its next step is temporarily unsafe.
+        if (BlastAutoVault.waitForFlames(hero, Dungeon.level, safe)) {
+            hero.spendAndNext(Actor.TICK);
+            return true;
+        }
         // Allow transient enemies, doors or hazards to clear; never wait indefinitely.
         if (++blockedTravelTurns >= BLOCKED_TRAVEL_TURNS) clearInterruptedTravel();
         return false;
@@ -382,6 +388,20 @@ public final class BlastAutoPlay {
             return true;
         }
         ManualCell cell = (ManualCell) input;
+        // Route map-click travel through the same one-step hazard checks as auto-play.
+        // Native Hero.getCloser() otherwise caches an unsafe path across flame cycles.
+        if (Dungeon.level instanceof com.shatteredpixel.shatteredpixeldungeon.levels.VaultLevel
+                && cell.destination != hero.pos
+                && com.shatteredpixel.shatteredpixeldungeon.actors.Actor.findChar(cell.destination) == null
+                && Dungeon.level.passable[cell.destination]) {
+            interruptedDestination = cell.destination;
+            blockedTravelTurns = 0;
+            manualAction = false;
+            manualConfirmationHero = null;
+            hero.curAction = null;
+            hero.lastAction = null;
+            return false;
+        }
         if (!hero.handle(cell.destination)) {
             throw new IllegalStateException("Queued manual destination was rejected: " + cell.destination);
         }
