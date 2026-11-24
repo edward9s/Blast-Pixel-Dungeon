@@ -25,11 +25,13 @@ final class BlastAutoEquipment {
     private static final ThreadLocal<Boolean> automaticItemUse = new ThreadLocal<>();
     private static final ArrayDeque<Item> replacedEquipment = new ArrayDeque<>();
     private static Item pendingCursedPickup;
+    private static boolean pendingStrengthCleanup;
 
     private BlastAutoEquipment() {}
 
     static void reset() {
         pendingCursedPickup = null;
+        pendingStrengthCleanup = false;
         replacedEquipment.clear();
     }
 
@@ -88,6 +90,21 @@ final class BlastAutoEquipment {
         return !isCursed(armor) && armor.STRReq(armor.trueLevel()) <= hero.STR();
     }
 
+    /** Preserve enchanted or inscribed equipment, even when its strength requirement is unmet. */
+    static boolean isUnwearableForSale(Item item, int strength) {
+        if (item instanceof MeleeWeapon) {
+            MeleeWeapon weapon = (MeleeWeapon) item;
+            return weapon.enchantment == null
+                    && weapon.STRReq(weapon.trueLevel()) > strength;
+        }
+        if (item instanceof Armor) {
+            Armor armor = (Armor) item;
+            return armor.glyph == null && armor.checkSeal() == null
+                    && armor.STRReq(armor.trueLevel()) > strength;
+        }
+        return false;
+    }
+
     private static boolean sellWithAlchemize(Hero hero, Item item) {
         Alchemize spell = availableAlchemize(hero);
         if (spell == null || item.isEquipped(hero)
@@ -108,12 +125,17 @@ final class BlastAutoEquipment {
     private static boolean drinkStrength(Hero hero) {
         PotionOfStrength potion = hero.belongings.getItem(PotionOfStrength.class);
         if (potion == null || potion.quantity() <= 0) return false;
+        int previousStrength = hero.STR();
         automaticItemUse.set(true);
         try {
             potion.execute(hero, Potion.AC_DRINK);
         } finally {
             automaticItemUse.remove();
         }
+        if (hero.STR() <= previousStrength) {
+            throw new IllegalStateException("Automatic strength potion did not raise strength");
+        }
+        pendingStrengthCleanup = true;
         return true;
     }
 
@@ -146,6 +168,25 @@ final class BlastAutoEquipment {
             replacedEquipment.removeFirst();
             return true;
         }
+        return false;
+    }
+
+    /** Sell still-unwearable backpack gear only after automatic strength drinking. */
+    private static boolean sellUnwearableAfterStrength(Hero hero) {
+        if (!pendingStrengthCleanup) return false;
+        if (availableAlchemize(hero) == null) {
+            pendingStrengthCleanup = false;
+            return false;
+        }
+        for (Item item : hero.belongings.getAllItems(Item.class)) {
+            if (!isUnwearableForSale(item, hero.STR())
+                    || item.isEquipped(hero) || !Shopkeeper.canSell(item)) continue;
+            if (!sellWithAlchemize(hero, item)) {
+                throw new IllegalStateException("Unwearable equipment could not be sold");
+            }
+            return true;
+        }
+        pendingStrengthCleanup = false;
         return false;
     }
 
@@ -205,6 +246,7 @@ final class BlastAutoEquipment {
         if (sellReplaced(hero)) return true;
         if (sellCursedPickup(hero)) return true;
         if (drinkStrength(hero)) return true;
+        if (sellUnwearableAfterStrength(hero)) return true;
         return equipBetterWeapon(hero) || equipBetterArmor(hero);
     }
 }
