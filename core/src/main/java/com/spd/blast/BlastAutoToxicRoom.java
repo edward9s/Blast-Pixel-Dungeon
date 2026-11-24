@@ -164,7 +164,7 @@ final class BlastAutoToxicRoom {
         if (safe[door] && distances[door] != Integer.MAX_VALUE) return door;
         int best = -1;
         int shortest = Integer.MAX_VALUE;
-        for (int offset : PathFinder.NEIGHBOURS8) {
+        for (int offset : PathFinder.NEIGHBOURS4) {
             int cell = door + offset;
             if (!level.insideMap(cell) || room.inside(level.cellToPoint(cell))
                     || !safe[cell] || distances[cell] >= shortest) continue;
