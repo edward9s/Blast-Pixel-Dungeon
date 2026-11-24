@@ -73,8 +73,8 @@ public final class BlastAutoToxicRoomTest {
         check(visit != null && visit.length == 3
                 && visit[0] == 0 && visit[1] == 1 && visit[2] == 2,
                 "shortest toxic-room trip must visit chest, chest, skeleton in order");
-        check(BlastAutoToxicRoom.enoughPurity(19f, 12, 0, 4, 1f),
-                "one Purity must allow the three-container trip when time permits");
+        check(BlastAutoToxicRoom.enoughPurity(19f, 10, 0, 6, 1f),
+                "one Purity must cover three openings, three pickups and the return trip");
         int[][] blocked = {
                 {0, 1, Integer.MAX_VALUE},
                 {1, 0, Integer.MAX_VALUE},
