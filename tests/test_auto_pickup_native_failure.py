@@ -18,23 +18,23 @@ class NativeAutoPickupTests(unittest.TestCase):
         action = PICKUP.split("public static boolean chooseAction(", 1)[1].split(
             "static boolean isPickupType(", 1
         )[0]
-        self.assertNotIn("retryTurns = RETRY_TURNS;", action)
+        self.assertNotIn("retries.put(item, RETRY_TURNS);", action)
         callback = PICKUP.split("public static void onPickupFailure(", 1)[1].split(
             "static boolean knownLoot(", 1
         )[0]
         self.assertIn("item == attemptedItem && cell == attemptedCell", callback)
         self.assertIn("hero == currentHero && Dungeon.level == currentLevel", callback)
-        self.assertIn("retryTurns = RETRY_TURNS;", callback)
+        self.assertIn("retries.put(item, RETRY_TURNS);", callback)
 
     def test_buried_loot_uses_native_pickup_after_reordering(self):
         action = PICKUP.split("public static boolean chooseAction(", 1)[1].split(
             "static String nearbyDiagnostic(", 1
         )[0]
         self.assertIn("firstEligibleItem(heap, candidate ->", action)
-        self.assertIn("exposeForPickup(nearestHeap, nearestItem);", action)
+        self.assertIn("preparePickup(hero, nearestHeap, nearestItem);", action)
         self.assertIn("hero.curAction = new HeroAction.PickUp(nearest);", action)
         self.assertLess(action.index("if (nearest == hero.pos)"),
-                        action.index("exposeForPickup(nearestHeap, nearestItem);"))
+                        action.index("preparePickup(hero, nearestHeap, nearestItem);"))
         self.assertIn("for (Item item : heap.items)", PICKUP)
         self.assertIn("heap.items.addFirst(item);", PICKUP)
 

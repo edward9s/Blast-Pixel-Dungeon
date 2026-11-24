@@ -46,16 +46,25 @@ final class BlastAutoEquipment {
     // Equipment replaced when Alchemize was unavailable is never sold retroactively.
     private static final Set<Item> retainedEquipment =
             Collections.newSetFromMap(new IdentityHashMap<Item, Boolean>());
-    private static Item pendingCursedPickup;
+    private static Item pendingSale;
     private static boolean pendingStrengthCleanup;
 
     private BlastAutoEquipment() {}
 
     static void reset() {
-        pendingCursedPickup = null;
+        resetActions();
+        retainedEquipment.clear();
+    }
+
+    private static void resetActions() {
+        pendingSale = null;
         pendingStrengthCleanup = false;
         replacedEquipment.clear();
-        retainedEquipment.clear();
+    }
+
+    static void enterLevel(Hero hero) {
+        resetActions();
+        retainedEquipment.removeIf(item -> !hero.belongings.contains(item));
     }
 
     static boolean isUsingAutomatically() {
@@ -76,13 +85,20 @@ final class BlastAutoEquipment {
         return spell != null && spell.quantity() > 0 ? spell : null;
     }
 
+    private enum Pickup { SKIP, KEEP, SELL }
+
     static boolean canPickup(Hero hero, Item item) {
-        if (!(item instanceof MeleeWeapon || item instanceof Armor)) return false;
-        boolean alchemizeAvailable = !hero.belongings.lostInventory()
-                && availableAlchemize(hero) != null;
-        return canPickup(item, alchemizeAvailable)
-                && (alchemizeAvailable || worthPickingWithoutAlchemize(
-                        item, hero.belongings, hero.belongings.armor(), hero.STR()));
+        return pickup(hero, item) != Pickup.SKIP;
+    }
+
+    private static Pickup pickup(Hero hero, Item item) {
+        if (!(item instanceof MeleeWeapon || item instanceof Armor)) return Pickup.SKIP;
+        boolean canSell = !hero.belongings.lostInventory() && availableAlchemize(hero) != null
+                && Shopkeeper.canSell(item);
+        if (isCursed(item)) return canSell ? Pickup.SELL : Pickup.SKIP;
+        if (worthPickingWithoutAlchemize(
+                item, hero.belongings, hero.belongings.armor(), hero.STR())) return Pickup.KEEP;
+        return canSell && isSaleCandidate(hero, item) ? Pickup.SELL : Pickup.SKIP;
     }
 
     static boolean blocksCursedPickup(Hero hero, Item item) {
@@ -138,21 +154,28 @@ final class BlastAutoEquipment {
         return false;
     }
 
+    private static boolean isSaleCandidate(Hero hero, Item item) {
+        if (retainedEquipment.contains(item)) return false;
+        Item equipped = item instanceof MeleeWeapon ? hero.belongings.weapon()
+                : item instanceof Armor ? hero.belongings.armor() : null;
+        return isRedundant(item, equipped);
+    }
+
     /** Mark the exact auto-selected item before native pickup begins. */
-    static void onPickupScheduled(Item item) {
-        pendingCursedPickup = isCursed(item) ? item : null;
+    static void onPickupScheduled(Hero hero, Item item) {
+        pendingSale = pickup(hero, item) == Pickup.SELL ? item : null;
     }
 
     static void onPickupFailed(Item item) {
-        if (pendingCursedPickup == item) pendingCursedPickup = null;
+        if (pendingSale == item) pendingSale = null;
     }
 
     /** Sell in Hero.actPickUp's success branch, without waiting for another AI turn. */
     static void onPickupCompleted(Hero hero, Item item) {
-        if (pendingCursedPickup != item) return;
-        pendingCursedPickup = null;
+        if (pendingSale != item) return;
+        pendingSale = null;
         if (!sellWithAlchemize(hero, item)) {
-            throw new IllegalStateException("Automatically collected cursed gear could not be sold");
+            throw new IllegalStateException("Equipment collected for sale could not be sold");
         }
     }
 

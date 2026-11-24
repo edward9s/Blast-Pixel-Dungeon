@@ -4,9 +4,9 @@ import java.util.function.IntPredicate;
 
 /** Tracks unsafe retreats and temporary failed steps per automatic task. */
 final class BlastAutoProgressGuard {
-    enum Intent { OTHER, TRAVEL, PICKUP, INTERACT, ROAM, HARVEST, FARM, RETREAT }
+    enum Intent { OTHER, TRAVEL, PICKUP, CRYSTAL, INTERACT, ROAM, HARVEST, FARM, RETREAT }
 
-    private static final int HISTORY_SIZE = 7;
+    private static final int HISTORY_SIZE = 9;
     private static final int MAX_BLOCKED_CELLS = 12;
     private static final int FAILED_MOVE_LIMIT = 3;
     private static final int TRANSIENT_BLOCK_TURNS = 12;
@@ -156,12 +156,9 @@ final class BlastAutoProgressGuard {
     }
 
     private void detectLoop() {
-        for (int period = 2; period <= 3; period++) {
+        for (int period = 2; period <= 4; period++) {
             if (historySize < 2 * period + 1) continue;
             boolean repeated = true;
-            boolean idle = false;
-            boolean mixedIntents = false;
-            Intent priorIntent = null;
             for (int step = 0; step < period + 1; step++) {
                 if (positions[historySize - 1 - step]
                         != positions[historySize - 1 - period - step]) {
@@ -170,21 +167,13 @@ final class BlastAutoProgressGuard {
                 }
             }
             if (!repeated) continue;
-            for (int step = historySize - 2 * period; step < historySize; step++) {
-                Intent current = arrivals[step];
-                if (current != Intent.OTHER && current != Intent.RETREAT) {
-                    idle = true;
-                }
-                if (priorIntent != null && priorIntent != current) mixedIntents = true;
-                priorIntent = current;
-            }
-            if (idle && mixedIntents) {
-                // Exclude the repeated step only for the task that requested it.
-                int index = historySize - period;
-                if (arrivals[index] != Intent.OTHER && arrivals[index] != Intent.RETREAT) {
-                    block(positions[index], arrivals[index]);
-                }
+            // Block one repeated idle step without blocking combat or retreats.
+            for (int index = historySize - period; index < historySize; index++) {
+                Intent intent = arrivals[index];
+                if (intent == Intent.OTHER || intent == Intent.RETREAT) continue;
+                block(positions[index], intent);
                 historySize = 0;
+                return;
             }
             break;
         }

@@ -37,8 +37,8 @@ import java.util.Arrays;
 final class BlastAutoCrystalRooms {
     private static Level phaseLevel;
     private static SpecialRoom phaseRoom;
-    private static boolean phaseWasEnabled;
-    private static boolean phaseActive;
+    private static HeroAction.Move phaseMove;
+    private static boolean leaving;
     private static boolean lootPending;
     private static Item toStage;
     private static final Set<Item> staged = Collections.newSetFromMap(
@@ -47,17 +47,13 @@ final class BlastAutoCrystalRooms {
     private BlastAutoCrystalRooms() {}
 
     static void resetPhase() {
-        restorePhase();
+        phaseRoom = null;
+        phaseMove = null;
+        leaving = false;
         phaseLevel = null;
         lootPending = false;
         toStage = null;
         staged.clear();
-    }
-
-    private static void restorePhase() {
-        if (phaseActive) BlastSettings.setTestFreeMovement(phaseWasEnabled);
-        phaseRoom = null;
-        phaseActive = false;
     }
 
     /** Phase through remaining crystal locks after spending the last crystal key. */
@@ -66,6 +62,7 @@ final class BlastAutoCrystalRooms {
         if (phaseLevel != level) resetPhase();
         phaseLevel = level;
         toStage = null;
+        phaseMove = null;
         SpecialRoom room = null;
         if (level instanceof RegularLevel) {
             RegularLevel regular = (RegularLevel) level;
@@ -103,16 +100,13 @@ final class BlastAutoCrystalRooms {
                 }
             }
         }
-        if (phaseActive && (!ready || phaseRoom != room)) {
-            restorePhase();
-            BlastLog.debug("auto-crystal action=restore-phase");
-        }
-        if (ready && !phaseActive) {
-            phaseWasEnabled = BlastSettings.testFreeMovement();
-            phaseRoom = room;
-            phaseActive = true;
-            BlastSettings.setTestFreeMovement(true);
-            BlastLog.debug("auto-crystal action=enable-phase");
+        if (phaseRoom != null && (!ready || phaseRoom != room)
+                && containsActive(hero.pos)) {
+            leaving = true;
+            toStage = null;
+        } else {
+            leaving = false;
+            phaseRoom = ready ? room : null;
         }
     }
 
@@ -141,8 +135,23 @@ final class BlastAutoCrystalRooms {
      * Staged equipment is ignored so it cannot be immediately picked up again.
      */
     static boolean containsActive(int cell) {
-        return phaseActive && phaseLevel == Dungeon.level && phaseRoom != null
+        return hasRoute()
                 && phaseRoom.inside(Dungeon.level.cellToPoint(cell));
+    }
+
+    static boolean hasRoute() {
+        return phaseLevel == Dungeon.level && phaseRoom != null;
+    }
+
+    static boolean canCrossDoor(Hero hero, int cell) {
+        return phaseMove != null && hero != null && hero.curAction == phaseMove
+                && phaseMove.dst == cell && hasRoute()
+                && Dungeon.level.map[cell] == Terrain.CRYSTAL_DOOR;
+    }
+
+    private static void move(Hero hero, int cell) {
+        phaseMove = new HeroAction.Move(cell);
+        hero.curAction = phaseMove;
     }
 
     static boolean isStaged(Item item) {
@@ -159,8 +168,16 @@ final class BlastAutoCrystalRooms {
             item.doDrop(hero);
             return true;
         }
-        if (!phaseActive) return false;
+        if (!hasRoute()) return false;
         Level level = Dungeon.level;
+        if (leaving) {
+            int entrance = level.pointToCell(phaseRoom.entrance());
+            if (hero.rooted || !safe[entrance] || distances[entrance] == Integer.MAX_VALUE) {
+                return false;
+            }
+            move(hero, BlastAutoPlay.firstStep(entrance, safe, distances));
+            return true;
+        }
 
         Heap target = null;
         Item prize = null;
@@ -197,8 +214,7 @@ final class BlastAutoCrystalRooms {
                 hero.curAction = new HeroAction.OpenChest(target.pos);
             }
         } else if (!hero.rooted) {
-            hero.curAction = new HeroAction.Move(
-                    BlastAutoPlay.firstStep(destination, safe, distances));
+            move(hero, BlastAutoPlay.firstStep(destination, safe, distances));
         } else return false;
         return true;
     }
