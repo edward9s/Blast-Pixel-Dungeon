@@ -1,6 +1,7 @@
 package com.spd.blast;
 
 import com.shatteredpixel.shatteredpixeldungeon.items.armor.LeatherArmor;
+import com.shatteredpixel.shatteredpixeldungeon.items.armor.WarriorArmor;
 import com.shatteredpixel.shatteredpixeldungeon.items.BrokenSeal;
 import com.shatteredpixel.shatteredpixeldungeon.items.armor.glyphs.Camouflage;
 import com.shatteredpixel.shatteredpixeldungeon.items.armor.glyphs.Brimstone;
@@ -309,6 +310,35 @@ public final class BlastAutoEquipmentTest {
         check(BlastAutoEquipment.worthPickingWithoutAlchemize(wearableFloorArmor,
                         Arrays.<Item>asList(tooHeavyArmor), null, wearableStrength),
                 "A heavy future upgrade must not hide the only wearable armor");
+
+        // Crown-upgraded class armor must stay equipped so the hero's armor
+        // ability remains available after an automatic defense upgrade.
+        WarriorArmor classArmor = new WarriorArmor();
+        classArmor.charge = 73f;
+        check(BlastAutoEquipment.isProtectedEquipment(classArmor),
+                "Class armor itself must always be retained");
+        check(!BlastAutoEquipment.isRedundant(classArmor, superiorArmor),
+                "Class armor cannot be discarded as an ordinary inferior armor");
+
+        classArmor.inscribe(new Camouflage());
+        LeatherArmor differentValuedGlyph = new LeatherArmor();
+        differentValuedGlyph.inscribe(new Brimstone());
+        check(BlastAutoEquipment.wouldLoseProtectedClassGlyph(
+                        classArmor, differentValuedGlyph),
+                "Auto transfer must not erase a valuable existing class-armor glyph");
+        check(BlastAutoEquipment.wouldLoseProtectedClassGlyph(
+                        classArmor, new LeatherArmor()),
+                "No-seal transfer must not clear a valuable class-armor glyph");
+        LeatherArmor sameValuedGlyph = new LeatherArmor();
+        sameValuedGlyph.inscribe(new Camouflage());
+        check(!BlastAutoEquipment.wouldLoseProtectedClassGlyph(
+                        classArmor, sameValuedGlyph),
+                "Matching valuable glyphs permit class-armor stat transfer");
+
+        WarriorArmor plainClassArmor = new WarriorArmor();
+        check(!BlastAutoEquipment.wouldLoseProtectedClassGlyph(
+                        plainClassArmor, differentValuedGlyph),
+                "Class armor without a protected glyph may inherit a better glyph");
 
         System.out.println("BlastAutoEquipmentTest passed");
     }
