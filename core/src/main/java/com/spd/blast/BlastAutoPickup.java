@@ -15,6 +15,8 @@ import com.shatteredpixel.shatteredpixeldungeon.items.Waterskin;
 import com.shatteredpixel.shatteredpixeldungeon.items.artifacts.DriedRose;
 import com.shatteredpixel.shatteredpixeldungeon.items.bags.Bag;
 import com.shatteredpixel.shatteredpixeldungeon.items.keys.Key;
+import com.shatteredpixel.shatteredpixeldungeon.items.potions.PotionOfStrength;
+import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfUpgrade;
 import com.shatteredpixel.shatteredpixeldungeon.items.rings.Ring;
 import com.shatteredpixel.shatteredpixeldungeon.items.rings.RingOfEnergy;
 import com.shatteredpixel.shatteredpixeldungeon.items.rings.RingOfHaste;
@@ -96,6 +98,9 @@ public final class BlastAutoPickup {
 
         int nearest = -1;
         int shortest = Integer.MAX_VALUE;
+        int bestPriority = -1;
+        Bag backpack = hero.belongings.backpack;
+        boolean lastSlot = backpack.capacity() - backpack.items.size() == 1;
         Item nearestItem = null;
         Heap nearestHeap = null;
         for (Heap heap : level.heaps.valueList()) {
@@ -107,15 +112,18 @@ public final class BlastAutoPickup {
                     || !knownLoot(heap.seen, hero.fieldOfView[cell])
                     || !safe[cell] || distances[cell] == Integer.MAX_VALUE) continue;
 
-            Item item = firstEligibleItem(heap, candidate ->
-                    !BlastAutoCrystalRooms.isStaged(candidate)
-                    && (isPickupType(candidate, instantPickup)
-                            || BlastAutoEquipment.canPickup(hero, candidate))
-                    && canCollect(hero, candidate, instantPickup));
-            if (item == null) continue;
-            if (distances[cell] < shortest) {
+            for (Item item : heap.items) {
+                int priority = pickupPriority(item);
+                if (priority < bestPriority || (priority == bestPriority
+                        && distances[cell] >= shortest)) continue;
+                if (BlastAutoCrystalRooms.isStaged(item)
+                        || !(isPickupType(item, instantPickup)
+                            || BlastAutoEquipment.canPickup(hero, item))
+                        || !canCollect(hero, item, instantPickup)
+                        || (lastSlot && !BlastAutoEquipment.useLastSlot(hero, item))) continue;
                 nearest = cell;
                 shortest = distances[cell];
+                bestPriority = priority;
                 nearestItem = item;
                 nearestHeap = heap;
             }
@@ -129,6 +137,17 @@ public final class BlastAutoPickup {
             hero.curAction = new HeroAction.Move(BlastAutoPlay.firstStep(nearest, safe, distances));
         }
         return true;
+    }
+
+    private static int pickupPriority(Item item) {
+        if (item instanceof Key) return 2;
+        if (item instanceof PotionOfStrength || item instanceof ScrollOfUpgrade) return 1;
+        return 0;
+    }
+
+    static boolean hasCollectibleLoot(Hero hero, Heap heap) {
+        return heap != null && firstEligibleItem(heap,
+                item -> canCollect(hero, item, BlastAutoPickupPolicy::isInstantPickup)) != null;
     }
 
     /**
@@ -182,6 +201,8 @@ public final class BlastAutoPickup {
                     && !item.keptThroughLostInventory()) status = "lost-inventory";
             else status = "full";
         }
+        else if (hero.belongings.backpack.capacity() - hero.belongings.backpack.items.size() == 1
+                && !BlastAutoEquipment.useLastSlot(hero, item)) status = "reserved-slot";
         else if (!safe[cell]) status = "unsafe";
         else if (!pickupSafe[cell]) status = "blocked";
         else if (distances[cell] == Integer.MAX_VALUE) status = "unreachable";

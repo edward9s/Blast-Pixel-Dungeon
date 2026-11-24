@@ -109,17 +109,17 @@ final class BlastAutoSentryRoom {
             activeEntrance = exit;
             activeTreasure = discovered == null ? -1 : discovered.pos;
         }
-        if (activeEntrance != exit || activeTreasure < 0)
-            return BlastAutoSpecialRooms.Action.NONE;
+        if (activeEntrance != exit) return BlastAutoSpecialRooms.Action.NONE;
 
         boolean[] map = crossing(hero, room, safe, hazards, barriers);
         int[] travel = reachable(hero.pos, map);
-        int back = reachable(activeTreasure, map)[exit];
-        Heap heap = level.heaps.get(activeTreasure);
+        Heap heap = activeTreasure < 0 ? null : level.heaps.get(activeTreasure);
         Item loot = eligibleLoot(hero, heap);
-        boolean pending = heap != null && (heap.type == Heap.Type.CHEST || loot != null);
+        boolean pending = loot != null || (heap != null && heap.type == Heap.Type.CHEST
+                && BlastAutoPickup.hasCollectibleLoot(hero, heap));
         if (pending && hero.speed() >= 2.9f
-                && enoughHaste(haste.cooldown(), travel[activeTreasure], back,
+                && enoughHaste(haste.cooldown(), travel[activeTreasure],
+                        reachable(activeTreasure, map)[exit],
                         1f / hero.speed())) {
             if (hero.pos != activeTreasure) {
                 if (hero.rooted) return BlastAutoSpecialRooms.Action.NONE;
@@ -158,7 +158,7 @@ final class BlastAutoSentryRoom {
         Heap treasure = chest(level, room, hero);
         // A missing chest can mean undiscovered, opened, or emptied. Leave the
         // room reachable through ordinary roaming and pickup in all cases.
-        if (treasure == null) return BlastAutoSpecialRooms.Action.NONE;
+        if (!BlastAutoPickup.hasCollectibleLoot(hero, treasure)) return BlastAutoSpecialRooms.Action.NONE;
         if (safe[treasure.pos] && distances[treasure.pos] != Integer.MAX_VALUE)
             return BlastAutoSpecialRooms.Action.NONE;
 
