@@ -1260,8 +1260,6 @@ public final class BlastAutoPlay {
 
     private static void resetForLevel(Hero hero) {
         if (currentHero == hero && currentLevel == Dungeon.level) return;
-        if (currentHero == hero) BlastAutoEquipment.enterLevel(hero);
-        else BlastAutoEquipment.reset();
         currentHero = hero;
         currentLevel = Dungeon.level;
         roaming.reset();
@@ -1284,6 +1282,7 @@ public final class BlastAutoPlay {
         pendingBombInputs.clear();
         clearFreeBombInputs();
         BlastAutoPickup.reset();
+        BlastAutoEquipment.reset();
         BlastAutoTrapClearer.reset();
         BlastAutoSpecialRooms.reset();
         BlastAutoSacrifice.reset();
