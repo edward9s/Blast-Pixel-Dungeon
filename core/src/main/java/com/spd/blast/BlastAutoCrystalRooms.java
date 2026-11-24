@@ -42,13 +42,14 @@ final class BlastAutoCrystalRooms {
         CrystalPathRoom room = level instanceof RegularLevel
                 ? (CrystalPathRoom) ((RegularLevel) level).room(CrystalPathRoom.class) : null;
         boolean pending = false;
-        if (room != null && Dungeon.branch == 0
-                && Notes.keyCount(new CrystalKey(Dungeon.depth)) == 0) {
+        if (room != null && room.entrance() != null && Dungeon.branch == 0
+                && Notes.keyCount(new CrystalKey(Dungeon.depth)) == 0
+                && (level.visited[level.pointToCell(room.entrance())]
+                    || level.mapped[level.pointToCell(room.entrance())]
+                    || hero.fieldOfView[level.pointToCell(room.entrance())])) {
             for (Heap heap : level.heaps.valueList()) {
                 if (room.inside(level.cellToPoint(heap.pos))
-                        && heap.peek() != null
-                        && (heap.seen || hero.fieldOfView[heap.pos]
-                            || level.visited[heap.pos] || level.mapped[heap.pos])) {
+                        && heap.peek() != null) {
                     pending = true;
                     break;
                 }
