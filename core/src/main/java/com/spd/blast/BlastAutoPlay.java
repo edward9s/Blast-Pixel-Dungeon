@@ -868,6 +868,10 @@ public final class BlastAutoPlay {
             return flightAction == BlastAutoSpecialRooms.Action.USE;
         }
 
+        // Synchronized vault flames require blob immunity before entering.
+        debugDecision = "vault-purity";
+        if (BlastAutoVault.drinkPurity(hero, Dungeon.level)) return true;
+
         // Strength potions, equipment upgrades, and ordinary gear cleanup run only while idle.
         // Cursed gear is sold immediately from the native pickup-success callback.
         debugDecision = "equipment";
@@ -1293,7 +1297,7 @@ public final class BlastAutoPlay {
         com.shatteredpixel.shatteredpixeldungeon.levels.rooms.secret.SecretChestChasmRoom chasmRoom =
                 BlastAutoChasmRoom.flightRoom(level, hero);
 
-        boolean[] vaultDanger = BlastAutoVault.imminent(level);
+        boolean[] vaultDanger = BlastAutoVault.imminent(hero, level);
         for (int cell = 0; cell < safe.length; cell++) {
             boolean known = level.visited[cell] || level.mapped[cell] || hero.fieldOfView[cell];
             boolean airborne = known && flightRoom != null
