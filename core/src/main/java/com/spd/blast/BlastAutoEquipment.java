@@ -136,7 +136,10 @@ final class BlastAutoEquipment {
                 replacedEquipment.removeFirst();
                 continue;
             }
-            if (availableAlchemize(hero) == null) return false;
+            if (availableAlchemize(hero) == null) {
+                replacedEquipment.removeFirst();
+                continue;
+            }
             if (!sellWithAlchemize(hero, item)) {
                 throw new IllegalStateException("Replaced equipment could not be sold");
             }
