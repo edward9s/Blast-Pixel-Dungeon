@@ -476,7 +476,9 @@ final class BlastAutoEquipment {
         for (Armor candidate : hero.belongings.getAllItems(Armor.class)) {
             if (candidate.isEquipped(hero) || candidate instanceof ClassArmor
                     || !canWearArmor(candidate, hero.STR(), seal)
-                    || (seal != null && candidate.checkSeal() != null)) continue;
+                    || (seal != null && candidate.checkSeal() != null)
+                    || (current instanceof ClassArmor
+                        && wouldLoseProtectedClassGlyph((ClassArmor) current, candidate))) continue;
             int rating = armorRatingWithSeal(candidate, seal);
             if (rating > bestRating) {
                 best = candidate;
@@ -486,7 +488,6 @@ final class BlastAutoEquipment {
         if (best == null) return false;
         if (current instanceof ClassArmor) {
             ClassArmor classArmor = (ClassArmor) current;
-            if (wouldLoseProtectedClassGlyph(classArmor, best)) return false;
             float charge = classArmor.charge;
             com.shatteredpixel.shatteredpixeldungeon.actors.hero.abilities.ArmorAbility ability =
                     hero.armorAbility;
