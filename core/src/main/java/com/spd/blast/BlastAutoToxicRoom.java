@@ -115,6 +115,13 @@ final class BlastAutoToxicRoom {
         return -1;
     }
 
+    private static boolean collectibleCatalyst(Hero hero, Heap heap) {
+        return heap != null && BlastAutoPickup.firstEligibleItem(heap,
+                item -> item instanceof TrinketCatalyst
+                        && BlastAutoPickup.canCollect(hero, item,
+                                BlastAutoPickupPolicy::isInstantPickup)) != null;
+    }
+
     /** Immunity permits toxic gas only, never another active environmental hazard. */
     private static boolean onlyToxicHazard(int cell, Blob[] hazards) {
         for (Blob hazard : hazards) {
@@ -182,7 +189,7 @@ final class BlastAutoToxicRoom {
         Heap heap = level.heaps.get(purityTreasure);
         boolean pending = heap != null
                 && (heap.type == Heap.Type.CHEST || heap.type == Heap.Type.HEAP)
-                && catalystTreasure(level, room) == purityTreasure;
+                && collectibleCatalyst(hero, heap);
         int interactions = heap != null && heap.type == Heap.Type.CHEST ? 2 : 1;
         float stepTime = Math.max(1f, 1f / hero.speed());
         if (pending && !hero.rooted
@@ -243,6 +250,8 @@ final class BlastAutoToxicRoom {
         int[] toChest = distancesFrom(door, route);
         int[] back = distancesFrom(treasure, route);
         Heap heap = level.heaps.get(treasure);
+        if (!collectibleCatalyst(hero, heap))
+            return BlastAutoSpecialRooms.Action.NONE;
         int interactions = heap.type == Heap.Type.CHEST ? 2 : 1;
         float duration = immunity == null
                 ? BlobImmunity.DURATION - 1f : immunity.cooldown();
