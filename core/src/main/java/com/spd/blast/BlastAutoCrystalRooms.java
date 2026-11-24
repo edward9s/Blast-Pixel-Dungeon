@@ -222,7 +222,8 @@ final class BlastAutoCrystalRooms {
                 }
             }
             if (item == null) return false;
-            if (!BlastAutoPickup.canCollect(hero, item,
+            if (target.type == Heap.Type.HEAP
+                    && !BlastAutoPickup.canCollect(hero, item,
                     BlastAutoPickupPolicy::isInstantPickup)) return false;
             if (target.type == Heap.Type.HEAP) {
                 BlastAutoPickup.preparePickup(hero, target, item);
