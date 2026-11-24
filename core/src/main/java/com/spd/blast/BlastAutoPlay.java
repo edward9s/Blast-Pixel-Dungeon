@@ -463,7 +463,11 @@ public final class BlastAutoPlay {
             return false;
         }
         if (hero.pos == pausedVaultDestination) {
+            int destination = pausedVaultDestination;
             pausedVaultDestination = -1;
+            if (level.heaps.get(destination) != null) {
+                hero.curAction = new HeroAction.PickUp(destination);
+            }
             return false;
         }
         Blob[] hazards = BlastAutoEnvironment.activeHazards(level);
@@ -525,7 +529,8 @@ public final class BlastAutoPlay {
 
     /** The Hero.act caller enters native ready() so its map listener is restored. */
     public static boolean pauseForUser(Hero hero) {
-        return isPaused() && !manualActionActive(hero) && pendingBombInputs.isEmpty();
+        return isPaused() && pausedVaultDestination < 0
+                && !manualActionActive(hero) && pendingBombInputs.isEmpty();
     }
 
     /** Manual targeting pauses auto play; the game menu no longer does. */
