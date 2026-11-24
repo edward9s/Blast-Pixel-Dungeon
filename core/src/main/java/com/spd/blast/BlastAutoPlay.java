@@ -529,7 +529,7 @@ public final class BlastAutoPlay {
 
     /** The Hero.act caller enters native ready() so its map listener is restored. */
     public static boolean pauseForUser(Hero hero) {
-        return isPaused() && pausedVaultDestination < 0
+        return isPaused() && pausedVaultDestination < 0 && hero.curAction == null
                 && !manualActionActive(hero) && pendingBombInputs.isEmpty();
     }
 
