@@ -2,6 +2,8 @@ package com.spd.blast;
 
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
+import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.BlobImmunity;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.Blob;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.ToxicGas;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
@@ -9,6 +11,9 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroAction;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
 import com.shatteredpixel.shatteredpixeldungeon.items.bombs.Bomb;
+import com.shatteredpixel.shatteredpixeldungeon.items.potions.Potion;
+import com.shatteredpixel.shatteredpixeldungeon.items.potions.PotionOfPurity;
+import com.shatteredpixel.shatteredpixeldungeon.items.trinkets.TrinketCatalyst;
 import com.shatteredpixel.shatteredpixeldungeon.items.potions.brews.AquaBrew;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
 import com.shatteredpixel.shatteredpixeldungeon.levels.RegularLevel;
@@ -16,13 +21,23 @@ import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
 import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.special.ToxicGasRoom;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.Trap;
 import com.shatteredpixel.shatteredpixeldungeon.mechanics.Ballistica;
+import com.watabou.utils.PathFinder;
 
 /** Quench permanent gas vents, then keep the toxic-room entrance ventilated. */
 final class BlastAutoToxicRoom {
     private static final int THROW_RANGE = 8;
     private static final int SAFE_DISTANCE = 3;
+    private static int purityEntrance = -1;
+    private static int purityTreasure = -1;
+    private static int attemptedPurityTreasure = -1;
 
     private BlastAutoToxicRoom() {}
+
+    static void reset() {
+        purityEntrance = -1;
+        purityTreasure = -1;
+        attemptedPurityTreasure = -1;
+    }
 
     /** ToxicVent is inactive: its ToxicGasSeed blob is the actual permanent source. */
     static boolean sourceTerrain(int terrain, boolean toxicVent, boolean seeded) {
@@ -85,6 +100,171 @@ final class BlastAutoToxicRoom {
             }
         }
         return false;
+    }
+
+    /** Only a pending Magical Catalyst chest or opened heap justifies purity. */
+    private static int catalystTreasure(Level level, ToxicGasRoom room) {
+        for (Heap heap : level.heaps.valueList()) {
+            if ((heap.type != Heap.Type.CHEST && heap.type != Heap.Type.HEAP)
+                    || heap.isEmpty() || !room.inside(level.cellToPoint(heap.pos)))
+                continue;
+            for (Item item : heap.items) {
+                if (item instanceof TrinketCatalyst) return heap.pos;
+            }
+        }
+        return -1;
+    }
+
+    /** Immunity permits toxic gas only, never another active environmental hazard. */
+    private static boolean onlyToxicHazard(int cell, Blob[] hazards) {
+        for (Blob hazard : hazards) {
+            if (hazard == null) break;
+            if (hazard.cur[cell] > 0 && !(hazard instanceof ToxicGas)) return false;
+        }
+        return true;
+    }
+
+    /** Allow the gas room itself while retaining all other movement restrictions. */
+    private static boolean[] purityRoute(Hero hero, Level level, ToxicGasRoom room, int door,
+                                          boolean[] safe, Blob[] hazards, boolean[] barriers) {
+        boolean[] route = safe.clone();
+        for (int y = room.top; y <= room.bottom; y++) {
+            for (int x = room.left; x <= room.right; x++) {
+                int cell = x + y * level.width();
+                boolean interior = x > room.left && x < room.right
+                        && y > room.top && y < room.bottom;
+                if (!interior && cell != door) continue;
+                if (!level.insideMap(cell) || !level.passable[cell] || level.pit[cell]
+                        || (level.solid[cell] && level.map[cell] != Terrain.DOOR)
+                        || barriers[cell] || !BlastAutoPlay.isTrapSafe(level.traps.get(cell))
+                        || AutoPlayPlantSafety.isHarmful(level.plants.get(cell))
+                        || !onlyToxicHazard(cell, hazards)) continue;
+                Char occupant = Actor.findChar(cell);
+                if (occupant == null || occupant == hero) route[cell] = true;
+            }
+        }
+        return route;
+    }
+
+    private static int[] distancesFrom(int start, boolean[] map) {
+        PathFinder.buildDistanceMap(start, map);
+        return PathFinder.distance.clone();
+    }
+
+    /** Budget for the trip, opening the chest, picking up loot, and returning. */
+    static boolean enoughPurity(float duration, int forward, int backward,
+                                int interactions, float stepTime) {
+        return duration > 0 && forward >= 0 && backward >= 0
+                && forward != Integer.MAX_VALUE && backward != Integer.MAX_VALUE
+                && interactions >= 1 && stepTime > 0
+                && ((long) forward + backward) * stepTime + interactions + 2 < duration;
+    }
+
+    /** Once purity is drunk, keep this crossing ahead of normal gas retreat. */
+    static BlastAutoSpecialRooms.Action continuePurityRun(Hero hero, boolean[] safe,
+            Blob[] hazards, boolean[] barriers) {
+        if (purityTreasure < 0) return BlastAutoSpecialRooms.Action.NONE;
+        Level level = Dungeon.level;
+        ToxicGasRoom room = knownRoom(level);
+        BlobImmunity immunity = hero.buff(BlobImmunity.class);
+        if (room == null || immunity == null || hero.belongings.lostInventory()
+                || !level.insideMap(purityEntrance)
+                || !level.insideMap(purityTreasure)) {
+            purityEntrance = -1;
+            purityTreasure = -1;
+            return BlastAutoSpecialRooms.Action.NONE;
+        }
+
+        boolean[] route = purityRoute(hero, level, room, purityEntrance,
+                safe, hazards, barriers);
+        int[] forward = distancesFrom(hero.pos, route);
+        int[] backward = distancesFrom(purityTreasure, route);
+        Heap heap = level.heaps.get(purityTreasure);
+        boolean pending = heap != null
+                && (heap.type == Heap.Type.CHEST || heap.type == Heap.Type.HEAP)
+                && catalystTreasure(level, room) == purityTreasure;
+        int interactions = heap != null && heap.type == Heap.Type.CHEST ? 2 : 1;
+        float stepTime = Math.max(1f, 1f / hero.speed());
+        if (pending && !hero.rooted
+                && enoughPurity(immunity.cooldown(), forward[purityTreasure],
+                        backward[purityEntrance], interactions, stepTime)) {
+            if (hero.pos != purityTreasure) {
+                hero.curAction = new HeroAction.Move(
+                        BlastAutoPlay.firstStep(purityTreasure, route, forward));
+            } else if (heap.type == Heap.Type.CHEST) {
+                hero.curAction = new HeroAction.OpenChest(purityTreasure);
+            } else {
+                Item catalyst = BlastAutoPickup.firstEligibleItem(heap,
+                        item -> item instanceof TrinketCatalyst
+                                && BlastAutoPickup.canCollect(hero, item,
+                                        BlastAutoPickupPolicy::isInstantPickup));
+                if (catalyst == null) return BlastAutoSpecialRooms.Action.NONE;
+                BlastAutoPickup.exposeForPickup(heap, catalyst);
+                hero.curAction = new HeroAction.PickUp(purityTreasure);
+            }
+            return BlastAutoSpecialRooms.Action.MOVE;
+        }
+
+        // Picked up the catalyst, or immunity is almost over: leave the room.
+        int[] retreat = distancesFrom(hero.pos, route);
+        if (hero.pos == purityEntrance) {
+            purityEntrance = -1;
+            purityTreasure = -1;
+            return BlastAutoSpecialRooms.Action.NONE;
+        }
+        if (!hero.rooted && retreat[purityEntrance] != Integer.MAX_VALUE) {
+            hero.curAction = new HeroAction.Move(
+                    BlastAutoPlay.firstStep(purityEntrance, route, retreat));
+            return BlastAutoSpecialRooms.Action.MOVE;
+        }
+        purityEntrance = -1;
+        purityTreasure = -1;
+        return BlastAutoSpecialRooms.Action.NONE;
+    }
+
+    /** Allow an unidentified Purity potion only for an actual catalyst objective. */
+    private static BlastAutoSpecialRooms.Action claimCatalyst(Hero hero, Level level,
+            ToxicGasRoom room, boolean[] safe, int[] distances,
+            Blob[] hazards, boolean[] barriers) {
+        if (!gasInside(level, room)) return BlastAutoSpecialRooms.Action.NONE;
+        int treasure = catalystTreasure(level, room);
+        if (treasure < 0 || treasure == attemptedPurityTreasure)
+            return BlastAutoSpecialRooms.Action.NONE;
+
+        BlobImmunity immunity = hero.buff(BlobImmunity.class);
+        PotionOfPurity potion = hero.belongings.getItem(PotionOfPurity.class);
+        if (immunity == null && (potion == null || potion.quantity() <= 0))
+            return BlastAutoSpecialRooms.Action.NONE;
+
+        int door = level.pointToCell(room.entrance());
+        if (!safe[door] || distances[door] == Integer.MAX_VALUE) 
+            return BlastAutoSpecialRooms.Action.NONE;
+        boolean[] route = purityRoute(hero, level, room, door, safe, hazards, barriers);
+        int[] toChest = distancesFrom(door, route);
+        int[] back = distancesFrom(treasure, route);
+        Heap heap = level.heaps.get(treasure);
+        int interactions = heap.type == Heap.Type.CHEST ? 2 : 1;
+        float duration = immunity == null
+                ? BlobImmunity.DURATION - 1f : immunity.cooldown();
+        if (!enoughPurity(duration, toChest[treasure], back[door],
+                interactions, Math.max(1f, 1f / hero.speed())))
+            return BlastAutoSpecialRooms.Action.NONE;
+
+        if (hero.pos != door) {
+            return BlastAutoSpecialRooms.approachEntrance(
+                    hero, treasure, door, safe, distances);
+        }
+
+        purityEntrance = door;
+        purityTreasure = treasure;
+        attemptedPurityTreasure = treasure;
+        if (immunity == null) {
+            BlastLog.debug("auto-toxic action=purity-catalyst chest=" + treasure
+                    + " identified=" + potion.isKnown());
+            potion.execute(hero, Potion.AC_DRINK);
+            return BlastAutoSpecialRooms.Action.USE;
+        }
+        return continuePurityRun(hero, safe, hazards, barriers);
     }
 
     /** A floor heap wedges an open door and is retrieved after the gas clears. */
@@ -221,6 +401,10 @@ final class BlastAutoToxicRoom {
             if (action == BlastAutoAqua.Action.THROW)
                 return BlastAutoSpecialRooms.Action.USE;
         }
+        BlastAutoSpecialRooms.Action purity = claimCatalyst(
+                hero, level, room, safe, distances, hazards, specialBarriers);
+        if (purity != BlastAutoSpecialRooms.Action.NONE) return purity;
+
         if (!holdDoor(sourceActive, hasAqua, gas))
             return BlastAutoSpecialRooms.Action.NONE;
 
