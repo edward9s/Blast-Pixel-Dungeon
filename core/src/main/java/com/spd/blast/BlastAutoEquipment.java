@@ -86,19 +86,22 @@ final class BlastAutoEquipment {
         return armor.DRMin(level) + armor.DRMax(level);
     }
 
-    /** A transferred upgraded warrior seal increases the destination armor's level. */
+    /** A transferred upgraded warrior seal adds one real level to the new armor. */
+    private static int armorLevelWithSeal(Armor armor, BrokenSeal seal) {
+        return armor.trueLevel() + (seal != null && seal.level() > 0 ? 1 : 0);
+    }
+
     static int armorRatingWithSeal(Armor armor, BrokenSeal seal) {
-        int level = armor.trueLevel();
-        if (seal != null && seal.level() > 0) level++;
-        return armorRatingAtLevel(armor, level);
+        return armorRatingAtLevel(armor, armorLevelWithSeal(armor, seal));
     }
 
     private static boolean canEquip(Hero hero, MeleeWeapon weapon) {
+        // Hero.STR() includes equipped Ring of Might and all active strength bonuses.
         return !isCursed(weapon) && weapon.STRReq(weapon.trueLevel()) <= hero.STR();
     }
 
-    private static boolean canEquip(Hero hero, Armor armor) {
-        return !isCursed(armor) && armor.STRReq(armor.trueLevel()) <= hero.STR();
+    static boolean canWearArmor(Armor armor, int strength, BrokenSeal seal) {
+        return !isCursed(armor) && armor.STRReq(armorLevelWithSeal(armor, seal)) <= strength;
     }
 
     /** Preserve enchanted or inscribed equipment, even when its strength requirement is unmet. */
@@ -267,7 +270,8 @@ final class BlastAutoEquipment {
         Armor best = null;
         int bestRating = currentRating;
         for (Armor candidate : hero.belongings.getAllItems(Armor.class)) {
-            if (candidate.isEquipped(hero) || !canEquip(hero, candidate)
+            if (candidate.isEquipped(hero)
+                    || !canWearArmor(candidate, hero.STR(), seal)
                     || (seal != null && candidate.checkSeal() != null)) continue;
             int rating = armorRatingWithSeal(candidate, seal);
             if (rating > bestRating) {
