@@ -1277,8 +1277,7 @@ public final class BlastAutoPlay {
     static boolean isAutoAttackExcluded(Mob mob) {
         return mob instanceof NPC || mob instanceof DemonSpawner
                 || (Dungeon.level instanceof com.shatteredpixel.shatteredpixeldungeon.levels.MiningLevel
-                    && (mob instanceof com.shatteredpixel.shatteredpixeldungeon.actors.mobs.CrystalSpire
-                        || mob instanceof com.shatteredpixel.shatteredpixeldungeon.actors.mobs.GnollGeomancer));
+                    && mob instanceof com.shatteredpixel.shatteredpixeldungeon.actors.mobs.CrystalSpire);
     }
 
     /** Sleeping enemies are deliberately left alone by automatic combat. */
