@@ -2,6 +2,11 @@ package com.spd.blast;
 
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.CrystalSpire;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.CrystalGuardian;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.GnollGeomancer;
+import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroAction;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.Blacksmith;
 import com.shatteredpixel.shatteredpixeldungeon.items.quest.Pickaxe;
@@ -63,4 +68,40 @@ final class BlastAutoBlacksmith {
                 BlastAutoPlay.firstStep(stand, safe, distances));
         return hero.curAction != null;
     }
+    /** The crystal spire is damaged only by its native pickaxe interaction. */
+    static boolean attackBoss(Hero hero, boolean[] safe, int[] distances) {
+        Level level = Dungeon.level;
+        if (!(level instanceof MiningLevel) || !Blacksmith.Quest.given()
+                || Blacksmith.Quest.bossBeaten()
+                || hero.belongings.getItem(Pickaxe.class) == null) return false;
+        for (int cell = 0; cell < level.length(); cell++) {
+            if (level.map[cell] == Terrain.WALL_DECO) return false;
+        }
+        for (Heap heap : level.heaps.valueList()) {
+            if (heap.type != Heap.Type.HEAP && heap.type != Heap.Type.FOR_SALE)
+                return false;
+        }
+        for (Mob mob : level.mobs) {
+            if (mob instanceof CrystalGuardian && mob.isAlive()) return false;
+        }
+        for (Mob mob : level.mobs) {
+            if (!(mob instanceof CrystalSpire) || !mob.isAlive()) continue;
+            int stand = -1;
+            int steps = Integer.MAX_VALUE;
+            for (int offset : PathFinder.NEIGHBOURS8) {
+                int cell = mob.pos + offset;
+                if (!level.insideMap(cell) || !safe[cell]
+                        || distances[cell] >= steps) continue;
+                stand = cell;
+                steps = distances[cell];
+            }
+            if (stand < 0) return false;
+            hero.curAction = hero.pos == stand
+                    ? new HeroAction.Interact(mob)
+                    : new HeroAction.Move(BlastAutoPlay.firstStep(stand, safe, distances));
+            return true;
+        }
+        return false;
+    }
+
 }
