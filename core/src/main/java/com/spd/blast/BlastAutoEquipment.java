@@ -9,6 +9,7 @@ import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.BrokenSeal;
 import com.shatteredpixel.shatteredpixeldungeon.items.KindOfWeapon;
 import com.shatteredpixel.shatteredpixeldungeon.items.armor.Armor;
+import com.shatteredpixel.shatteredpixeldungeon.items.armor.ClassArmor;
 import com.shatteredpixel.shatteredpixeldungeon.items.potions.Potion;
 import com.shatteredpixel.shatteredpixeldungeon.items.potions.PotionOfStrength;
 import com.shatteredpixel.shatteredpixeldungeon.items.spells.Alchemize;
@@ -175,15 +176,25 @@ final class BlastAutoEquipment {
         }
         if (item instanceof Armor) {
             Armor armor = (Armor) item;
-            return armor.checkSeal() != null || armor.augment != Armor.Augment.NONE
-                    || armor.glyph instanceof Swiftness
-                    || armor.glyph instanceof Camouflage
-                    || armor.glyph instanceof Obfuscation
-                    || armor.glyph instanceof Brimstone
-                    || armor.glyph instanceof AntiMagic
-                    || armor.glyph instanceof Thorns;
+            return armor instanceof ClassArmor || armor.checkSeal() != null
+                    || armor.augment != Armor.Augment.NONE || isProtectedGlyph(armor.glyph);
         }
         return false;
+    }
+
+    private static boolean isProtectedGlyph(Armor.Glyph glyph) {
+        return glyph instanceof Swiftness || glyph instanceof Camouflage
+                || glyph instanceof Obfuscation || glyph instanceof Brimstone
+                || glyph instanceof AntiMagic || glyph instanceof Thorns;
+    }
+
+    /** Automatic transfer must not discard a selected valuable inscription. */
+    static boolean wouldLoseProtectedClassGlyph(ClassArmor source, Armor replacement) {
+        if (!isProtectedGlyph(source.glyph)) return false;
+        if (replacement.glyph != null
+                && source.glyph.getClass() == replacement.glyph.getClass()) return false;
+        return replacement.glyph != null || source.checkSeal() == null
+                || !source.checkSeal().canTransferGlyph();
     }
 
     static boolean hasGlyphConflict(Armor current, Armor replacement) {
@@ -442,11 +453,28 @@ final class BlastAutoEquipment {
         Armor current = hero.belongings.armor();
         if (current != null && isCursed(current)) return false;
         BrokenSeal seal = current == null ? null : current.checkSeal();
+
+        // A crown-upgraded ClassArmor carries the hero's active armor ability.
+        // Recover existing saves where auto-play previously replaced it with
+        // ordinary armor, then transfer the ordinary armor's stats next turn.
+        if (!(current instanceof ClassArmor)) {
+            ClassArmor classArmor = hero.belongings.getItem(ClassArmor.class);
+            if (classArmor != null && classArmor != current
+                    && canWearArmor(classArmor, hero.STR(), seal)
+                    && (seal == null || classArmor.checkSeal() == null)) {
+                if (!equipArmorWithSeal(hero, current, classArmor)) {
+                    throw new IllegalStateException("Could not restore hero ability armor");
+                }
+                retainedEquipment.remove(classArmor);
+                return true;
+            }
+        }
+
         int currentRating = current == null ? Integer.MIN_VALUE : armorRating(current);
         Armor best = null;
         int bestRating = currentRating;
         for (Armor candidate : hero.belongings.getAllItems(Armor.class)) {
-            if (candidate.isEquipped(hero)
+            if (candidate.isEquipped(hero) || candidate instanceof ClassArmor
                     || !canWearArmor(candidate, hero.STR(), seal)
                     || (seal != null && candidate.checkSeal() != null)) continue;
             int rating = armorRatingWithSeal(candidate, seal);
@@ -456,6 +484,17 @@ final class BlastAutoEquipment {
             }
         }
         if (best == null) return false;
+        if (current instanceof ClassArmor) {
+            ClassArmor classArmor = (ClassArmor) current;
+            if (wouldLoseProtectedClassGlyph(classArmor, best)) return false;
+            float charge = classArmor.charge;
+            classArmor.transferStatsFrom(hero, best);
+            if (hero.belongings.armor() != classArmor || classArmor.charge != charge) {
+                throw new IllegalStateException("Hero ability armor or its charge was lost");
+            }
+            hero.spendAndNext(com.shatteredpixel.shatteredpixeldungeon.actors.Actor.TICK);
+            return true;
+        }
         if (!equipArmorWithSeal(hero, current, best)) {
             throw new IllegalStateException("Eligible armor upgrade failed to equip");
         }
