@@ -88,6 +88,13 @@ final class BlastAutoEquipment {
                 && current.glyph.getClass() != replacement.glyph.getClass();
     }
 
+    /** Keep an old inscription if it does not survive on the new armor. */
+    static boolean keepOldArmor(Armor current, Armor replacement) {
+        return current != null && current.glyph != null
+                && (replacement.glyph == null
+                    || current.glyph.getClass() != replacement.glyph.getClass());
+    }
+
     private static int armorRatingAtLevel(Armor armor, int level) {
         return armor.DRMin(level) + armor.DRMax(level);
     }
@@ -245,6 +252,7 @@ final class BlastAutoEquipment {
         }
 
         Armor.Glyph originalSealGlyph = seal.getGlyph();
+        Armor.Glyph originalOldGlyph = current.glyph;
         Armor.Glyph originalNextGlyph = next.glyph;
         boolean preserveOldGlyph = hasGlyphConflict(current, next);
 
@@ -259,6 +267,9 @@ final class BlastAutoEquipment {
         if (preserveOldGlyph) {
             // Keep the destination glyph and record it on the transferred seal.
             next.inscribe(originalNextGlyph);
+            if (current.glyph != originalOldGlyph || next.glyph != originalNextGlyph) {
+                throw new IllegalStateException("Conflicting armor glyph was overwritten");
+            }
         }
         if (next.doEquip(hero)) return true;
 
@@ -290,15 +301,15 @@ final class BlastAutoEquipment {
             }
         }
         if (best == null) return false;
-        boolean preserveOldArmor = hasGlyphConflict(current, best);
         if (!equipArmorWithSeal(hero, current, best)) {
             throw new IllegalStateException("Eligible armor upgrade failed to equip");
         }
         if (seal != null && best.checkSeal() != seal) {
             throw new IllegalStateException("Warrior seal was not attached to replacement armor");
         }
-        // A distinct old inscription is worth keeping even with Alchemize available.
-        if (current != null && !preserveOldArmor && availableAlchemize(hero) != null
+        // Never sell a remaining old inscription that the new armor does not have.
+        if (current != null && !keepOldArmor(current, best)
+                && availableAlchemize(hero) != null
                 && Shopkeeper.canSell(current)) replacedEquipment.addLast(current);
         return true;
     }
