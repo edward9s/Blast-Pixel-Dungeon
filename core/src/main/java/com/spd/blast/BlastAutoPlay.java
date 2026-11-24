@@ -944,6 +944,15 @@ public final class BlastAutoPlay {
                 BlastAutoProgressGuard.Intent.TRAVEL);
         int[] idleDistances = navigationDistances(hero.pos, safe, distances, idleSafe);
 
+        // Complete the crystal-path room before ordinary pickup or roaming.
+        idleSafe = progress.safeFor(safe, hero.pos, BlastAutoProgressGuard.Intent.PICKUP);
+        idleDistances = navigationDistances(hero.pos, safe, distances, idleSafe);
+        debugDecision = "crystal-path";
+        if (BlastAutoCrystalRooms.collect(hero, idleSafe, idleDistances)) {
+            progress.intent(BlastAutoProgressGuard.Intent.PICKUP);
+            return hero.curAction == null;
+        }
+
         // Resume interrupted player travel after tactical combat and before idle tasks.
         debugDecision = "manual-route";
         if (resumeInterruptedTravel(hero, idleSafe, idleDistances)) {
@@ -988,15 +997,6 @@ public final class BlastAutoPlay {
             roaming.clearDestination();
             progress.intent(BlastAutoProgressGuard.Intent.INTERACT);
             return toxicVents == BlastAutoSpecialRooms.Action.USE;
-        }
-
-        // Complete the crystal-path room before ordinary pickup or roaming.
-        idleSafe = progress.safeFor(safe, hero.pos, BlastAutoProgressGuard.Intent.PICKUP);
-        idleDistances = navigationDistances(hero.pos, safe, distances, idleSafe);
-        debugDecision = "crystal-path";
-        if (BlastAutoCrystalRooms.collect(hero, idleSafe, idleDistances)) {
-            progress.intent(BlastAutoProgressGuard.Intent.PICKUP);
-            return hero.curAction == null;
         }
 
         // Collect reachable floor loot after visible enemies have been handled.
@@ -1427,7 +1427,8 @@ public final class BlastAutoPlay {
 
         boolean[] vaultDanger = BlastAutoVault.imminent(hero, level);
         for (int cell = 0; cell < safe.length; cell++) {
-            boolean known = level.visited[cell] || level.mapped[cell] || hero.fieldOfView[cell];
+            boolean known = level.visited[cell] || level.mapped[cell] || hero.fieldOfView[cell]
+                    || BlastAutoCrystalRooms.containsActive(cell);
             boolean airborne = known && flightRoom != null
                     && BlastAutoSpecialRooms.flightTile(level, flightRoom, cell);
             airborne |= chasmRoom != null && BlastAutoChasmRoom.flightTile(level, chasmRoom, cell);
