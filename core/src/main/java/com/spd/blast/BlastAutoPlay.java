@@ -1046,6 +1046,12 @@ public final class BlastAutoPlay {
             progress.intent(BlastAutoProgressGuard.Intent.ROAM);
             hero.curAction = new HeroAction.Move(step);
         } else {
+            if (BlastAutoVault.waitForLaser(hero, Dungeon.level, safe, distances)) {
+                debugDecision = "vault-laser-wait";
+                roaming.clearDestination();
+                hero.spendAndNext(Actor.TICK);
+                return true;
+            }
             int staging = BlastAutoVault.stagingCell(hero, Dungeon.level, safe, distances);
             if (staging >= 0 && !hero.rooted) {
                 roaming.clearDestination();
