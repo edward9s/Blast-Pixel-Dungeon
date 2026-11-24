@@ -330,12 +330,14 @@ final class BlastAutoToxicRoom {
             int[] back = distancesFrom(target, route);
             if (!hero.rooted && enoughPurity(immunity.cooldown(), forward[target],
                     back[purityEntrance], roomActions(hero, heap), stepTime)) {
-                if (hero.pos != target) {
+                if ((heap.type == Heap.Type.CHEST || heap.type == Heap.Type.SKELETON)
+                        && (hero.pos == target || level.adjacent(hero.pos, target))) {
+                    // Native OpenChest works beside a container; don't spend a
+                    // move just to open a chest or skeleton under immunity.
+                    hero.curAction = new HeroAction.OpenChest(target);
+                } else if (hero.pos != target) {
                     hero.curAction = new HeroAction.Move(
                             BlastAutoPlay.firstStep(target, route, forward));
-                } else if (heap.type == Heap.Type.CHEST
-                        || heap.type == Heap.Type.SKELETON) {
-                    hero.curAction = new HeroAction.OpenChest(target);
                 } else if (heap.type == Heap.Type.HEAP) {
                     Item loot = firstRoomLoot(hero, heap);
                     if (loot == null) throw new IllegalStateException("Lost toxic-room loot");
