@@ -23,19 +23,28 @@ import com.shatteredpixel.shatteredpixeldungeon.levels.traps.Trap;
 import com.shatteredpixel.shatteredpixeldungeon.mechanics.Ballistica;
 import com.watabou.utils.PathFinder;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+
 /** Quench permanent gas vents, then keep the toxic-room entrance ventilated. */
 final class BlastAutoToxicRoom {
     private static final int THROW_RANGE = 8;
     private static final int SAFE_DISTANCE = 3;
     private static int purityEntrance = -1;
-    private static int purityTreasure = -1;
+    private static int[] purityTargets = new int[0];
+    private static int purityIndex;
     private static int attemptedPurityTreasure = -1;
 
     private BlastAutoToxicRoom() {}
 
-    static void reset() {
+    private static void endPurityRun() {
         purityEntrance = -1;
-        purityTreasure = -1;
+        purityTargets = new int[0];
+        purityIndex = 0;
+    }
+
+    static void reset() {
+        endPurityRun();
         attemptedPurityTreasure = -1;
     }
 
@@ -122,6 +131,111 @@ final class BlastAutoToxicRoom {
                                 BlastAutoPickupPolicy::isInstantPickup)) != null;
     }
 
+    /** The native gas room contains two chests and one skeleton heap. */
+    private static Heap[] roomLoot(Hero hero, Level level, ToxicGasRoom room) {
+        ArrayList<Heap> targets = new ArrayList<>();
+        for (Heap heap : level.heaps.valueList()) {
+            if (heap.isEmpty() || !room.inside(level.cellToPoint(heap.pos))) continue;
+            if (heap.type == Heap.Type.CHEST || heap.type == Heap.Type.SKELETON
+                    || (heap.type == Heap.Type.HEAP && firstRoomLoot(hero, heap) != null)) {
+                targets.add(heap);
+            }
+        }
+        return targets.toArray(new Heap[0]);
+    }
+
+    private static Item firstRoomLoot(Hero hero, Heap heap) {
+        return BlastAutoPickup.firstEligibleItem(heap,
+                item -> (BlastAutoPickup.isPickupType(item,
+                            BlastAutoPickupPolicy::isInstantPickup)
+                        || BlastAutoEquipment.canPickup(hero, item))
+                        && BlastAutoPickup.canCollect(hero, item,
+                                BlastAutoPickupPolicy::isInstantPickup));
+    }
+
+    /** Reserve one interaction for opening and one per collectible item. */
+    private static int roomActions(Hero hero, Heap heap) {
+        if (heap == null) return 0;
+        int actions = heap.type == Heap.Type.HEAP ? 0 : 1;
+        for (Item item : heap.items) {
+            if ((BlastAutoPickup.isPickupType(item,
+                        BlastAutoPickupPolicy::isInstantPickup)
+                    || BlastAutoEquipment.canPickup(hero, item))
+                    && BlastAutoPickup.canCollect(hero, item,
+                            BlastAutoPickupPolicy::isInstantPickup)) actions++;
+        }
+        return actions;
+    }
+
+    /**
+     * Select the shortest complete trip through up to three room loot locations.
+     * Indices 1..N refer to targets and index 0 to the entry/exit. Return null
+     * if any complete return trip is impossible.
+     */
+    static int[] shortestOrder(int[][] steps) {
+        if (steps == null || steps.length < 2 || steps.length > 4)
+            throw new IllegalArgumentException("Expected 1..3 toxic-room targets");
+        for (int[] row : steps) {
+            if (row == null || row.length != steps.length)
+                throw new IllegalArgumentException("Invalid toxic-room distance matrix");
+        }
+        int count = steps.length - 1;
+        int[] order = new int[count];
+        for (int i = 0; i < count; i++) order[i] = i;
+        int[] best = null;
+        long bestLength = Long.MAX_VALUE;
+        do {
+            long length = 0;
+            int from = 0;
+            boolean reachable = true;
+            for (int target : order) {
+                int segment = steps[from][target + 1];
+                if (segment < 0 || segment == Integer.MAX_VALUE) {
+                    reachable = false;
+                    break;
+                }
+                length += segment;
+                from = target + 1;
+            }
+            int returnSteps = steps[from][0];
+            if (reachable && returnSteps >= 0 && returnSteps != Integer.MAX_VALUE) {
+                length += returnSteps;
+                if (length < bestLength) {
+                    bestLength = length;
+                    best = order.clone();
+                }
+            }
+        } while (nextOrder(order));
+        return best;
+    }
+
+    private static boolean nextOrder(int[] order) {
+        int i = order.length - 2;
+        while (i >= 0 && order[i] >= order[i + 1]) i--;
+        if (i < 0) return false;
+        int j = order.length - 1;
+        while (order[j] <= order[i]) j--;
+        int value = order[i];
+        order[i] = order[j];
+        order[j] = value;
+        for (int left = i + 1, right = order.length - 1; left < right; left++, right--) {
+            value = order[left];
+            order[left] = order[right];
+            order[right] = value;
+        }
+        return true;
+    }
+
+    private static int routeLength(int[][] steps, int[] order) {
+        int distance = 0;
+        int from = 0;
+        for (int target : order) {
+            distance += steps[from][target + 1];
+            from = target + 1;
+        }
+        return distance + steps[from][0];
+    }
+
     /** Immunity permits toxic gas only, never another active environmental hazard. */
     private static boolean onlyToxicHazard(int cell, Blob[] hazards) {
         for (Blob hazard : hazards) {
@@ -183,56 +297,61 @@ final class BlastAutoToxicRoom {
                 && ((long) forward + backward) * stepTime + interactions + 2 < duration;
     }
 
-    /** Once purity is drunk, keep this crossing ahead of normal gas retreat. */
+    /** One potion opens both chests and the skeleton before the hero withdraws. */
     static BlastAutoSpecialRooms.Action continuePurityRun(Hero hero, boolean[] safe,
             Blob[] hazards, boolean[] barriers) {
-        if (purityTreasure < 0) return BlastAutoSpecialRooms.Action.NONE;
+        if (purityTargets.length == 0) return BlastAutoSpecialRooms.Action.NONE;
         Level level = Dungeon.level;
         ToxicGasRoom room = knownRoom(level);
         BlobImmunity immunity = hero.buff(BlobImmunity.class);
         if (room == null || immunity == null || hero.belongings.lostInventory()
-                || !level.insideMap(purityEntrance)
-                || !level.insideMap(purityTreasure)) {
-            purityEntrance = -1;
-            purityTreasure = -1;
+                || !level.insideMap(purityEntrance)) {
+            endPurityRun();
             return BlastAutoSpecialRooms.Action.NONE;
         }
 
         int door = level.pointToCell(room.entrance());
-        boolean[] route = purityRoute(hero, level, room, door,
-                safe, hazards, barriers);
+        boolean[] route = purityRoute(hero, level, room, door, safe, hazards, barriers);
         int[] forward = distancesFrom(hero.pos, route);
-        int[] backward = distancesFrom(purityTreasure, route);
-        Heap heap = level.heaps.get(purityTreasure);
-        boolean pending = heap != null
-                && (heap.type == Heap.Type.CHEST || heap.type == Heap.Type.HEAP)
-                && collectibleCatalyst(hero, heap);
-        int interactions = heap != null && heap.type == Heap.Type.CHEST ? 2 : 1;
         float stepTime = Math.max(1f, 1f / hero.speed());
-        if (pending && !hero.rooted
-                && enoughPurity(immunity.cooldown(), forward[purityTreasure],
-                        backward[purityEntrance], interactions, stepTime)) {
-            if (hero.pos != purityTreasure) {
-                hero.curAction = new HeroAction.Move(
-                        BlastAutoPlay.firstStep(purityTreasure, route, forward));
-            } else if (heap.type == Heap.Type.CHEST) {
-                hero.curAction = new HeroAction.OpenChest(purityTreasure);
-            } else {
-                Item catalyst = BlastAutoPickup.firstEligibleItem(heap,
-                        item -> item instanceof TrinketCatalyst
-                                && BlastAutoPickup.canCollect(hero, item,
-                                        BlastAutoPickupPolicy::isInstantPickup));
-                if (catalyst == null) return BlastAutoSpecialRooms.Action.NONE;
-                BlastAutoPickup.exposeForPickup(heap, catalyst);
-                hero.curAction = new HeroAction.PickUp(purityTreasure);
+
+        while (purityIndex < purityTargets.length) {
+            int target = purityTargets[purityIndex];
+            if (!level.insideMap(target)) {
+                throw new IllegalStateException("Invalid toxic-room loot target");
             }
-            return BlastAutoSpecialRooms.Action.MOVE;
+            Heap heap = level.heaps.get(target);
+            if (heap == null || (heap.type == Heap.Type.HEAP
+                    && firstRoomLoot(hero, heap) == null)) {
+                purityIndex++;
+                continue;
+            }
+
+            int[] back = distancesFrom(target, route);
+            if (!hero.rooted && enoughPurity(immunity.cooldown(), forward[target],
+                    back[purityEntrance], roomActions(hero, heap), stepTime)) {
+                if (hero.pos != target) {
+                    hero.curAction = new HeroAction.Move(
+                            BlastAutoPlay.firstStep(target, route, forward));
+                } else if (heap.type == Heap.Type.CHEST
+                        || heap.type == Heap.Type.SKELETON) {
+                    hero.curAction = new HeroAction.OpenChest(target);
+                } else if (heap.type == Heap.Type.HEAP) {
+                    Item loot = firstRoomLoot(hero, heap);
+                    if (loot == null) throw new IllegalStateException("Lost toxic-room loot");
+                    BlastAutoPickup.exposeForPickup(heap, loot);
+                    hero.curAction = new HeroAction.PickUp(target);
+                } else {
+                    throw new IllegalStateException("Unexpected toxic-room container");
+                }
+                return BlastAutoSpecialRooms.Action.MOVE;
+            }
+            break;
         }
 
-        // Picked up the catalyst, or immunity is almost over: leave the room.
+        // All loot collected or insufficient immunity remains: return outside.
         if (hero.pos == purityEntrance) {
-            purityEntrance = -1;
-            purityTreasure = -1;
+            endPurityRun();
             return BlastAutoSpecialRooms.Action.NONE;
         }
         if (!hero.rooted && forward[purityEntrance] != Integer.MAX_VALUE) {
@@ -240,22 +359,32 @@ final class BlastAutoToxicRoom {
                     BlastAutoPlay.firstStep(purityEntrance, route, forward));
             return BlastAutoSpecialRooms.Action.MOVE;
         }
-        purityEntrance = -1;
-        purityTreasure = -1;
+        endPurityRun();
         return BlastAutoSpecialRooms.Action.NONE;
     }
 
-    /** Allow an unidentified Purity potion only for an actual catalyst objective. */
+    /** The catalyst enables an unidentified Purity to recover all three caches. */
     private static BlastAutoSpecialRooms.Action claimCatalyst(Hero hero, Level level,
             ToxicGasRoom room, boolean[] safe, int[] distances,
             Blob[] hazards, boolean[] barriers) {
         if (!gasInside(level, room)) return BlastAutoSpecialRooms.Action.NONE;
-        int treasure = catalystTreasure(level, room);
-        if (treasure < 0 || treasure == attemptedPurityTreasure)
+        int catalyst = catalystTreasure(level, room);
+        if (catalyst < 0 || catalyst == attemptedPurityTreasure)
             return BlastAutoSpecialRooms.Action.NONE;
-        // Let ordinary auto-pickup reach treasure without spending a potion.
-        if (safe[treasure] && distances[treasure] != Integer.MAX_VALUE)
+        Heap[] loot = roomLoot(hero, level, room);
+        if (loot.length == 0 || loot.length > 3
+                || !collectibleCatalyst(hero, level.heaps.get(catalyst)))
             return BlastAutoSpecialRooms.Action.NONE;
+
+        boolean allSafe = true;
+        for (Heap heap : loot) {
+            if (!safe[heap.pos] || distances[heap.pos] == Integer.MAX_VALUE) {
+                allSafe = false;
+                break;
+            }
+        }
+        // Ordinary auto-interaction/pickup can handle the entire room already.
+        if (allSafe) return BlastAutoSpecialRooms.Action.NONE;
 
         BlobImmunity immunity = hero.buff(BlobImmunity.class);
         PotionOfPurity potion = hero.belongings.getItem(PotionOfPurity.class);
@@ -266,29 +395,39 @@ final class BlastAutoToxicRoom {
         int stand = purityStand(level, room, door, safe, distances);
         if (stand < 0) return BlastAutoSpecialRooms.Action.NONE;
         boolean[] route = purityRoute(hero, level, room, door, safe, hazards, barriers);
-        int[] toChest = distancesFrom(stand, route);
-        int[] back = distancesFrom(treasure, route);
-        Heap heap = level.heaps.get(treasure);
-        if (!collectibleCatalyst(hero, heap))
-            return BlastAutoSpecialRooms.Action.NONE;
-        int interactions = heap.type == Heap.Type.CHEST ? 2 : 1;
+        int[][] steps = new int[loot.length + 1][loot.length + 1];
+        for (int i = 0; i < steps.length; i++) {
+            int origin = i == 0 ? stand : loot[i - 1].pos;
+            int[] reachable = distancesFrom(origin, route);
+            for (int j = 0; j < steps.length; j++) {
+                int destination = j == 0 ? stand : loot[j - 1].pos;
+                steps[i][j] = reachable[destination];
+            }
+        }
+        int[] order = shortestOrder(steps);
+        if (order == null) return BlastAutoSpecialRooms.Action.NONE;
+        int actions = 0;
+        for (Heap heap : loot) actions += roomActions(hero, heap);
         float duration = immunity == null
                 ? BlobImmunity.DURATION - 1f : immunity.cooldown();
-        if (!enoughPurity(duration, toChest[treasure], back[stand],
-                interactions, Math.max(1f, 1f / hero.speed())))
+        if (!enoughPurity(duration, routeLength(steps, order), 0, actions,
+                Math.max(1f, 1f / hero.speed())))
             return BlastAutoSpecialRooms.Action.NONE;
-
         if (hero.pos != stand) {
             return BlastAutoSpecialRooms.approachEntrance(
-                    hero, treasure, stand, safe, distances);
+                    hero, catalyst, stand, safe, distances);
         }
 
         purityEntrance = stand;
-        purityTreasure = treasure;
-        attemptedPurityTreasure = treasure;
+        purityTargets = new int[order.length];
+        for (int i = 0; i < order.length; i++) {
+            purityTargets[i] = loot[order[i]].pos;
+        }
+        purityIndex = 0;
+        attemptedPurityTreasure = catalyst;
         if (immunity == null) {
-            BlastLog.debug("auto-toxic action=purity-catalyst chest=" + treasure
-                    + " identified=" + potion.isKnown());
+            BlastLog.debug("auto-toxic action=purity-room containers="
+                    + Arrays.toString(purityTargets) + " identified=" + potion.isKnown());
             potion.execute(hero, Potion.AC_DRINK);
             return BlastAutoSpecialRooms.Action.USE;
         }
