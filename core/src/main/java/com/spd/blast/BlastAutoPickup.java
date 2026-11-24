@@ -98,7 +98,8 @@ public final class BlastAutoPickup {
                     || !safe[cell] || distances[cell] == Integer.MAX_VALUE) continue;
 
             Item item = firstEligibleItem(heap, candidate ->
-                    (isPickupType(candidate, instantPickup)
+                    !BlastAutoCrystalRooms.isStaged(candidate)
+                    && (isPickupType(candidate, instantPickup)
                             || BlastAutoEquipment.canPickup(hero, candidate))
                     && canCollect(hero, candidate, instantPickup)
                     && !(retryTurns > 0 && candidate == attemptedItem
