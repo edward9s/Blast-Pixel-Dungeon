@@ -144,7 +144,9 @@ final class BlastAutoCrystalRooms {
             }
             if (!fitsBag) required++;
         }
-        int toDrop = required;
+        int free = Math.max(0, hero.belongings.backpack.capacity()
+                - hero.belongings.backpack.items.size());
+        int toDrop = Math.max(0, required - free);
         if (toDrop > 0) {
             Item candidate = null;
             for (Item item : hero.belongings.backpack) {
