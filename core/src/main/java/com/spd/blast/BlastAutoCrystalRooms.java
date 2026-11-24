@@ -71,7 +71,7 @@ final class BlastAutoCrystalRooms {
      * Evaluate the complete two-lock route from the room entrance to each prize.
      * A door inherits the priority of the prize whose cheapest route uses it next.
      */
-    private static int pathDoorPriority(Level level, Room room, int target) {
+    private static int pathDoorPriority(Level level, CrystalPathRoom room, int target) {
         if (level.map[target] != Terrain.CRYSTAL_DOOR || room.entrance() == null
                 || Dungeon.branch != 0) return 0;
         int keys = Notes.keyCount(new CrystalKey(Dungeon.depth));
