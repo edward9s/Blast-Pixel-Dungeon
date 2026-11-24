@@ -149,12 +149,8 @@ final class BlastAutoToxicRoom {
         return route;
     }
 
-    /** Use native OpenChest and PickUp actions until no eligible loot remains. */
-    private static BlastAutoSpecialRooms.Action collectRoom(Hero hero, Level level,
-            ToxicGasRoom room, boolean[] safe, Blob[] hazards, boolean[] barriers) {
-        boolean[] route = lootRoute(hero, level, room, safe, hazards, barriers);
-        PathFinder.buildDistanceMap(hero.pos, route);
-        int[] distances = PathFinder.distance;
+    private static Heap closestRoomLoot(Hero hero, Level level,
+                                         ToxicGasRoom room, int[] distances) {
         Heap closest = null;
         int shortest = Integer.MAX_VALUE;
         for (Heap heap : level.heaps.valueList()) {
@@ -167,6 +163,16 @@ final class BlastAutoToxicRoom {
                 shortest = distances[heap.pos];
             }
         }
+        return closest;
+    }
+
+    /** Use native OpenChest and PickUp actions until no eligible loot remains. */
+    private static BlastAutoSpecialRooms.Action collectRoom(Hero hero, Level level,
+            ToxicGasRoom room, boolean[] safe, Blob[] hazards, boolean[] barriers) {
+        boolean[] route = lootRoute(hero, level, room, safe, hazards, barriers);
+        PathFinder.buildDistanceMap(hero.pos, route);
+        int[] distances = PathFinder.distance;
+        Heap closest = closestRoomLoot(hero, level, room, distances);
         if (closest == null) return BlastAutoSpecialRooms.Action.NONE;
         int target = closest.pos;
         if (closest.type != Heap.Type.HEAP
@@ -351,6 +357,11 @@ final class BlastAutoToxicRoom {
                     && purity != null && purity.quantity() > 0) {
                 int stand = drinkStand(level, room, safe, distances);
                 if (stand >= 0) {
+                    boolean[] crossing = lootRoute(
+                            hero, level, room, safe, hazards, specialBarriers);
+                    PathFinder.buildDistanceMap(stand, crossing);
+                    if (closestRoomLoot(hero, level, room, PathFinder.distance) == null)
+                        return BlastAutoSpecialRooms.Action.NONE;
                     if (hero.pos != stand && !hero.rooted) {
                         hero.curAction = new HeroAction.Move(
                                 BlastAutoPlay.firstStep(stand, safe, distances));
