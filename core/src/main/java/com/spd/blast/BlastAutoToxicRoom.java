@@ -230,15 +230,14 @@ final class BlastAutoToxicRoom {
         }
 
         // Picked up the catalyst, or immunity is almost over: leave the room.
-        int[] retreat = distancesFrom(hero.pos, route);
         if (hero.pos == purityEntrance) {
             purityEntrance = -1;
             purityTreasure = -1;
             return BlastAutoSpecialRooms.Action.NONE;
         }
-        if (!hero.rooted && retreat[purityEntrance] != Integer.MAX_VALUE) {
+        if (!hero.rooted && forward[purityEntrance] != Integer.MAX_VALUE) {
             hero.curAction = new HeroAction.Move(
-                    BlastAutoPlay.firstStep(purityEntrance, route, retreat));
+                    BlastAutoPlay.firstStep(purityEntrance, route, forward));
             return BlastAutoSpecialRooms.Action.MOVE;
         }
         purityEntrance = -1;
