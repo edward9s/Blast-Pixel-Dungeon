@@ -9,6 +9,9 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.VaultMirror;
 import com.shatteredpixel.shatteredpixeldungeon.items.quest.DwarfToken;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroAction;
 import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
+import com.shatteredpixel.shatteredpixeldungeon.items.bombs.Bomb;
+import com.shatteredpixel.shatteredpixeldungeon.levels.RegularLevel;
+import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.special.CrystalVaultRoom;
 import com.shatteredpixel.shatteredpixeldungeon.items.keys.CrystalKey;
 import com.shatteredpixel.shatteredpixeldungeon.items.keys.GoldenKey;
 import com.shatteredpixel.shatteredpixeldungeon.items.keys.IronKey;
@@ -135,6 +138,7 @@ public final class BlastAutoInteract {
             }
         }
 
+        if (target < 0 && demolishLastCrystalChest(hero, safe, distances)) return true;
         if (target < 0) return false;
         if (hero.pos == stand) {
             hero.curAction = chest ? new HeroAction.OpenChest(target)
@@ -144,6 +148,58 @@ public final class BlastAutoInteract {
                     BlastAutoPlay.firstStep(stand, safe, distances));
         }
         return true;
+    }
+
+    /** Recover the unchosen crystal vault chest after all crystal keys are spent. */
+    private static boolean demolishLastCrystalChest(Hero hero, boolean[] safe,
+                                                    int[] distances) {
+        Level level = Dungeon.level;
+        if (!(level instanceof RegularLevel) || Dungeon.branch != 0
+                || Notes.keyCount(new CrystalKey(Dungeon.depth)) != 0
+                || !BlastSettings.testAutoPlay() || BlastRemoteBomb.isTimedMode()
+                || hero.buff(BlastRemoteBomb.class) == null) return false;
+        CrystalVaultRoom room = (CrystalVaultRoom)
+                ((RegularLevel) level).room(CrystalVaultRoom.class);
+        if (room == null) return false;
+        Heap chest = null;
+        int remaining = 0;
+        for (Heap heap : level.heaps.valueList()) {
+            if (heap.type == Heap.Type.CRYSTAL_CHEST
+                    && room.inside(level.cellToPoint(heap.pos))) {
+                remaining++;
+                chest = heap;
+            }
+        }
+        if (remaining != 1 || chest == null || !chest.seen) return false;
+        BlastBombManiac maniac = BlastBombManiac.current();
+        if (maniac == null || maniac.remaining() == 0) return false;
+        Bomb bomb = maniac.bombAt(0);
+        boolean remote = BlastSettings.testRemoteThrow();
+        int best = -1;
+        int shortest = Integer.MAX_VALUE;
+        for (int cell = 0; cell < level.length(); cell++) {
+            if (!safe[cell] || distances[cell] == Integer.MAX_VALUE
+                    || distances[cell] >= shortest) continue;
+            int center = remote ? BlastBombTrajectory.throwPos(cell, chest.pos) : cell;
+            if (!level.insideMap(center) || !bomb.blastWarningCells(center)[chest.pos])
+                continue;
+            if (remote && center != chest.pos) continue;
+            best = cell;
+            shortest = distances[cell];
+        }
+        if (best < 0 || hero.rooted && best != hero.pos) return false;
+        if (best != hero.pos) {
+            hero.curAction = new HeroAction.Move(
+                    BlastAutoPlay.firstStep(best, safe, distances));
+            return true;
+        }
+        boolean started = remote ? maniac.blastAutoDemolishChest(chest.pos)
+                : maniac.blastAutoDemolishChestNearby();
+        if (started) {
+            BlastLog.debug("auto-crystal action=demolish chest=" + chest.pos);
+            if (!remote) hero.spendAndNext(1f);
+        }
+        return started;
     }
 
     /** Containers allow standing on their cell; doors require an adjacent cell. */
