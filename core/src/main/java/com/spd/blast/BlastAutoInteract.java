@@ -2,6 +2,10 @@ package com.spd.blast;
 
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.VaultTokenDoor;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.VaultMirror;
+import com.shatteredpixel.shatteredpixeldungeon.items.quest.DwarfToken;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroAction;
 import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
 import com.shatteredpixel.shatteredpixeldungeon.items.keys.CrystalKey;
@@ -50,6 +54,26 @@ public final class BlastAutoInteract {
         Level level = Dungeon.level;
         if (safe.length != level.length() || distances.length != level.length()) {
             throw new IllegalArgumentException("Invalid auto-interaction distance map");
+        }
+
+        // Vault NPC objects are opened through their native interaction dialogs.
+        // Approach only when the token threshold or an unclaimed reward is present.
+        for (Mob mob : level.mobs) {
+            boolean ready = mob instanceof VaultTokenDoor
+                    && hero.belongings.getItem(DwarfToken.class) != null
+                    && hero.belongings.getItem(DwarfToken.class).quantity() >= 10;
+            ready |= mob instanceof VaultMirror && ((VaultMirror) mob).reward != null;
+            if (!ready || !mob.isAlive() || !hero.fieldOfView[mob.pos]) continue;
+            int candidate = nearestStand(level, mob.pos, false, safe, distances);
+            if (candidate < 0) continue;
+            if (hero.pos == candidate) {
+                // Native dialog still requires the player to confirm the reward.
+                hero.curAction = new HeroAction.Interact(mob);
+            } else {
+                hero.curAction = new HeroAction.Move(
+                        BlastAutoPlay.firstStep(candidate, safe, distances));
+            }
+            return true;
         }
 
         // Journal keys are valid on the main branch only, like native SPD.
