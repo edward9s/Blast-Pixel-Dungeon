@@ -1,6 +1,7 @@
 package com.spd.blast;
 
 import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
+import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
 
 /** Deterministic checks for the permanent toxic-room vent and doorway policy. */
 public final class BlastAutoToxicRoomTest {
@@ -44,52 +45,21 @@ public final class BlastAutoToxicRoomTest {
                 "native bombs destroy closed flammable doors");
         check((Terrain.flags[Terrain.OPEN_DOOR] & Terrain.FLAMABLE) != 0,
                 "native bombs destroy open flammable doors");
-        // An unidentified Potion of Purity grants 20 turns of toxic-gas
-        // immunity; budget both the unopened chest and the return to the door.
-        check(BlastAutoToxicRoom.enoughPurity(19f, 5, 5, 2, 1f),
-                "a short round trip, opening chest and pickup fits within immunity");
-        check(!BlastAutoToxicRoom.enoughPurity(19f, 9, 9, 2, 1f),
-                "do not drink Purity when it expires before the round trip ends");
-        check(!BlastAutoToxicRoom.enoughPurity(12f, 4, 4, 2, 1f),
-                "a nearly expired immunity must cause retreat");
-        check(!BlastAutoToxicRoom.enoughPurity(20f, Integer.MAX_VALUE, 2, 2, 1f),
-                "an unreachable chest must never consume Purity");
-        check(!BlastAutoToxicRoom.enoughPurity(20f, 2, Integer.MAX_VALUE, 2, 1f),
-                "an unsafe return route must never consume Purity");
-        check(!BlastAutoToxicRoom.enoughPurity(20f, 4, 4, 0, 1f),
-                "the expected pickup action must be included in the time budget");
-        check(!BlastAutoToxicRoom.enoughPurity(20f, 4, 4, 2, 0f),
-                "invalid movement speed must be rejected");
+        // All unopened room caches need opening, even without collectible
+        // contents; opened heaps are visited only when loot can be picked up.
+        check(BlastAutoToxicRoom.pendingContainer(Heap.Type.CHEST, false),
+                "A closed chest should trigger toxic-room looting");
+        check(BlastAutoToxicRoom.pendingContainer(Heap.Type.SKELETON, false),
+                "A skeleton pile should trigger toxic-room looting");
+        check(BlastAutoToxicRoom.pendingContainer(Heap.Type.REMAINS, false),
+                "Remains should be handled like a skeleton pile");
+        check(BlastAutoToxicRoom.pendingContainer(Heap.Type.HEAP, true),
+                "Collectible items left on the floor should trigger looting");
+        check(!BlastAutoToxicRoom.pendingContainer(Heap.Type.HEAP, false),
+                "Rejected items must not trigger endless toxic-room visits");
+        check(!BlastAutoToxicRoom.pendingContainer(Heap.Type.LOCKED_CHEST, true),
+                "Locked treasure is outside this ordinary chest policy");
 
-        // Three caches: opening two chests plus one skeleton, then collecting
-        // their contents. Shortest order avoids wasting the 20-turn immunity.
-        int[][] threeCaches = {
-                {0, 2, 5, 5},
-                {2, 0, 3, 8},
-                {5, 3, 0, 2},
-                {5, 8, 2, 0}
-        };
-        int[] visit = BlastAutoToxicRoom.shortestOrder(threeCaches);
-        check(visit != null && visit.length == 3
-                && visit[0] == 0 && visit[1] == 1 && visit[2] == 2,
-                "shortest toxic-room trip must visit chest, chest, skeleton in order");
-        check(BlastAutoToxicRoom.enoughPurity(19f, 10, 0, 6, 1f),
-                "one Purity must cover three openings, three pickups and the return trip");
-        int[][] blocked = {
-                {0, 1, Integer.MAX_VALUE},
-                {1, 0, Integer.MAX_VALUE},
-                {Integer.MAX_VALUE, Integer.MAX_VALUE, 0}
-        };
-        check(BlastAutoToxicRoom.shortestOrder(blocked) == null,
-                "unreachable skeleton must not be included in a drinking plan");
-        boolean malformed = false;
-        try {
-            BlastAutoToxicRoom.shortestOrder(new int[][]{{0, 1}, {1}});
-        } catch (IllegalArgumentException expected) {
-            malformed = true;
-        }
-        check(malformed, "invalid route matrix must fail early");
-        
         System.out.println("BlastAutoToxicRoomTest passed");
     }
 }
