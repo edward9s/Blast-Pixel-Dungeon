@@ -39,7 +39,11 @@ final class BlastAutoBlacksmith {
             for (Mob mob : Dungeon.level.mobs) {
                 if (mob instanceof CrystalGuardian && mob.isAlive()) {
                     guardian = true;
-                    break;
+                    if (((CrystalGuardian) mob).recovering() && enabledDemolition) {
+                        // Native guardians revive indefinitely. The scoped demolition
+                        // option finishes one only after it has been defeated normally.
+                        mob.die(Dungeon.hero);
+                    }
                 }
             }
         }
