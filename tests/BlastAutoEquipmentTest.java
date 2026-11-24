@@ -1,8 +1,10 @@
 package com.spd.blast;
 
 import com.shatteredpixel.shatteredpixeldungeon.items.armor.LeatherArmor;
+import com.shatteredpixel.shatteredpixeldungeon.items.armor.glyphs.Camouflage;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.Dagger;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.Shortsword;
+import com.shatteredpixel.shatteredpixeldungeon.items.weapon.enchantments.Blazing;
 import com.shatteredpixel.shatteredpixeldungeon.items.artifacts.DriedRose;
 
 /** Automatic equipment checks true upgrade levels even for unidentified gear. */
@@ -44,6 +46,26 @@ public final class BlastAutoEquipmentTest {
                 "Sellable cursed gear may be collected when Alchemize is present");
         check(!BlastAutoEquipment.canPickup(new DriedRose(), true),
                 "Artifacts must remain outside the automatic equipment policy");
+
+        int insufficientStrength = plain.STRReq(plain.trueLevel()) - 1;
+        check(BlastAutoEquipment.isUnwearableForSale(plain, insufficientStrength),
+                "Unenchanted weapons above the real strength limit may be sold");
+        check(!BlastAutoEquipment.isUnwearableForSale(plain, insufficientStrength + 1),
+                "Weapons within the strength limit must be preserved");
+        plain.enchant(new Blazing());
+        check(!BlastAutoEquipment.isUnwearableForSale(plain, insufficientStrength),
+                "Enchanted weapons must never be sold during strength cleanup");
+
+        int insufficientArmorStrength = basicArmor.STRReq(basicArmor.trueLevel()) - 1;
+        check(BlastAutoEquipment.isUnwearableForSale(basicArmor, insufficientArmorStrength),
+                "Uninscribed armor above the real strength limit may be sold");
+        check(!BlastAutoEquipment.isUnwearableForSale(basicArmor, insufficientArmorStrength + 1),
+                "Armor within the strength limit must be preserved");
+        basicArmor.inscribe(new Camouflage());
+        check(!BlastAutoEquipment.isUnwearableForSale(basicArmor, insufficientArmorStrength),
+                "Inscribed armor must never be sold during strength cleanup");
+        check(!BlastAutoEquipment.isUnwearableForSale(new DriedRose(), 0),
+                "Only weapons and armor are eligible for strength cleanup");
 
         System.out.println("BlastAutoEquipmentTest passed");
     }
