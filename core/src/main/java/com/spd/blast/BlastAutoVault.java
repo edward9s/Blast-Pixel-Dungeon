@@ -26,7 +26,7 @@ final class BlastAutoVault {
                     || flames.curCooldowns.length != danger.length)))
                 throw new IllegalStateException("Invalid vault flame grid");
             for (int cell = 0; cell < danger.length; cell++) {
-                if (flames.cur[cell] > 1) danger[cell] = true;
+                if (flames.cur[cell] > 0) danger[cell] = true;
                 if (flames.afterTriggerCooldowns != null
                         && flames.afterTriggerCooldowns[cell] >= 0
                         && flames.curCooldowns[cell] <= 1) danger[cell] = true;
@@ -37,7 +37,7 @@ final class BlastAutoVault {
             if (!mob.isAlive()) continue;
             if (mob instanceof VaultLaser) {
                 VaultLaser laser = (VaultLaser) mob;
-                if (laser.curCooldown > 2) continue;
+                if (laser.curCooldown > 1) continue;
                 if (laser.laserDirs == null || laser.laserDirs.length == 0)
                     throw new IllegalStateException("Vault laser has no directions");
                 Ballistica beam = new Ballistica(laser.pos,
@@ -45,7 +45,7 @@ final class BlastAutoVault {
                 for (int cell : beam.subPath(1, beam.dist)) danger[cell] = true;
             } else if (mob instanceof VaultSentry) {
                 VaultSentry sentry = (VaultSentry) mob;
-                if (sentry.curCooldown > 2) continue;
+                if (sentry.curCooldown > 1) continue;
                 if (sentry.scanDirs == null || sentry.scanDirs.length == 0)
                     throw new IllegalStateException("Vault sentry has no scan directions");
                 for (int direction : sentry.scanDirs[sentry.scanDirIdx]) {
