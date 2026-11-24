@@ -204,6 +204,7 @@ public final class BlastAutoPlay {
         BlastAutoEquipment.reset();
         BlastAutoTrapClearer.reset();
         BlastAutoSpecialRooms.reset();
+        BlastAutoCrystalRooms.resetPhase();
         BlastAutoSacrifice.reset();
         BlastAutoFood.stopFeeding();
 
@@ -647,6 +648,7 @@ public final class BlastAutoPlay {
         hero.lastAction = null;
         hero.resting = false;
 
+        BlastAutoCrystalRooms.updatePhase(hero);
         Blob[] hazards = BlastAutoEnvironment.activeHazards(Dungeon.level);
         boolean[] specialBarriers = BlastAutoEnvironment.activeSpecialBarriers(Dungeon.level);
         boolean[] safe = safeCells(hero, hazards, specialBarriers);
