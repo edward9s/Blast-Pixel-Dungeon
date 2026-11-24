@@ -72,9 +72,9 @@ final class BlastAutoCrystalRooms {
             CrystalPathRoom path = (CrystalPathRoom) regular.room(CrystalPathRoom.class);
             CrystalChoiceRoom choice = (CrystalChoiceRoom) regular.room(CrystalChoiceRoom.class);
             if (path != null && remainingCrystalDoors(level, path) <= 3
-                    && hasUncollectedLoot(level, path)) room = path;
+                    && hasUncollectedLoot(hero, level, path)) room = path;
             else if (choice != null && remainingCrystalDoors(level, choice) <= 1
-                    && hasUncollectedLoot(level, choice)) room = choice;
+                    && hasUncollectedLoot(hero, level, choice)) room = choice;
         }
         lootPending = room != null;
         boolean ready = false;
@@ -87,7 +87,8 @@ final class BlastAutoCrystalRooms {
                 for (Heap heap : level.heaps.valueList()) {
                     if (!room.inside(level.cellToPoint(heap.pos))) continue;
                     for (Item item : heap.items) {
-                        if (!staged.contains(item)) prizes.add(item);
+                        if (!staged.contains(item)
+                                && !BlastAutoEquipment.blocksCursedPickup(hero, item)) prizes.add(item);
                     }
                 }
                 int required = requiredSlots(hero, prizes);
@@ -115,10 +116,12 @@ final class BlastAutoCrystalRooms {
         }
     }
 
-    private static boolean hasUncollectedLoot(Level level, Room room) {
+    private static boolean hasUncollectedLoot(Hero hero, Level level, Room room) {
         for (Heap heap : level.heaps.valueList()) {
             if (room.inside(level.cellToPoint(heap.pos))
-                    && heap.items.stream().anyMatch(item -> !staged.contains(item))) return true;
+                    && heap.items.stream().anyMatch(item -> !staged.contains(item)
+                            && (heap.type != Heap.Type.HEAP
+                                || !BlastAutoEquipment.blocksCursedPickup(hero, item)))) return true;
         }
         return false;
     }

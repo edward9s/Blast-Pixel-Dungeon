@@ -128,7 +128,7 @@ final class BlastAutoSentryRoom {
             } else if (heap.type == Heap.Type.CHEST) {
                 hero.curAction = new HeroAction.OpenChest(activeTreasure);
             } else {
-                BlastAutoPickup.exposeForPickup(heap, loot);
+                BlastAutoPickup.preparePickup(hero, heap, loot);
                 hero.curAction = new HeroAction.PickUp(activeTreasure);
             }
             return BlastAutoSpecialRooms.Action.MOVE;

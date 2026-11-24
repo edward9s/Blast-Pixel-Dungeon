@@ -85,6 +85,12 @@ final class BlastAutoEquipment {
                         item, hero.belongings, hero.belongings.armor(), hero.STR()));
     }
 
+    static boolean blocksCursedPickup(Hero hero, Item item) {
+        return (item instanceof MeleeWeapon || item instanceof Armor) && isCursed(item)
+                && !canPickup(item, !hero.belongings.lostInventory()
+                        && availableAlchemize(hero) != null);
+    }
+
     /** A cursed item is collected only when it can be sold using Alchemize. */
     static boolean canPickup(Item item, boolean alchemizeAvailable) {
         if (!(item instanceof MeleeWeapon || item instanceof Armor)) return false;
