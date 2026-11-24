@@ -10,6 +10,8 @@ import com.shatteredpixel.shatteredpixeldungeon.items.food.Pasty;
 import com.shatteredpixel.shatteredpixeldungeon.items.food.SmallRation;
 import com.shatteredpixel.shatteredpixeldungeon.items.food.StewedMeat;
 import com.shatteredpixel.shatteredpixeldungeon.items.potions.PotionOfHealing;
+import com.shatteredpixel.shatteredpixeldungeon.items.potions.exotic.PotionOfCleansing;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Hunger;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -136,6 +138,30 @@ public final class BlastAutoFoodTest {
         rawMeat.quantity(5);
         same(ration, BlastAutoFood.bestFitWithin(Arrays.asList(rawMeat, ration), 450, 1f),
                 "larger fitting ration takes priority over a larger stack of meat");
+        // Cleansing satisfies 450 hunger but is reserved until ordinary food
+        // runs out, and only when the hunger indicator is still showing.
+        PotionOfCleansing cleansing = new PotionOfCleansing();
+        if (BlastAutoFood.cleansingIfHungry(
+                Collections.singletonList(cleansing), (int) Hunger.HUNGRY - 1) != null) {
+            throw new AssertionError("Do not waste cleansing when no longer hungry");
+        }
+        if (BlastAutoFood.cleansingIfHungry(
+                Collections.singletonList(cleansing), (int) Hunger.HUNGRY) != cleansing) {
+            throw new AssertionError("Cleansing must remove the remaining hungry state");
+        }
+        if (BlastAutoFood.cleansingIfHungry(
+                Collections.singletonList(cleansing), (int) Hunger.STARVING) != cleansing) {
+            throw new AssertionError("Cleansing must be eligible at full starvation");
+        }
+        if (BlastAutoFood.cleansingIfHungry(
+                Collections.emptyList(), (int) Hunger.STARVING) != null) {
+            throw new AssertionError("Do not use a missing cleansing potion");
+        }
+        cleansing.quantity(0);
+        if (BlastAutoFood.cleansingIfHungry(
+                Collections.singletonList(cleansing), (int) Hunger.STARVING) != null) {
+            throw new AssertionError("Do not use an empty cleansing stack");
+        }
         System.out.println("BlastAutoFoodTest passed");
     }
 }

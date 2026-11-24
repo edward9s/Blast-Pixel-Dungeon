@@ -16,6 +16,8 @@ import com.shatteredpixel.shatteredpixeldungeon.items.food.MeatPie;
 import com.shatteredpixel.shatteredpixeldungeon.items.food.MysteryMeat;
 import com.shatteredpixel.shatteredpixeldungeon.items.food.Pasty;
 import com.shatteredpixel.shatteredpixeldungeon.items.food.StewedMeat;
+import com.shatteredpixel.shatteredpixeldungeon.items.potions.Potion;
+import com.shatteredpixel.shatteredpixeldungeon.items.potions.exotic.PotionOfCleansing;
 
 import java.util.ArrayList;
 
@@ -108,6 +110,16 @@ public final class BlastAutoFood {
         return selected;
     }
 
+    /** Use cleansing as a fallback only when hunger is still visible. */
+    static PotionOfCleansing cleansingIfHungry(Iterable<PotionOfCleansing> potions,
+                                               int remainingHunger) {
+        if (remainingHunger < Hunger.HUNGRY) return null;
+        for (PotionOfCleansing potion : potions) {
+            if (potion.quantity() > 0) return potion;
+        }
+        return null;
+    }
+
     /** Keep native Food/Horn actions on the hero's actor turn. */
     private static void eatAutomatically(Hero hero, Item item, String action) {
         automaticConsumption.set(true);
@@ -159,11 +171,21 @@ public final class BlastAutoFood {
         }
 
         Food food = bestFitWithin(foods, remainingHunger, foodMultiplier);
-        if (food == null) {
-            stopFeeding();
-            return false;
+        if (food != null) {
+            eatAutomatically(hero, food, Food.AC_EAT);
+            return true;
         }
-        eatAutomatically(hero, food, Food.AC_EAT);
-        return true;
+
+        PotionOfCleansing cleansing = cleansingIfHungry(
+                hero.belongings.getAllItems(PotionOfCleansing.class), remainingHunger);
+        if (cleansing != null) {
+            // The native cleansing effect satisfies Hunger.STARVING (450 points).
+            // It is worth spending only when ordinary food cannot be used.
+            cleansing.execute(hero, Potion.AC_DRINK);
+            stopFeeding();
+            return true;
+        }
+        stopFeeding();
+        return false;
     }
 }
