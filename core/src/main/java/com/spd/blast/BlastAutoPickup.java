@@ -163,6 +163,7 @@ public final class BlastAutoPickup {
         Item item = selectedItem;
         String status;
         if (BlastAutoTrapClearer.holdingDoorOpen(cell)) status = "door-held";
+        else if (BlastAutoEquipment.blocksCursedPickup(hero, item)) status = "cursed";
         else if (!isPickupType(item, instantPickup)
                 && !BlastAutoEquipment.canPickup(hero, item)) status = "type";
         else if (!canCollect(hero, item, instantPickup)) {
@@ -254,6 +255,7 @@ public final class BlastAutoPickup {
     }
 
     static boolean canCollect(Hero hero, Item item, Predicate<Item> instantPickup) {
+        if (BlastAutoEquipment.blocksCursedPickup(hero, item)) return false;
         if (item instanceof DriedRose.Petal) {
             return canUpgradeRose(hero.belongings.getItem(DriedRose.class));
         }

@@ -177,7 +177,7 @@ final class BlastAutoSpecialRooms {
                     item -> BlastAutoPickup.canCollect(hero, item,
                             BlastAutoPickupPolicy::isInstantPickup));
             if (loot != null) {
-                BlastAutoPickup.exposeForPickup(chest, loot);
+                BlastAutoPickup.preparePickup(hero, chest, loot);
                 hero.curAction = new HeroAction.PickUp(flightTreasure);
                 return Action.MOVE;
             }

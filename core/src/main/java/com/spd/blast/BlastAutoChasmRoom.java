@@ -134,7 +134,7 @@ final class BlastAutoChasmRoom {
         Heap heap = Dungeon.level.heaps.get(hero.pos);
         Item loot = eligibleLoot(hero, heap);
         if (loot != null) {
-            BlastAutoPickup.exposeForPickup(heap, loot);
+            BlastAutoPickup.preparePickup(hero, heap, loot);
             hero.curAction = new HeroAction.PickUp(hero.pos);
             return BlastAutoSpecialRooms.Action.MOVE;
         }
