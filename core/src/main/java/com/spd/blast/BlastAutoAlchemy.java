@@ -24,10 +24,8 @@ import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.Scroll;
 import com.shatteredpixel.shatteredpixeldungeon.items.spells.Alchemize;
 import com.shatteredpixel.shatteredpixeldungeon.items.stones.Runestone;
 import com.shatteredpixel.shatteredpixeldungeon.items.stones.StoneOfAugmentation;
-import com.shatteredpixel.shatteredpixeldungeon.items.stones.StoneOfClairvoyance;
 import com.shatteredpixel.shatteredpixeldungeon.items.stones.StoneOfDetectMagic;
 import com.shatteredpixel.shatteredpixeldungeon.items.stones.StoneOfEnchantment;
-import com.shatteredpixel.shatteredpixeldungeon.items.stones.StoneOfShock;
 import com.shatteredpixel.shatteredpixeldungeon.journal.Catalog;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
@@ -185,8 +183,7 @@ final class BlastAutoAlchemy {
 
     private static boolean importantStone(Runestone stone) {
         return stone instanceof StoneOfEnchantment || stone instanceof StoneOfDetectMagic
-                || stone instanceof StoneOfAugmentation || stone instanceof StoneOfClairvoyance
-                || stone instanceof StoneOfShock;
+                || stone instanceof StoneOfAugmentation;
     }
 
     private static boolean fuelSeed(Seed seed) {
