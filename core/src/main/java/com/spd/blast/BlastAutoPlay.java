@@ -284,10 +284,17 @@ public final class BlastAutoPlay {
             hero.curAction = new HeroAction.Move(firstStep(interruptedDestination, safe, distances));
             return true;
         }
-        // A periodic flame corridor needs a turn to change phase. Keep the clicked
-        // destination while its next step is temporarily unsafe.
-        if (BlastAutoVault.waitForFlames(hero, Dungeon.level, safe)) {
-            hero.spendAndNext(Actor.TICK);
+        // A temporarily burning tile must not erase the player's destination.
+        // Plan through the known flame grid, then execute only a currently safe step.
+        int flameStep = BlastAutoVault.nextFlameStep(
+                hero, Dungeon.level, interruptedDestination, safe);
+        if (flameStep >= 0) {
+            blockedTravelTurns = 0;
+            if (safe[flameStep]) {
+                hero.curAction = new HeroAction.Move(flameStep);
+            } else {
+                hero.spendAndNext(Actor.TICK);
+            }
             return true;
         }
         // Allow transient enemies, doors or hazards to clear; never wait indefinitely.
