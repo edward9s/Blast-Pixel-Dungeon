@@ -818,6 +818,13 @@ public final class BlastAutoPlay {
             return false;
         }
 
+        // The crystal mimic can disappear shortly after it takes the first hit.
+        debugDecision = "crystal-mimic";
+        BlastAutoCombat.Action intercept = BlastAutoCombat.interceptCrystalMimic(hero, safe, distances);
+        if (intercept != BlastAutoCombat.Action.NONE) {
+            return intercept == BlastAutoCombat.Action.STARTED;
+        }
+
         // Blast-specific tactics are isolated from the portable AI policy.
         debugDecision = "bomb";
         if (BlastAutoBombAI.actAgainstOtherEnemies(hero)) return true;
