@@ -172,12 +172,17 @@ final class BlastAutoToxicRoom {
 
     /** Use native OpenChest and PickUp actions until no eligible loot remains. */
     private static BlastAutoSpecialRooms.Action collectRoom(Hero hero, Level level,
-            ToxicGasRoom room, boolean[] safe, Blob[] hazards, boolean[] barriers) {
+            ToxicGasRoom room, boolean[] safe, Blob[] hazards, boolean[] barriers,
+            boolean toxicDoorway) {
         boolean[] route = lootRoute(hero, level, room, safe, hazards, barriers);
         PathFinder.buildDistanceMap(hero.pos, route);
         int[] distances = PathFinder.distance;
         Heap closest = closestRoomLoot(hero, level, room, distances);
         if (closest == null) return BlastAutoSpecialRooms.Action.NONE;
+        if (toxicDoorway && hero.buff(BlobImmunity.class) == null) {
+            PotionOfPurity purity = hero.belongings.getItem(PotionOfPurity.class);
+            if (purity != null && purity.quantity() > 0) return drinkPurity(hero, purity);
+        }
         int target = closest.pos;
         if (closest.type != Heap.Type.HEAP
                 && (hero.pos == target || level.adjacent(hero.pos, target))) {
@@ -195,14 +200,46 @@ final class BlastAutoToxicRoom {
         return BlastAutoSpecialRooms.Action.MOVE;
     }
 
-    /** Called before generic gas escape, only while physically inside the room. */
+    /** Continue a loot crossing before general-purpose gas retreat. */
     static BlastAutoSpecialRooms.Action continueLoot(Hero hero, boolean[] safe,
             Blob[] hazards, boolean[] barriers) {
         Level level = Dungeon.level;
         ToxicGasRoom room = knownRoom(level);
-        if (room == null || !room.inside(level.cellToPoint(hero.pos))
-                || hero.belongings.lostInventory()) return BlastAutoSpecialRooms.Action.NONE;
-        return collectRoom(hero, level, room, safe, hazards, barriers);
+        if (room == null || hero.belongings.lostInventory()) return BlastAutoSpecialRooms.Action.NONE;
+
+        int door = level.pointToCell(room.entrance());
+        boolean toxicDoorway = hero.pos == door && !barriers[door] && toxicOnlyAt(door, hazards);
+        if (!toxicDoorway && !room.inside(level.cellToPoint(hero.pos))) {
+            return BlastAutoSpecialRooms.Action.NONE;
+        }
+        return collectRoom(hero, level, room, safe, hazards, barriers, toxicDoorway);
+    }
+
+    private static boolean toxicOnlyAt(int cell, Blob[] hazards) {
+        boolean toxic = false;
+        for (Blob hazard : hazards) {
+            if (hazard == null) break;
+            if (hazard.cur[cell] <= 0) continue;
+            if (!(hazard instanceof ToxicGas)) return false;
+            toxic = true;
+        }
+        return toxic;
+    }
+
+    static void logDoorMove(int from, int to, String reason) {
+        Level level = Dungeon.level;
+        ToxicGasRoom room = knownRoom(level);
+        if (room == null) return;
+        int door = level.pointToCell(room.entrance());
+        if (level.distance(from, door) <= 1 || level.distance(to, door) <= 1) {
+            BlastLog.debug("auto-toxic action=" + reason + " from=" + from + " to=" + to + " door=" + door);
+        }
+    }
+
+    private static BlastAutoSpecialRooms.Action drinkPurity(Hero hero, PotionOfPurity purity) {
+        BlastLog.debug("auto-toxic action=drink-purity known=" + purity.isKnown());
+        purity.execute(hero, Potion.AC_DRINK);
+        return BlastAutoSpecialRooms.Action.USE;
     }
 
     /** Drink by the doorway, avoiding consumption before a long approach. */
@@ -371,15 +408,11 @@ final class BlastAutoToxicRoom {
                                 BlastAutoPlay.firstStep(stand, safe, distances));
                         return BlastAutoSpecialRooms.Action.MOVE;
                     }
-                    if (hero.pos == stand) {
-                        BlastLog.debug("auto-toxic action=drink-purity known=" + purity.isKnown());
-                        purity.execute(hero, Potion.AC_DRINK);
-                        return BlastAutoSpecialRooms.Action.USE;
-                    }
+                    if (hero.pos == stand) return drinkPurity(hero, purity);
                 }
             }
             BlastAutoSpecialRooms.Action collect = collectRoom(
-                    hero, level, room, safe, hazards, specialBarriers);
+                    hero, level, room, safe, hazards, specialBarriers, false);
             if (collect != BlastAutoSpecialRooms.Action.NONE) return collect;
         }
         if ((!pending && sourceActive) || !holdDoor(sourceActive, hasAqua, gas))
