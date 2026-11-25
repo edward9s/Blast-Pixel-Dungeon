@@ -17,6 +17,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.ToxicGas;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.VaultFlameTraps;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.Web;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
+import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
 import com.shatteredpixel.shatteredpixeldungeon.levels.RegularLevel;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
@@ -45,9 +46,15 @@ public final class BlastAutoEnvironment {
 
     /** Resolve active blobs once per actor turn, not once per cell. */
     static Blob[] activeHazards(Level level) {
+        return activeHazards(level, false);
+    }
+
+    static Blob[] activeHazards(Level level, boolean planFlames) {
         Blob[] active = new Blob[HAZARD_TYPES.size()];
         int count = 0;
         for (Class<? extends Blob> type : HAZARD_TYPES) {
+            if (type == VaultFlameTraps.class && (planFlames || (Dungeon.hero != null
+                    && Dungeon.hero.isImmune(VaultFlameTraps.class)))) continue;
             Blob blob = level.blobs.get(type);
             if (blob == null || blob.volume <= 0) continue;
             if (blob.cur == null || blob.cur.length != level.length()) {
