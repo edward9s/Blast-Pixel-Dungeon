@@ -372,7 +372,7 @@ final class BlastAutoTrapClearer {
         Item spareGear = null;
         ArrayList<Food> foods = new ArrayList<>();
         for (Item item : inventory) {
-            if (item.quantity() <= 0 || equipped.test(item)) continue;
+            if (item.quantity() <= 0 || item.unique || equipped.test(item)) continue;
             if (item instanceof MissileWeapon) {
                 MissileWeapon candidate = (MissileWeapon) item;
                 if (safeTrapMissile(candidate)
