@@ -21,12 +21,26 @@ class AutoBlacksmithScopeTest(unittest.TestCase):
         mining = (SRC / "BlastAutoBlacksmith.java").read_text()
         self.assertNotIn("setTestFreeMovement", mining)
         self.assertNotIn("setTestDemolition", mining)
-        self.assertNotIn("CrystalGuardian", mining)
         spire = mining.split("static boolean attackBoss(", 1)[1].split(
             "static boolean attackArmoredGeomancer(", 1
         )[0]
         self.assertIn("getItem(Pickaxe.class)", spire)
         self.assertIn("new HeroAction.Interact(mob)", spire)
+        self.assertIn("PathFinder.NEIGHBOURS8", spire)
+        self.assertIn("mob instanceof CrystalGuardian && mob.isAlive()", spire)
+
+    def test_guardians_have_a_separate_demolition_rule(self):
+        mining = (SRC / "BlastAutoBlacksmith.java").read_text()
+        scope = mining.split("static boolean guardianDemolition()", 1)[1].split("}", 1)[0]
+        self.assertIn("phase()", scope)
+        self.assertIn("Blacksmith.Quest.CRYSTAL", scope)
+        self.assertIn("!Blacksmith.Quest.bossBeaten()", scope)
+        self.assertIn("((CrystalGuardian) mob).recovering()", mining)
+        demolition = (SRC / "BlastDemolition.java").read_text()
+        self.assertIn("if (!general && !guardians) return null;", demolition)
+        self.assertIn("boolean destructive = general && bomb.explodesDestructively();", demolition)
+        self.assertIn("if (mob instanceof CrystalGuardian && BlastAutoBlacksmith.active()) return guardians;", demolition)
+        self.assertIn("return general && !(mob instanceof CrystalSpire)", demolition)
 
 
 if __name__ == "__main__":

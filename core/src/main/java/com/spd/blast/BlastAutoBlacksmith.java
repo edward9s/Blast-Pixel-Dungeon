@@ -4,6 +4,7 @@ import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.CrystalSpire;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.CrystalGuardian;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.GnollGeomancer;
 import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroAction;
@@ -25,6 +26,20 @@ final class BlastAutoBlacksmith {
 
     static boolean phase() {
         return active() && BlastSettings.testAutoPlay() && !BlastAutoPlay.isPaused();
+    }
+
+    static boolean guardianDemolition() {
+        return phase() && Blacksmith.Quest.Type() == Blacksmith.Quest.CRYSTAL
+                && !Blacksmith.Quest.bossBeaten();
+    }
+
+    static void finishDownedGuardians(Hero hero) {
+        if (!guardianDemolition()) return;
+        for (Mob mob : Dungeon.level.mobs.toArray(new Mob[0])) {
+            if (mob instanceof CrystalGuardian && ((CrystalGuardian) mob).recovering()) {
+                mob.die(hero);
+            }
+        }
     }
 
     static boolean mine(Hero hero, boolean[] safe, int[] distances) {
@@ -59,6 +74,9 @@ final class BlastAutoBlacksmith {
         if (!active() || Blacksmith.Quest.Type() != Blacksmith.Quest.CRYSTAL
                 || Blacksmith.Quest.bossBeaten() || hero.belongings.getItem(Pickaxe.class) == null
                 || !goldCollected()) return false;
+        for (Mob mob : level.mobs) {
+            if (mob instanceof CrystalGuardian && mob.isAlive()) return false;
+        }
         for (Mob mob : level.mobs) {
             if (!(mob instanceof CrystalSpire) || !mob.isAlive()
                     || !(hero.fieldOfView[mob.pos] || level.visited[mob.pos]
