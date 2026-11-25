@@ -119,8 +119,7 @@ public final class BlastAutoInteract {
         int bestPriority = Integer.MIN_VALUE;
 
         for (Heap heap : level.heaps.valueList()) {
-            if (!heap.seen || !canOpen(heap.type, goldenKeys, crystalKeys)
-                    || !BlastAutoPickup.hasCollectibleLoot(hero, heap)) continue;
+            if (!heap.seen || !canOpen(heap.type, goldenKeys, crystalKeys)) continue;
             int candidate = nearestStand(level, heap.pos, true, safe, distances);
             int priority = BlastAutoCrystalRooms.priority(level, hero, heap.pos, true);
             if (candidate >= 0 && BlastAutoCrystalRooms.replace(
