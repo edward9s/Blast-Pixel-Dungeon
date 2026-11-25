@@ -6,37 +6,24 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroAction;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.TormentedSpirit;
 import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
-import com.shatteredpixel.shatteredpixeldungeon.items.bombs.ArcaneBomb;
-import com.shatteredpixel.shatteredpixeldungeon.items.bombs.ShrapnelBomb;
 import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.Scroll;
 import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfRemoveCurse;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
 import com.watabou.utils.PathFinder;
 
-/** Opens tombs with a prepared bomb loadout and cleanses the rare red wraith. */
+/** Opens discovered tombs and cleanses the rare red wraith. */
 final class BlastAutoGraves {
     private static Level lastTombLevel;
     private static String lastTombBlock;
 
     private BlastAutoGraves() {}
 
-    static boolean canOpen(boolean arcane, boolean shrapnel, boolean scroll) {
-        return scroll && (arcane || shrapnel);
-    }
-
-    private static String preparationBlock(Hero hero, ScrollOfRemoveCurse scroll) {
-        if (!BlastSettings.testAutoPlay()) return "auto-play-disabled";
-        if (hero.belongings.lostInventory()) return "lost-inventory";
-        if (scroll == null || scroll.quantity() <= 0) return "no-remove-curse-scroll";
-        BlastBombManiac maniac = BlastBombManiac.current();
-        if (maniac == null || !canOpen(maniac.typeIndex(ArcaneBomb.class) >= 0,
-                maniac.typeIndex(ShrapnelBomb.class) >= 0, true)) return "no-arcane-or-shrapnel";
-        return null;
-    }
-
     static BlastAutoSpecialRooms.Action cleanse(Hero hero, boolean[] safe, int[] distances) {
+        if (!BlastSettings.testAutoPlay() || hero.belongings.lostInventory()) {
+            return BlastAutoSpecialRooms.Action.NONE;
+        }
         ScrollOfRemoveCurse scroll = hero.belongings.getItem(ScrollOfRemoveCurse.class);
-        if (preparationBlock(hero, scroll) != null) return BlastAutoSpecialRooms.Action.NONE;
+        if (scroll == null || scroll.quantity() <= 0) return BlastAutoSpecialRooms.Action.NONE;
         Level level = Dungeon.level;
         int stand = -1, best = Integer.MAX_VALUE;
         for (Mob mob : level.mobs) {
@@ -62,8 +49,6 @@ final class BlastAutoGraves {
     }
 
     static BlastAutoSpecialRooms.Action openTomb(Hero hero, boolean[] safe, int[] distances) {
-        String preparation = preparationBlock(hero, hero.belongings.getItem(ScrollOfRemoveCurse.class));
-        if (preparation != null && !BlastSettings.debugLog()) return BlastAutoSpecialRooms.Action.NONE;
         Level level = Dungeon.level;
         int observed = -1, nearest = Integer.MAX_VALUE;
         int target = -1, stand = -1, best = Integer.MAX_VALUE;
@@ -74,7 +59,6 @@ final class BlastAutoGraves {
                 observed = heap.pos;
                 nearest = distance;
             }
-            if (preparation != null) continue;
             int candidate = heap.pos;
             if (safe[candidate] && distances[candidate] < best) {
                 stand = candidate;
@@ -91,7 +75,6 @@ final class BlastAutoGraves {
             }
         }
         if (observed < 0) return BlastAutoSpecialRooms.Action.NONE;
-        if (preparation != null) return tombBlocked(observed, preparation);
         if (target < 0) return tombBlocked(observed, "no-safe-stand");
         if (hero.rooted && hero.pos != stand) return tombBlocked(target, "rooted");
         if (hero.pos == stand) {
