@@ -23,6 +23,9 @@ import com.watabou.utils.PathFinder;
 
 /** Automated native interactions with discovered containers and keyed doors. */
 public final class BlastAutoInteract {
+    private static Level lastChestLogLevel;
+    private static String lastChestBlock;
+
     private BlastAutoInteract() {}
 
     static boolean canOpen(Heap.Type type, int goldenKeys, int crystalKeys) {
@@ -99,7 +102,7 @@ public final class BlastAutoInteract {
             wornKeys = Notes.keyCount(new WornKey(Dungeon.depth));
         }
 
-        if (crystalKeys == 0 && demolishLastCrystalChest(hero, safe, distances)) return true;
+        if (demolishLastCrystalChest(hero, safe, distances, crystalKeys)) return true;
 
         int target = -1;
         int stand = -1;
@@ -154,12 +157,13 @@ public final class BlastAutoInteract {
 
     /** Recover the unchosen crystal vault chest after all crystal keys are spent. */
     private static boolean demolishLastCrystalChest(Hero hero, boolean[] safe,
-                                                    int[] distances) {
+                                                    int[] distances, int crystalKeys) {
         Level level = Dungeon.level;
         if (!(level instanceof RegularLevel) || Dungeon.branch != 0
-                || Notes.keyCount(new CrystalKey(Dungeon.depth)) != 0
-                || !BlastSettings.testAutoPlay() || BlastRemoteBomb.isTimedMode()
-                || hero.buff(BlastRemoteBomb.class) == null) return false;
+                || !BlastSettings.testAutoPlay()) return false;
+        boolean timed = BlastRemoteBomb.isTimedMode();
+        boolean hasRemote = hero.buff(BlastRemoteBomb.class) != null;
+        if (!BlastSettings.debugLog() && (crystalKeys != 0 || timed || !hasRemote)) return false;
         CrystalVaultRoom room = (CrystalVaultRoom)
                 ((RegularLevel) level).room(CrystalVaultRoom.class);
         if (room == null) return false;
@@ -169,14 +173,23 @@ public final class BlastAutoInteract {
             if (heap.type == Heap.Type.CRYSTAL_CHEST
                     && room.inside(level.cellToPoint(heap.pos))) {
                 remaining++;
-                chest = heap;
+                if (heap.seen || hero.fieldOfView[heap.pos]
+                        || level.visited[heap.pos] || level.mapped[heap.pos]) chest = heap;
             }
         }
-        if (remaining != 1 || !BlastAutoPickup.hasCollectibleLoot(hero, chest)
-                || !(chest.seen || hero.fieldOfView[chest.pos]
-                        || level.visited[chest.pos] || level.mapped[chest.pos])) return false;
+        if (chest == null) return false;
+        if (crystalKeys != 0) return crystalChestBlocked(chest.pos, "crystal-key-available");
+        if (remaining != 1) return crystalChestBlocked(chest.pos, "multiple-chests");
+        if (timed) return crystalChestBlocked(chest.pos, "timed-mode");
+        if (!hasRemote) return crystalChestBlocked(chest.pos, "no-remote-control");
+        if (!BlastAutoPickup.hasCollectibleLoot(hero, chest)) {
+            return crystalChestBlocked(chest.pos, "loot-unavailable backpack="
+                    + hero.belongings.backpack.items.size() + "/" + hero.belongings.backpack.capacity());
+        }
         BlastBombManiac maniac = BlastBombManiac.current();
-        if (maniac == null || maniac.remaining() == 0) return false;
+        if (maniac == null || maniac.remaining() == 0) {
+            return crystalChestBlocked(chest.pos, "no-bomb-charge");
+        }
         Bomb bomb = maniac.bombAt(0);
         boolean remote = BlastSettings.testRemoteThrow();
         int best = -1;
@@ -191,7 +204,10 @@ public final class BlastAutoInteract {
             best = cell;
             shortest = distances[cell];
         }
-        if (best < 0 || hero.rooted && best != hero.pos) return false;
+        if (best < 0) {
+            return crystalChestBlocked(chest.pos, remote ? "no-throw-position" : "no-placement-position");
+        }
+        if (hero.rooted && best != hero.pos) return crystalChestBlocked(chest.pos, "rooted");
         if (best != hero.pos) {
             hero.curAction = new HeroAction.Move(
                     BlastAutoPlay.firstStep(best, safe, distances));
@@ -199,11 +215,23 @@ public final class BlastAutoInteract {
         }
         boolean started = remote ? maniac.blastAutoDemolishChest(chest.pos)
                 : maniac.blastAutoDemolishChestNearby();
-        if (started) {
-            BlastLog.debug("auto-crystal action=demolish chest=" + chest.pos);
-            if (!remote) hero.spendAndNext(1f);
+        if (!started) return crystalChestBlocked(chest.pos, "bomb-action-rejected");
+        lastChestBlock = null;
+        BlastLog.debug("auto-crystal action=demolish chest=" + chest.pos);
+        if (!remote) hero.spendAndNext(1f);
+        return true;
+    }
+
+    private static boolean crystalChestBlocked(int cell, String reason) {
+        if (BlastSettings.debugLog()) {
+            String trace = "auto-crystal chest=" + cell + " blocked=" + reason;
+            if (lastChestLogLevel != Dungeon.level || !trace.equals(lastChestBlock)) {
+                lastChestLogLevel = Dungeon.level;
+                lastChestBlock = trace;
+                BlastLog.debug(trace);
+            }
         }
-        return started;
+        return false;
     }
 
     /** Containers allow standing on their cell; doors require an adjacent cell. */
