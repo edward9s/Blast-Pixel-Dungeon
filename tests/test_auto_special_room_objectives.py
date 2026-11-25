@@ -42,10 +42,16 @@ class SpecialRoomObjectivesTest(unittest.TestCase):
     def test_other_entrance_tasks_use_the_same_guard(self):
         sentry = source("BlastAutoSentryRoom.java")
         special = source("BlastAutoSpecialRooms.java")
-        self.assertIn("if (!BlastAutoPickup.hasCollectibleLoot(hero, treasure)) return BlastAutoSpecialRooms.Action.NONE;", sentry)
+        self.assertIn("if (treasure == null) return BlastAutoSpecialRooms.Action.NONE;", sentry)
         self.assertIn("hero, treasure.pos, exit, safe, distances", sentry)
         self.assertIn("return approachEntrance(hero, chest.pos, exit, safe, distances);", special)
-        self.assertIn("if (!BlastAutoPickup.hasCollectibleLoot(hero, chest)) return Action.NONE;", special)
+        self.assertIn("if (chest == null) return Action.NONE;", special)
+
+    def test_opening_containers_does_not_filter_by_pickup_eligibility(self):
+        for name in ("BlastAutoInteract.java", "BlastAutoSentryRoom.java",
+                     "BlastAutoSpecialRooms.java", "BlastAutoChasmRoom.java",
+                     "BlastAutoToxicRoom.java", "BlastAutoVault.java"):
+            self.assertNotIn("hasCollectibleLoot(", source(name), name)
 
     def test_active_crossing_precedes_optional_tasks(self):
         code = source("BlastAutoPlay.java")
@@ -62,8 +68,9 @@ class SpecialRoomObjectivesTest(unittest.TestCase):
 
     def test_live_hazards_keep_their_separate_retreat_rules(self):
         self.assertIn("hero.pos != exit && travel[exit]", source("BlastAutoSentryRoom.java"))
-        self.assertIn("No affordable objective: first seek the entrance",
-                      source("BlastAutoChasmRoom.java"))
+        chasm = source("BlastAutoChasmRoom.java")
+        self.assertIn("if (reach[exit] != Integer.MAX_VALUE) {\n            landing = exit;", chasm)
+        self.assertIn("if (!flight[cell] || level.pit[cell]", chasm)
 
 
 if __name__ == "__main__":
