@@ -109,9 +109,8 @@ final class BlastAutoToxicRoom {
     }
 
     private static boolean pendingLoot(Hero hero, Heap heap) {
-        if (!pendingContainer(heap.type, true)) return false;
-        return heap.type == Heap.Type.HEAP ? collectibleItem(hero, heap) != null
-                : BlastAutoPickup.hasCollectibleLoot(hero, heap);
+        return pendingContainer(heap.type, heap.type == Heap.Type.HEAP
+                && collectibleItem(hero, heap) != null);
     }
 
     private static boolean hasRoomLoot(Hero hero, Level level, ToxicGasRoom room) {
