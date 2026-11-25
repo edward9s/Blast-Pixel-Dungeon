@@ -22,6 +22,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroAction;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroClass;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Talent;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.CrystalMimic;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mimic;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.KindOfWeapon;
@@ -66,19 +67,30 @@ final class BlastAutoCombat {
 
         if (hero.rooted) return Action.NONE;
         for (Mob target : targets) {
-            Action approach = approachBombRange(hero, target, safe, distances);
+            Action approach = approachTarget(hero, target, safe, distances);
             if (approach != Action.NONE) return approach;
-
-            int destination = BlastAutoPlay.nearCell(hero.pos, target.pos, safe, distances);
-            if (destination >= 0 && distances[destination] > 0
-                    && distances[destination] < Integer.MAX_VALUE) {
-                BlastAutoPlay.rememberCombatTarget(target);
-                hero.curAction = new HeroAction.Move(
-                        BlastAutoPlay.firstStep(destination, safe, distances));
-                return Action.QUEUED;
-            }
         }
         return Action.NONE;
+    }
+
+    static Action interceptCrystalMimic(Hero hero, boolean[] safe, int[] distances) {
+        CrystalMimic nearest = null;
+        int distance = Integer.MAX_VALUE;
+        for (Mob mob : Dungeon.level.mobs) {
+            if (!(mob instanceof CrystalMimic) || !canTarget(hero, mob)) continue;
+            int steps = Dungeon.level.distance(hero.pos, mob.pos);
+            if (steps < distance) {
+                nearest = (CrystalMimic) mob;
+                distance = steps;
+            }
+        }
+        if (nearest == null) return Action.NONE;
+        if (BlastAutoBombAI.attackCrystalMimic(hero, nearest)) return Action.STARTED;
+        Action attack = chooseAttack(hero, nearest, new CombatEquipment(hero));
+        if (attack == Action.NONE && !hero.rooted && nearest.state == nearest.FLEEING) {
+            return approachTarget(hero, nearest, safe, distances);
+        }
+        return attack;
     }
 
     /** Attack from the current tile without moving toward an enemy. */
@@ -110,6 +122,19 @@ final class BlastAutoCombat {
         Choice remote = better(wand, missile);
         boolean canMelee = hero.canAttack(target) && meleeCollateralSafe(hero, target);
         float melee = canMelee ? meleeDamage(hero, target) : 0f;
+        if (target instanceof CrystalMimic && !target.rooted && target.buff(Chill.class) == null
+                && target.buff(Frost.class) == null && melee < target.HP
+                && (remote == null || remote.damage < target.HP)
+                && hero.buff(MagicImmune.class) == null) {
+            for (Wand candidate : equipment.wands(hero)) {
+                if (!(candidate instanceof WandOfFrost)) continue;
+                Choice frost = evaluateWand(hero, target, candidate, null);
+                if (frost != null && zap(hero, target, frost) != Action.NONE) {
+                    BlastLog.debug("auto-crystal-mimic action=slow target=" + target.pos);
+                    return Action.STARTED;
+                }
+            }
+        }
         if (remote != null && preferRemote(remote.damage, melee)) {
             Action action = remote.wand != null
                     ? zap(hero, target, remote) : throwMissile(hero, target, remote);
@@ -120,6 +145,17 @@ final class BlastAutoCombat {
 
     static boolean preferRemote(float remote, float melee) {
         return remote > 0f && remote >= melee;
+    }
+
+    private static Action approachTarget(Hero hero, Mob target, boolean[] safe, int[] distances) {
+        Action bomb = approachBombRange(hero, target, safe, distances);
+        if (bomb != Action.NONE) return bomb;
+        int destination = BlastAutoPlay.nearCell(hero.pos, target.pos, safe, distances);
+        if (destination < 0 || distances[destination] <= 0
+                || distances[destination] == Integer.MAX_VALUE) return Action.NONE;
+        BlastAutoPlay.rememberCombatTarget(target);
+        hero.curAction = new HeroAction.Move(BlastAutoPlay.firstStep(destination, safe, distances));
+        return Action.QUEUED;
     }
 
     private static Action approachBombRange(Hero hero, Mob target,
@@ -138,20 +174,23 @@ final class BlastAutoCombat {
     private static ArrayList<Mob> enemies(Hero hero) {
         ArrayList<Mob> targets = new ArrayList<>();
         for (Mob mob : Dungeon.level.mobs) {
-            if (!mob.isAlive() || (mob.alignment != Char.Alignment.ENEMY && !(mob instanceof Mimic))
-                    || mob.invisible > 0 || !hero.fieldOfView[mob.pos]
-                    || (!(mob instanceof Mimic) && !BlastAutoPlay.isAwake(mob))
-                    || BlastAutoPlay.isAutoAttackExcluded(mob)
-                    || BlastAutoPlay.ignored(mob)
-                    || hero.isCharmedBy(mob) || mob.isInvulnerable(Hero.class)) continue;
-            targets.add(mob);
+            if (canTarget(hero, mob)) targets.add(mob);
         }
-        targets.sort(Comparator.comparingInt((Mob mob) -> BlastAutoPlay.combatPriority(mob,
+        targets.sort(Comparator.comparing((Mob mob) -> !(mob instanceof CrystalMimic))
+                .thenComparingInt(mob -> BlastAutoPlay.combatPriority(mob,
                         !BlastAutoSacrifice.isRangedEnemy(mob.getClass())
                         && Dungeon.level.adjacent(hero.pos, mob.pos)
                         && mob.state == mob.HUNTING && mob.isTargeting(hero)))
                 .thenComparingInt(mob -> Dungeon.level.distance(hero.pos, mob.pos)));
         return targets;
+    }
+
+    private static boolean canTarget(Hero hero, Mob mob) {
+        return mob.isAlive() && (mob.alignment == Char.Alignment.ENEMY || mob instanceof Mimic)
+                && mob.invisible <= 0 && hero.fieldOfView[mob.pos]
+                && (mob instanceof Mimic || BlastAutoPlay.isAwake(mob))
+                && !BlastAutoPlay.isAutoAttackExcluded(mob) && !BlastAutoPlay.ignored(mob)
+                && !hero.isCharmedBy(mob) && !mob.isInvulnerable(Hero.class);
     }
 
     /** Candidate inventory is reused across targets, but scanned only when needed. */
