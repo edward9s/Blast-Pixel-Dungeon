@@ -182,10 +182,6 @@ public final class BlastAutoInteract {
         if (remaining != 1) return crystalChestBlocked(chest.pos, "multiple-chests");
         if (timed) return crystalChestBlocked(chest.pos, "timed-mode");
         if (!hasRemote) return crystalChestBlocked(chest.pos, "no-remote-control");
-        if (!BlastAutoPickup.hasCollectibleLoot(hero, chest)) {
-            return crystalChestBlocked(chest.pos, "loot-unavailable backpack="
-                    + hero.belongings.backpack.items.size() + "/" + hero.belongings.backpack.capacity());
-        }
         BlastBombManiac maniac = BlastBombManiac.current();
         if (maniac == null || maniac.remaining() == 0) {
             return crystalChestBlocked(chest.pos, "no-bomb-charge");
