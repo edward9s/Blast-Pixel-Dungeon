@@ -274,12 +274,12 @@ public final class BlastBombManiac extends Buff {
 
     /** The AI waits for the throw animation before detonating this exact bomb. */
     public boolean blastAutoThrowAndDetonate(int destination) {
-        return autoThrowAndDetonate(destination, selected);
+        return blastAutoThrowAndDetonate(destination, selected);
     }
 
     /** Clear terrain with a basic bomb without changing the player's selected type. */
     public boolean blastAutoThrowOrdinaryAndDetonate(int destination) {
-        return autoThrowAndDetonate(destination, 0);
+        return blastAutoThrowAndDetonate(destination, 0);
     }
 
     public boolean blastAutoDemolishChest(int destination) {
@@ -295,7 +295,7 @@ public final class BlastBombManiac extends Buff {
         return true;
     }
 
-    private boolean autoThrowAndDetonate(int destination, int bombIndex) {
+    boolean blastAutoThrowAndDetonate(int destination, int bombIndex) {
         if (!BlastSettings.testAutoPlay() || !BlastSettings.testRemoteThrow()
                 || BlastRemoteBomb.isTimedMode()) {
             throw new IllegalStateException("Automatic throw-and-detonate requires remote throw mode");
@@ -393,15 +393,15 @@ public final class BlastBombManiac extends Buff {
 
     /** Place and immediately detonate one bomb during the AI's actor turn. */
     public boolean blastAutoPlaceAndDetonate() {
-        return autoPlaceAndDetonate(selected);
+        return blastAutoPlaceAndDetonate(selected);
     }
 
     /** Clear terrain with a basic bomb without changing the player's selected type. */
     public boolean blastAutoPlaceOrdinaryAndDetonate() {
-        return autoPlaceAndDetonate(0);
+        return blastAutoPlaceAndDetonate(0);
     }
 
-    private boolean autoPlaceAndDetonate(int bombIndex) {
+    boolean blastAutoPlaceAndDetonate(int bombIndex) {
         if (!BlastSettings.testAutoPlay() || BlastSettings.testRemoteThrow()
                 || BlastRemoteBomb.isTimedMode()) {
             throw new IllegalStateException("Automatic place-and-detonate requires remote mode");
