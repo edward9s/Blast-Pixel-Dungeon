@@ -17,6 +17,9 @@ import com.shatteredpixel.shatteredpixeldungeon.items.bags.Bag;
 import com.shatteredpixel.shatteredpixeldungeon.items.bombs.Bomb;
 import com.shatteredpixel.shatteredpixeldungeon.items.keys.Key;
 import com.shatteredpixel.shatteredpixeldungeon.items.potions.PotionOfStrength;
+import com.shatteredpixel.shatteredpixeldungeon.items.quest.CeremonialCandle;
+import com.shatteredpixel.shatteredpixeldungeon.items.quest.CorpseDust;
+import com.shatteredpixel.shatteredpixeldungeon.items.quest.Embers;
 import com.shatteredpixel.shatteredpixeldungeon.items.rings.Ring;
 import com.shatteredpixel.shatteredpixeldungeon.items.rings.RingOfEnergy;
 import com.shatteredpixel.shatteredpixeldungeon.items.rings.RingOfHaste;
@@ -120,6 +123,7 @@ public final class BlastAutoPickup {
                 if (priority < bestPriority || (priority == bestPriority
                         && distances[cell] >= shortest)) continue;
                 if (BlastAutoCrystalRooms.isStaged(item)
+                        || BlastAutoWandmaker.isPlacedCandle(level, cell, item)
                         || !(isPickupType(item, instantPickup)
                             || BlastAutoEquipment.canPickup(hero, item))
                         || !canCollect(hero, item, instantPickup)
@@ -144,8 +148,9 @@ public final class BlastAutoPickup {
 
     private static int pickupPriority(Item item) {
         if (item instanceof SpiritBow) return 3;
-        if (item instanceof Key) return 2;
-        if (item instanceof PotionOfStrength || item instanceof ScrollOfUpgrade) return 1;
+        if (item instanceof Key || item instanceof CorpseDust || item instanceof Embers) return 2;
+        if (item instanceof PotionOfStrength || item instanceof ScrollOfUpgrade
+                || item instanceof CeremonialCandle) return 1;
         return 0;
     }
 
@@ -175,7 +180,8 @@ public final class BlastAutoPickup {
             int distance = level.distance(hero.pos, cell);
             if (distance > 2) continue;
             Item candidate = firstEligibleItem(heap, item ->
-                    (isPickupType(item, instantPickup)
+                    !BlastAutoWandmaker.isPlacedCandle(level, cell, item)
+                    && (isPickupType(item, instantPickup)
                             || BlastAutoEquipment.canPickup(hero, item))
                     && canCollect(hero, item, instantPickup));
             if (candidate == null) candidate = heap.peek();
@@ -195,6 +201,7 @@ public final class BlastAutoPickup {
         String status;
         if (BlastAutoTrapClearer.holdingDoorOpen(cell)
                 || BlastAutoToxicRoom.holdingDoorOpen(cell)) status = "door-held";
+        else if (BlastAutoWandmaker.isPlacedCandle(level, cell, item)) status = "ritual-candle-placed";
         else if (uncollectibleBomb(item)) status = "lit-bomb";
         else if (item instanceof Wand && item.cursed) status = "cursed-wand";
         else if (item instanceof Wand && !BlastAutoCombat.supportsWand((Wand) item))
@@ -279,7 +286,7 @@ public final class BlastAutoPickup {
     }
 
     static boolean isPickupType(Item item, Predicate<Item> instantPickup) {
-        if (item instanceof SpiritBow) return true;
+        if (item instanceof SpiritBow || item instanceof CorpseDust || item instanceof Embers) return true;
         if (item instanceof Bomb || item instanceof BlastDeathBomb) return !uncollectibleBomb(item);
         if (item instanceof Wand) return !item.cursed && BlastAutoCombat.supportsWand((Wand) item);
         if (item instanceof Ring) {
