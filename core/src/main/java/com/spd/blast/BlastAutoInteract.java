@@ -4,14 +4,19 @@ import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.Shopkeeper;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.VaultTokenDoor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.VaultMirror;
 import com.shatteredpixel.shatteredpixeldungeon.items.quest.DwarfToken;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroAction;
 import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
+import com.shatteredpixel.shatteredpixeldungeon.items.Item;
+import com.shatteredpixel.shatteredpixeldungeon.items.bags.Bag;
 import com.shatteredpixel.shatteredpixeldungeon.items.bombs.Bomb;
 import com.shatteredpixel.shatteredpixeldungeon.levels.RegularLevel;
+import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.Room;
 import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.special.CrystalVaultRoom;
+import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.special.ShopRoom;
 import com.shatteredpixel.shatteredpixeldungeon.items.keys.CrystalKey;
 import com.shatteredpixel.shatteredpixeldungeon.items.keys.GoldenKey;
 import com.shatteredpixel.shatteredpixeldungeon.items.keys.IronKey;
@@ -19,6 +24,7 @@ import com.shatteredpixel.shatteredpixeldungeon.items.keys.WornKey;
 import com.shatteredpixel.shatteredpixeldungeon.journal.Notes;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
+import com.shatteredpixel.shatteredpixeldungeon.windows.WndTradeItem;
 import com.watabou.utils.PathFinder;
 
 /** Automated native interactions with discovered containers and keyed doors. */
@@ -62,6 +68,8 @@ public final class BlastAutoInteract {
         if (safe.length != level.length() || distances.length != level.length()) {
             throw new IllegalArgumentException("Invalid auto-interaction distance map");
         }
+
+        if (buyShopBag(hero, level, safe, distances)) return true;
 
         // Vault NPC objects are opened through their native interaction dialogs.
         // Approach only when the token threshold or an unclaimed reward is present.
@@ -152,6 +160,38 @@ public final class BlastAutoInteract {
             hero.curAction = new HeroAction.Move(
                     BlastAutoPlay.firstStep(stand, safe, distances));
         }
+        return true;
+    }
+
+    private static boolean buyShopBag(Hero hero, Level level, boolean[] safe, int[] distances) {
+        if (!(level instanceof RegularLevel) || hero.belongings.lostInventory()) return false;
+        Room room = ((RegularLevel) level).room(hero.pos);
+        if (!(room instanceof ShopRoom)) return false;
+
+        Heap target = null;
+        int nearest = Integer.MAX_VALUE;
+        for (Heap heap : level.heaps.valueList()) {
+            if (heap.type != Heap.Type.FOR_SALE || heap.size() != 1
+                    || !room.inside(level.cellToPoint(heap.pos))
+                    || !safe[heap.pos] || distances[heap.pos] >= nearest) continue;
+            Item item = heap.peek();
+            if (!(item instanceof Bag) || hero.belongings.getItem(item.getClass()) != null
+                    || !hero.belongings.backpack.canHold(item)
+                    || Shopkeeper.sellPrice(item) > Dungeon.gold) continue;
+            target = heap;
+            nearest = distances[heap.pos];
+        }
+        if (target == null) return false;
+        if (hero.pos != target.pos) {
+            if (hero.rooted) return false;
+            hero.curAction = new HeroAction.Move(BlastAutoPlay.firstStep(target.pos, safe, distances));
+            return true;
+        }
+
+        Item bag = target.peek();
+        int price = Shopkeeper.sellPrice(bag);
+        WndTradeItem.buy(target);
+        BlastLog.debug("auto-shop action=buy item=" + bag.getClass().getSimpleName() + " price=" + price);
         return true;
     }
 
