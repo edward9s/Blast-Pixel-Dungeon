@@ -148,7 +148,7 @@ public final class BlastAutoPickup {
 
     private static int pickupPriority(Item item) {
         if (item instanceof SpiritBow) return 3;
-        if (item instanceof Key || item instanceof CorpseDust || item instanceof Embers) return 2;
+        if (item instanceof Key) return 2;
         if (item instanceof PotionOfStrength || item instanceof ScrollOfUpgrade
                 || item instanceof CeremonialCandle) return 1;
         return 0;
