@@ -223,7 +223,7 @@ final class BlastAutoChasmRoom {
         if (!inside && (distances[entrance] == Integer.MAX_VALUE || !safe[entrance]))
             return BlastAutoSpecialRooms.Action.NONE;
         PotionOfLevitation potion = hero.belongings.getItem(PotionOfLevitation.class);
-        if (potion == null || !potion.isKnown() || potion.quantity() == 0)
+        if (potion == null || potion.quantity() <= 0)
             return BlastAutoSpecialRooms.Action.NONE;
         if (hero.buff(Levitation.class) != null)
             return BlastAutoSpecialRooms.Action.NONE;
