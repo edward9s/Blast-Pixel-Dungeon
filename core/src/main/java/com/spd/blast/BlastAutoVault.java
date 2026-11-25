@@ -8,6 +8,8 @@ import com.shatteredpixel.shatteredpixeldungeon.items.potions.PotionOfPurity;
 import com.shatteredpixel.shatteredpixeldungeon.levels.RegularLevel;
 import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.quest.vault.treasure.VaultFlamesTreasureRoom;
 import com.watabou.utils.PathFinder;
+
+import java.util.Arrays;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.VaultLaser;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.VaultSentry;
@@ -18,6 +20,8 @@ import com.shatteredpixel.shatteredpixeldungeon.mechanics.ConeAOE;
 
 /** One-turn vault machinery forecast; never assumes test invulnerability protects the hero. */
 final class BlastAutoVault {
+    private static final int FLAME_LOOKAHEAD = 16;
+
     private BlastAutoVault() {}
 
     /**
@@ -26,7 +30,7 @@ final class BlastAutoVault {
      */
     static int stagingCell(Hero hero, Level level, boolean[] safe, int[] distances) {
         if (!(level instanceof VaultLevel)) return -1;
-        boolean[] danger = imminent(hero, level);
+        boolean[] danger = imminent(hero, level, false);
         int best = -1;
         int shortest = Integer.MAX_VALUE;
         for (int cell = 0; cell < danger.length; cell++) {
@@ -95,52 +99,114 @@ final class BlastAutoVault {
         return false;
     }
 
-    /**
-     * Find a route across temporarily active vents without walking into fire.
-     * A blocked first step tells the caller to wait and retry next turn.
-     */
-    static int nextFlameStep(Hero hero, Level level, int goal, boolean[] safe) {
-        if (!(level instanceof VaultLevel) || !level.insideMap(goal)) return -1;
-        VaultFlameTraps flames = (VaultFlameTraps) level.blobs.get(VaultFlameTraps.class);
-        if (flames == null || flames.cur == null || flames.cur.length != level.length())
-            return -1;
-
-        boolean[] traversable = safe.clone();
-        for (int cell = 0; cell < traversable.length; cell++) {
-            if (flames.cur[cell] > 0 && level.insideMap(cell) && level.passable[cell]
-                    && !level.pit[cell] && (level.visited[cell] || level.mapped[cell]
-                    || hero.fieldOfView[cell])
-                    && com.shatteredpixel.shatteredpixeldungeon.actors.Actor.findChar(cell) == null) {
-                traversable[cell] = true;
-            }
-        }
-        if (!traversable[goal]) return -1;
-        PathFinder.buildDistanceMap(goal, traversable);
-        int[] remaining = PathFinder.distance;
-        if (remaining[hero.pos] == Integer.MAX_VALUE) return -1;
-        int step = -1;
-        int shortest = remaining[hero.pos];
-        for (int offset : PathFinder.NEIGHBOURS8) {
-            int cell = hero.pos + offset;
-            if (!level.insideMap(cell) || !traversable[cell]
-                    || remaining[cell] >= shortest) continue;
-            shortest = remaining[cell];
-            step = cell;
-        }
-        return step;
+    private static boolean periodic(VaultFlameTraps flames, int cell) {
+        return flames.afterTriggerCooldowns != null && flames.afterTriggerCooldowns[cell] > 0
+                && flames.afterTriggerCooldowns[cell] > flames.triggersAfterCooldown[cell];
     }
 
-    static boolean waitForFlames(Hero hero, Level level, boolean[] safe) {
-        if (!(level instanceof VaultLevel)) return false;
+    static boolean nearPeriodicFlames(Hero hero, Level level) {
+        if (!(level instanceof VaultLevel) || hero.isImmune(VaultFlameTraps.class)) return false;
         VaultFlameTraps flames = (VaultFlameTraps) level.blobs.get(VaultFlameTraps.class);
-        if (flames == null || flames.cur == null || !safe[hero.pos]) return false;
-        for (int offset : PathFinder.NEIGHBOURS8) {
+        if (flames == null) return false;
+        for (int offset : PathFinder.NEIGHBOURS9) {
             int cell = hero.pos + offset;
-            if (!level.insideMap(cell) || safe[cell] || !level.passable[cell]
-                    || level.pit[cell] || flames.cur[cell] <= 0) continue;
-            return true;
+            if (level.insideMap(cell) && periodic(flames, cell)) return true;
         }
         return false;
+    }
+
+    static void excludeVentDestinations(Level level, int[] turns) {
+        VaultFlameTraps flames = (VaultFlameTraps) level.blobs.get(VaultFlameTraps.class);
+        for (int cell = 0; cell < turns.length; cell++) {
+            if (periodic(flames, cell)) turns[cell] = Integer.MAX_VALUE;
+        }
+    }
+
+    static final class FlameRoutes {
+        final int[] turns;
+        final int[] firstStep;
+
+        FlameRoutes(int length) {
+            turns = new int[length];
+            firstStep = new int[length];
+            Arrays.fill(turns, Integer.MAX_VALUE);
+            Arrays.fill(firstStep, -1);
+        }
+
+        int toward(int origin, int goal, boolean[] passable) {
+            if (firstStep[goal] >= 0) return firstStep[goal];
+            if (!passable[goal]) return -1;
+            PathFinder.buildDistanceMap(goal, passable);
+            int closest = -1;
+            int remaining = PathFinder.distance[origin];
+            for (int cell = 0; cell < turns.length; cell++) {
+                if (turns[cell] == 0 || firstStep[cell] < 0) continue;
+                int distance = PathFinder.distance[cell];
+                if (distance < remaining || (distance == remaining && closest >= 0
+                        && turns[cell] < turns[closest])) {
+                    closest = cell;
+                    remaining = distance;
+                }
+            }
+            return closest < 0 ? -1 : firstStep[closest];
+        }
+    }
+
+    /** Each edge is a move or a wait, checked against the fire at that time. */
+    static FlameRoutes flameRoutes(Hero hero, Level level, boolean[] passable) {
+        VaultFlameTraps flames = (VaultFlameTraps) level.blobs.get(VaultFlameTraps.class);
+        int length = passable.length;
+        int moveTicks = Math.max(1, (int) Math.ceil(1f / hero.speed()));
+        FlameRoutes routes = new FlameRoutes(length);
+        routes.turns[hero.pos] = 0;
+        routes.firstStep[hero.pos] = hero.pos;
+
+        boolean[][] burning = new boolean[FLAME_LOOKAHEAD][length];
+        for (int cell = 0; cell < length; cell++) {
+            if (!passable[cell] || !periodic(flames, cell)) continue;
+            int fire = flames.cur[cell];
+            int cooldown = flames.curCooldowns[cell];
+            int period = flames.afterTriggerCooldowns[cell];
+            for (int tick = 0; tick < FLAME_LOOKAHEAD; tick++) {
+                burning[tick][cell] = fire > 0;
+                if (fire > 0) fire--;
+                if (cooldown <= 0) cooldown = period;
+                if (--cooldown == 0) fire += flames.triggersAfterCooldown[cell];
+            }
+        }
+
+        int[] current = new int[length];
+        int[] next = new int[length];
+        Arrays.fill(current, -1);
+        current[hero.pos] = hero.pos;
+        for (int tick = 0; tick <= FLAME_LOOKAHEAD - moveTicks; tick += moveTicks) {
+            Arrays.fill(next, -1);
+            for (int from = 0; from < length; from++) {
+                if (current[from] < 0) continue;
+                for (int offset : PathFinder.NEIGHBOURS9) {
+                    int to = from + offset;
+                    if (!level.insideMap(to) || !passable[to] || next[to] >= 0
+                            || !safeForMove(burning, to, tick, moveTicks)) continue;
+                    int first = tick == 0 ? to : current[from];
+                    next[to] = first;
+                    if (routes.turns[to] == Integer.MAX_VALUE) {
+                        routes.turns[to] = tick + moveTicks;
+                        routes.firstStep[to] = first;
+                    }
+                }
+            }
+            int[] previous = current;
+            current = next;
+            next = previous;
+        }
+        return routes;
+    }
+
+    private static boolean safeForMove(boolean[][] burning, int cell, int tick, int moveTicks) {
+        for (int i = tick; i < tick + moveTicks; i++) {
+            if (burning[i][cell]) return false;
+        }
+        return true;
     }
 
     static boolean drinkPurity(Hero hero, Level level) {
@@ -157,12 +223,12 @@ final class BlastAutoVault {
         return true;
     }
 
-    static boolean[] imminent(Hero hero, Level level) {
+    static boolean[] imminent(Hero hero, Level level, boolean planFlames) {
         boolean[] danger = new boolean[level.length()];
         if (!(level instanceof VaultLevel)) return danger;
 
         VaultFlameTraps flames = (VaultFlameTraps) level.blobs.get(VaultFlameTraps.class);
-        if (flames != null) {
+        if (flames != null && !hero.isImmune(VaultFlameTraps.class)) {
             if (flames.cur == null || flames.cur.length != danger.length
                     || (flames.afterTriggerCooldowns != null
                     && (flames.afterTriggerCooldowns.length != danger.length
@@ -170,10 +236,8 @@ final class BlastAutoVault {
                     || flames.curCooldowns.length != danger.length)))
                 throw new IllegalStateException("Invalid vault flame grid");
             for (int cell = 0; cell < danger.length; cell++) {
-                // The current small flame becomes a damaging large flame after the move.
-                // An unlit vent only produces its harmless warning flame next turn.
-                if (hero.buff(BlobImmunity.class) == null && flames.cur[cell] > 0)
-                    danger[cell] = true;
+                // Leave periodic vents to the timed route rather than ordinary movement.
+                danger[cell] = periodic(flames, cell) ? !planFlames : flames.cur[cell] > 0;
             }
         }
 
