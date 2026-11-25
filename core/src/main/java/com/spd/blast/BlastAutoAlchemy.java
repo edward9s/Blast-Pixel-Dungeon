@@ -6,6 +6,7 @@ import com.shatteredpixel.shatteredpixeldungeon.Statistics;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.items.EnergyCrystal;
+import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.Recipe;
 import com.shatteredpixel.shatteredpixeldungeon.items.bags.Bag;
@@ -196,7 +197,7 @@ final class BlastAutoAlchemy {
                                          ArrayList<Seed> seeds, ArrayList<Runestone> stones,
                                          int minimumStock) {
         if (!needsRestock(hero.belongings.getItem(Alchemize.class), minimumStock)) return false;
-        if (!canStore(hero, new Alchemize())) return Restock.ALCHEMIZE.blocked("output-full");
+        if (waitingForSpace(hero, new Alchemize())) return Restock.ALCHEMIZE.blocked("output-on-floor");
         Seed seed = null;
         for (Seed candidate : seeds) {
             if (fuelSeed(candidate) && (seed == null || candidate.quantity() > seed.quantity())) {
@@ -216,7 +217,7 @@ final class BlastAutoAlchemy {
     private static boolean brewAqua(Hero hero, boolean potKnown, AlchemistsToolkit toolkit,
                                     ArrayList<Seed> seeds, int minimumStock) {
         if (!needsRestock(hero.belongings.getItem(AquaBrew.class), minimumStock)) return false;
-        if (!canStore(hero, new AquaBrew())) return Restock.AQUA.blocked("output-full");
+        if (waitingForSpace(hero, new AquaBrew())) return Restock.AQUA.blocked("output-on-floor");
         PotionOfStormClouds clouds = hero.belongings.getItem(PotionOfStormClouds.class);
         if (clouds != null) {
             if (!clouds.isIdentified()) return Restock.AQUA.blocked("storm-clouds-unidentified");
@@ -228,7 +229,6 @@ final class BlastAutoAlchemy {
         if (levitation.quantity() <= LEVITATION_RESERVE)
             return Restock.AQUA.blocked("levitation-reserve");
         PotionOfStormClouds intermediate = new PotionOfStormClouds();
-        if (!canStore(hero, intermediate)) return Restock.AQUA.blocked("intermediate-full");
         return brew(hero, potKnown, toolkit, seeds, CLOUDS, ingredients(levitation),
                 AQUA.cost(ingredients(intermediate)));
     }
@@ -254,6 +254,18 @@ final class BlastAutoAlchemy {
 
     private static boolean canStore(Hero hero, Item result) {
         return BlastAutoPickup.canCollect(hero, result, BlastAutoPickupPolicy::isInstantPickup);
+    }
+
+    // Leave one batch waiting for pickup when the bags cannot take the result.
+    private static boolean waitingForSpace(Hero hero, Item result) {
+        if (canStore(hero, result)) return false;
+        for (Heap heap : Dungeon.level.heaps.valueList()) {
+            if (heap.type != Heap.Type.HEAP) continue;
+            for (Item item : heap.items) {
+                if (item.getClass() == result.getClass()) return true;
+            }
+        }
+        return false;
     }
 
     private static boolean importantStone(Runestone stone) {
@@ -291,7 +303,7 @@ final class BlastAutoAlchemy {
 
     private static boolean brew(Hero hero, boolean potKnown, AlchemistsToolkit toolkit,
                                 ArrayList<Seed> seeds, Recipe recipe, ArrayList<Item> ingredients,
-                                int reserveEnergy) {
+                                int nextCost) {
         Restock restock = recipe == SELL ? Restock.ALCHEMIZE
                 : (recipe == AQUA || recipe == CLOUDS ? Restock.AQUA : null);
         if (ingredients == null || !recipe.testIngredients(ingredients)) {
@@ -299,10 +311,10 @@ final class BlastAutoAlchemy {
             return false;
         }
 
-        int cost = recipe.cost(ingredients);
+        int cost = recipe.cost(ingredients) + nextCost;
         int portable = toolkit == null ? 0 : toolkit.availableEnergy();
         // Prefer spending existing energy. Only make up the shortfall from seeds.
-        ArrayList<Seed> fuel = energySeeds(cost + reserveEnergy - Dungeon.energy - portable,
+        ArrayList<Seed> fuel = energySeeds(cost - Dungeon.energy - portable,
                 seeds, ingredients);
         if (fuel == null) {
             if (restock != null) restock.blocked("insufficient-energy");
@@ -311,6 +323,10 @@ final class BlastAutoAlchemy {
 
         Item result = recipe.brew(ingredients);
         if (result == null) throw new IllegalStateException("Validated alchemy recipe produced no item");
+        if (recipe == CLOUDS) {
+            result = AQUA.brew(ingredients(result));
+            if (result == null) throw new IllegalStateException("Storm clouds did not produce aqua brew");
+        }
 
         // Recipes decrement live stacks, including shared stacks used for several inputs.
         for (Item ingredient : ingredients) {
@@ -327,9 +343,15 @@ final class BlastAutoAlchemy {
         if (useToolkit) cost = toolkit.consumeEnergy(cost);
         Dungeon.energy -= cost;
         Catalog.countUses(EnergyCrystal.class, cost);
-        if (!result.collect()) Dungeon.level.drop(result, hero.pos);
+        if (!result.collect()) {
+            Dungeon.level.drop(result, hero.pos);
+            if (restock != null) {
+                BlastLog.debug("auto-alchemy action=drop item=" + result.getClass().getSimpleName()
+                        + " reason=output-full");
+            }
+        }
         if (restock != null) restock.crafted(result);
-        Statistics.itemsCrafted++;
+        Statistics.itemsCrafted += recipe == CLOUDS ? 2 : 1;
         Badges.validateItemsCrafted();
         Item.updateQuickslot();
         hero.spendAndNext(Actor.TICK);
