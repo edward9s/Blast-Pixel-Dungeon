@@ -89,8 +89,9 @@ public final class BlastAutoBombAI {
         BlastBombManiac maniac = BlastBombManiac.current();
         if (maniac == null || maniac.remaining() == 0) return false;
         int flashbang = maniac.typeIndex(FlashBangBomb.class);
-        if (flashbang >= 0 && target.paralysed == 0
-                && tryCrystalMimicBomb(hero, target, maniac, flashbang)) return true;
+        // Damage can end paralysis early. A flashbang deals its damage first,
+        // then reapplies paralysis before the mimic can act again.
+        if (flashbang >= 0 && tryCrystalMimicBomb(hero, target, maniac, flashbang)) return true;
         int selected = maniac.selectedIndex();
         return selected != flashbang && tryCrystalMimicBomb(hero, target, maniac, selected);
     }
