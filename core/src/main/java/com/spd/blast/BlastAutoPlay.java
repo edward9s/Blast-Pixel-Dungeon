@@ -291,9 +291,14 @@ public final class BlastAutoPlay {
             queueTimedVaultStep(hero, timedStep);
             return true;
         }
-        if (safe[interruptedDestination] && distances[interruptedDestination] != Integer.MAX_VALUE) {
+        boolean vault = Dungeon.level instanceof com.shatteredpixel.shatteredpixeldungeon.levels.VaultLevel;
+        boolean[] route = vault
+                ? progress.safeFor(safe, hero.pos, BlastAutoProgressGuard.Intent.VAULT) : safe;
+        int[] routeDistances = navigationDistances(hero.pos, safe, distances, route);
+        if (route[interruptedDestination] && routeDistances[interruptedDestination] != Integer.MAX_VALUE) {
             blockedTravelTurns = 0;
-            hero.curAction = new HeroAction.Move(firstStep(interruptedDestination, safe, distances));
+            progress.intent(vault ? BlastAutoProgressGuard.Intent.VAULT : BlastAutoProgressGuard.Intent.TRAVEL);
+            hero.curAction = new HeroAction.Move(firstStep(interruptedDestination, route, routeDistances));
             return true;
         }
         // Allow transient enemies, doors or hazards to clear; never wait indefinitely.
@@ -459,6 +464,7 @@ public final class BlastAutoPlay {
             pausedVaultDestination = -1;
             return false;
         }
+        progress.observe(hero.pos);
         if (hero.pos == pausedVaultDestination) {
             int destination = pausedVaultDestination;
             pausedVaultDestination = -1;
@@ -470,17 +476,21 @@ public final class BlastAutoPlay {
         int timedStep = vaultTimedStep(hero, pausedVaultDestination);
         if (timedStep >= 0) {
             queueTimedVaultStep(hero, timedStep);
+            if (hero.curAction != null) progress.record(hero.pos, timedStep);
             return hero.curAction == null;
         }
         Blob[] hazards = BlastAutoEnvironment.activeHazards(level);
         boolean[] safe = safeCells(hero, hazards,
                 BlastAutoEnvironment.activeSpecialBarriers(level));
+        safe = progress.safeFor(safe, hero.pos, BlastAutoProgressGuard.Intent.VAULT);
         PathFinder.buildDistanceMap(hero.pos, safe);
         int[] distances = PathFinder.distance.clone();
         if (safe[pausedVaultDestination]
                 && distances[pausedVaultDestination] != Integer.MAX_VALUE) {
-            hero.curAction = new HeroAction.Move(
-                    firstStep(pausedVaultDestination, safe, distances));
+            int step = firstStep(pausedVaultDestination, safe, distances);
+            progress.intent(BlastAutoProgressGuard.Intent.VAULT);
+            hero.curAction = new HeroAction.Move(step);
+            progress.record(hero.pos, step);
             return false;
         }
         pausedVaultDestination = -1;
@@ -629,7 +639,7 @@ public final class BlastAutoPlay {
         BlastAutoPickup.advanceRetries();
         boolean started = chooseActionOnce(hero);
         HeroAction action = hero.curAction;
-        if (!(action instanceof HeroAction.PickUp)) {
+        if (!(action instanceof HeroAction.PickUp) && !"vault-timed-wait".equals(debugDecision)) {
             progress.record(hero.pos, action instanceof HeroAction.Move ? action.dst : -1);
         }
         if (action instanceof HeroAction.Move && BlastSettings.debugLog()) {
@@ -996,10 +1006,7 @@ public final class BlastAutoPlay {
 
         // Resume interrupted player travel after tactical combat and before idle tasks.
         debugDecision = "manual-route";
-        if (resumeInterruptedTravel(hero, idleSafe, idleDistances)) {
-            progress.intent(BlastAutoProgressGuard.Intent.TRAVEL);
-            return hero.curAction == null;
-        }
+        if (resumeInterruptedTravel(hero, idleSafe, idleDistances)) return hero.curAction == null;
 
         // Strength potions, equipment upgrades, and ordinary gear cleanup run only while idle.
         // Equipment picked up for sale is handled by the native pickup-success callback.
@@ -1198,6 +1205,9 @@ public final class BlastAutoPlay {
         }
 
         idleSafe = progress.safeFor(safe, hero.pos, BlastAutoProgressGuard.Intent.ROAM);
+        if (Dungeon.level instanceof com.shatteredpixel.shatteredpixeldungeon.levels.VaultLevel) {
+            idleSafe = progress.safeFor(idleSafe, hero.pos, BlastAutoProgressGuard.Intent.VAULT);
+        }
         idleDistances = navigationDistances(hero.pos, safe, distances, idleSafe);
         debugDecision = "roam";
         int step = roamStep(hero, idleSafe, idleDistances);
@@ -1624,6 +1634,7 @@ public final class BlastAutoPlay {
         if (hero.rooted || !BlastAutoVault.nearTimedHazard(hero, level)) return -1;
         boolean[] passable = safeCells(hero, BlastAutoEnvironment.activeHazards(level, true),
                 BlastAutoEnvironment.activeSpecialBarriers(level), false, false, true);
+        passable = progress.safeFor(passable, hero.pos, BlastAutoProgressGuard.Intent.VAULT);
         BlastAutoVault.TimedRoutes routes = BlastAutoVault.timedRoutes(hero, level, passable);
         if (goal >= 0 && goal != hero.pos) return routes.toward(hero.pos, goal, passable);
         int treasureGoal = BlastAutoVault.timedTreasureGoal(hero, level, passable);
@@ -1644,6 +1655,7 @@ public final class BlastAutoPlay {
             hero.spendAndNext(Actor.TICK);
         } else {
             debugDecision = "vault-timed-move";
+            progress.intent(BlastAutoProgressGuard.Intent.VAULT);
             hero.curAction = new HeroAction.Move(step);
             BlastLog.debug("auto-vault action=move-timed from=" + hero.pos + " to=" + step);
         }
