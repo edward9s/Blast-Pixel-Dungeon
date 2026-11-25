@@ -25,6 +25,7 @@ import com.shatteredpixel.shatteredpixeldungeon.items.rings.RingOfWealth;
 import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfUpgrade;
 import com.shatteredpixel.shatteredpixeldungeon.items.trinkets.TrinketCatalyst;
 import com.shatteredpixel.shatteredpixeldungeon.items.wands.Wand;
+import com.shatteredpixel.shatteredpixeldungeon.items.weapon.SpiritBow;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
 
 import java.util.IdentityHashMap;
@@ -142,6 +143,7 @@ public final class BlastAutoPickup {
     }
 
     private static int pickupPriority(Item item) {
+        if (item instanceof SpiritBow) return 3;
         if (item instanceof Key) return 2;
         if (item instanceof PotionOfStrength || item instanceof ScrollOfUpgrade) return 1;
         return 0;
@@ -277,6 +279,7 @@ public final class BlastAutoPickup {
     }
 
     static boolean isPickupType(Item item, Predicate<Item> instantPickup) {
+        if (item instanceof SpiritBow) return true;
         if (item instanceof Bomb || item instanceof BlastDeathBomb) return !uncollectibleBomb(item);
         if (item instanceof Wand) return !item.cursed && BlastAutoCombat.supportsWand((Wand) item);
         if (item instanceof Ring) {
