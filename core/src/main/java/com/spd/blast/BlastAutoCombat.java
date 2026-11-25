@@ -173,8 +173,12 @@ final class BlastAutoCombat {
         int destination = BlastAutoPlay.nearCell(hero.pos, target.pos, safe, distances);
         if (destination < 0 || distances[destination] <= 0
                 || distances[destination] == Integer.MAX_VALUE) return Action.NONE;
+        int step = BlastAutoPlay.firstStep(destination, safe, distances);
         BlastAutoPlay.rememberCombatTarget(target);
-        hero.curAction = new HeroAction.Move(BlastAutoPlay.firstStep(destination, safe, distances));
+        hero.curAction = new HeroAction.Move(step);
+        if (target instanceof RotLasher) {
+            BlastLog.debug("auto-combat target=RotLasher@" + target.pos + " action=approach to=" + step);
+        }
         return Action.QUEUED;
     }
 
@@ -284,7 +288,8 @@ final class BlastAutoCombat {
     private static Choice bestMissile(Hero hero, Mob target, CombatEquipment equipment) {
         if (hero.belongings.lostInventory() || hero.pos == target.pos) return null;
         Choice best = null;
-        if (equipment.arrow != null) {
+        // Spirit arrows can keep a regenerating lasher alive indefinitely.
+        if (equipment.arrow != null && !(target instanceof RotLasher)) {
             float damage = weaponCollateralSafe(hero, target, equipment.arrow, true)
                     ? physicalDamage(hero, target, equipment.arrow, equipment.bow) : 0f;
             if (damage > 0f) {
