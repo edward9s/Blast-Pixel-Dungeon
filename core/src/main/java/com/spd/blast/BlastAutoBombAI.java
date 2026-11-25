@@ -13,6 +13,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.NPC;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.Shopkeeper;
 import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
 import com.shatteredpixel.shatteredpixeldungeon.items.bombs.Bomb;
+import com.shatteredpixel.shatteredpixeldungeon.items.bombs.FlashBangBomb;
 import com.shatteredpixel.shatteredpixeldungeon.items.bombs.RegrowthBomb;
 
 /** Blast-only bomb tactics, isolated from the portable auto-play controller. */
@@ -87,7 +88,16 @@ public final class BlastAutoBombAI {
         if (!autoBombAvailable(hero)) return false;
         BlastBombManiac maniac = BlastBombManiac.current();
         if (maniac == null || maniac.remaining() == 0) return false;
-        Bomb bomb = maniac.selectedBomb();
+        int flashbang = maniac.typeIndex(FlashBangBomb.class);
+        if (flashbang >= 0 && target.paralysed == 0
+                && tryCrystalMimicBomb(hero, target, maniac, flashbang)) return true;
+        int selected = maniac.selectedIndex();
+        return selected != flashbang && tryCrystalMimicBomb(hero, target, maniac, selected);
+    }
+
+    private static boolean tryCrystalMimicBomb(Hero hero, CrystalMimic target,
+                                                BlastBombManiac maniac, int bombIndex) {
+        Bomb bomb = maniac.bombAt(bombIndex);
         if (bomb instanceof RegrowthBomb) return false;
 
         boolean remoteThrow = BlastSettings.testRemoteThrow();
@@ -102,8 +112,9 @@ public final class BlastAutoBombAI {
                 }
             }
         }
-        if (!detonate(hero, maniac, remoteThrow, target)) return false;
-        BlastLog.debug("auto-crystal-mimic action=bomb target=" + target.pos);
+        if (!detonate(hero, maniac, remoteThrow, target, bombIndex)) return false;
+        BlastLog.debug("auto-crystal-mimic action=bomb type=" + bomb.getClass().getSimpleName()
+                + " target=" + target.pos);
         return true;
     }
 
@@ -132,9 +143,14 @@ public final class BlastAutoBombAI {
 
     private static boolean detonate(Hero hero, BlastBombManiac maniac,
                                     boolean remoteThrow, Mob target) {
-        if (remoteThrow) return maniac.blastAutoThrowAndDetonate(target.pos);
+        return detonate(hero, maniac, remoteThrow, target, maniac.selectedIndex());
+    }
 
-        if (maniac.blastAutoPlaceAndDetonate()) {
+    private static boolean detonate(Hero hero, BlastBombManiac maniac,
+                                    boolean remoteThrow, Mob target, int bombIndex) {
+        if (remoteThrow) return maniac.blastAutoThrowAndDetonate(target.pos, bombIndex);
+
+        if (maniac.blastAutoPlaceAndDetonate(bombIndex)) {
             // Automatic attacks must advance time even when remote placement is free.
             hero.spendAndNext(1f);
             return true;
@@ -173,6 +189,7 @@ public final class BlastAutoBombAI {
                     || !BlastAutoPlay.isAwake(mob)
                     || BlastAutoPlay.isAutoAttackExcluded(mob)) continue;
             if (regrowth && !regrowthReady(mob.rooted, regrowthAt(mob.pos))) continue;
+            if (alreadyStunnedMimic(bomb, mob)) continue;
 
             int center = remoteThrow
                     ? BlastBombTrajectory.throwPos(hero.pos, mob.pos) : hero.pos;
@@ -217,8 +234,9 @@ public final class BlastAutoBombAI {
         if (maniac == null || maniac.remaining() == 0) return -1;
 
         Bomb bomb = maniac.selectedBomb();
-        if (bomb instanceof RegrowthBomb
-                && !regrowthReady(target.rooted, regrowthAt(target.pos))) return -1;
+        if (alreadyStunnedMimic(bomb, target)
+                || (bomb instanceof RegrowthBomb
+                    && !regrowthReady(target.rooted, regrowthAt(target.pos)))) return -1;
 
         // One projection filters candidate cells before checking their exact
         // blast coverage and collateral safety.
@@ -236,6 +254,10 @@ public final class BlastAutoBombAI {
             shortest = steps;
         }
         return best;
+    }
+
+    private static boolean alreadyStunnedMimic(Bomb bomb, Mob target) {
+        return bomb instanceof FlashBangBomb && target instanceof CrystalMimic && target.paralysed > 0;
     }
 
     private static boolean containsUnreadySacrificeMob(boolean[] blast, int[] flames) {
