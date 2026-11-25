@@ -1026,6 +1026,14 @@ public final class BlastAutoPlay {
             return toxicVents == BlastAutoSpecialRooms.Action.USE;
         }
 
+        idleSafe = progress.safeFor(safe, hero.pos, BlastAutoProgressGuard.Intent.INTERACT);
+        idleDistances = navigationDistances(hero.pos, safe, distances, idleSafe);
+        debugDecision = "wandmaker-ritual";
+        if (BlastAutoWandmaker.placeCandles(hero, idleSafe, idleDistances)) {
+            progress.intent(BlastAutoProgressGuard.Intent.INTERACT);
+            return hero.curAction == null;
+        }
+
         // Collect reachable floor loot after visible enemies have been handled.
         idleSafe = progress.safeFor(safe, hero.pos, BlastAutoProgressGuard.Intent.PICKUP);
         idleDistances = navigationDistances(hero.pos, safe, distances, idleSafe);
