@@ -4,7 +4,6 @@ import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.CrystalSpire;
-import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.CrystalGuardian;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.GnollGeomancer;
 import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroAction;
@@ -17,68 +16,20 @@ import com.watabou.utils.PathFinder;
 
 /** Native mining actions and scoped movement for the troll blacksmith quest. */
 final class BlastAutoBlacksmith {
-    private static boolean enabledPhase;
-    private static boolean previousPhase;
-    private static boolean enabledDemolition;
-    private static boolean previousDemolition;
-    private static boolean bossDemolitionDisabled;
-    private static boolean bossDemolitionWasEnabled;
-
     private BlastAutoBlacksmith() {}
 
-    static void update() {
-        boolean active = Dungeon.level instanceof MiningLevel
+    static boolean active() {
+        return Dungeon.branch == 1 && Dungeon.level instanceof MiningLevel
                 && Blacksmith.Quest.given() && !Blacksmith.Quest.completed();
-        if (active && !enabledPhase) {
-            previousPhase = BlastSettings.testFreeMovement();
-            enabledPhase = true;
-            BlastSettings.setTestFreeMovement(true);
-        }
-        boolean guardian = false;
-        if (active && Blacksmith.Quest.Type() == Blacksmith.Quest.CRYSTAL) {
-            for (Mob mob : Dungeon.level.mobs) {
-                if (mob instanceof CrystalGuardian && mob.isAlive()) {
-                    guardian = true;
-                    if (((CrystalGuardian) mob).recovering() && enabledDemolition) {
-                        // Native guardians revive indefinitely. The scoped demolition
-                        // option finishes one only after it has been defeated normally.
-                        mob.die(Dungeon.hero);
-                    }
-                }
-            }
-        }
-        if (bossDemolitionDisabled && (!active || Blacksmith.Quest.bossBeaten())) {
-            BlastSettings.setTestDemolition(bossDemolitionWasEnabled);
-            bossDemolitionDisabled = false;
-        }
-        if (guardian && !enabledDemolition && !bossDemolitionDisabled) {
-            previousDemolition = BlastSettings.testDemolition();
-            enabledDemolition = true;
-            BlastSettings.setTestDemolition(true);
-        } else if (!guardian && enabledDemolition) {
-            BlastSettings.setTestDemolition(previousDemolition);
-            enabledDemolition = false;
-        }
-        if (!active && enabledPhase) {
-            BlastSettings.setTestFreeMovement(previousPhase);
-            enabledPhase = false;
-        }
     }
 
-    static void reset() {
-        if (enabledPhase) BlastSettings.setTestFreeMovement(previousPhase);
-        enabledPhase = false;
-        if (enabledDemolition) BlastSettings.setTestDemolition(previousDemolition);
-        enabledDemolition = false;
-        if (bossDemolitionDisabled) BlastSettings.setTestDemolition(bossDemolitionWasEnabled);
-        bossDemolitionDisabled = false;
+    static boolean phase() {
+        return active() && BlastSettings.testAutoPlay() && !BlastAutoPlay.isPaused();
     }
 
     static boolean mine(Hero hero, boolean[] safe, int[] distances) {
         Level level = Dungeon.level;
-        if (!(level instanceof MiningLevel) || !Blacksmith.Quest.given()
-                || Blacksmith.Quest.completed()
-                || hero.belongings.getItem(Pickaxe.class) == null) return false;
+        if (!active() || hero.belongings.getItem(Pickaxe.class) == null) return false;
         int target = -1;
         int stand = -1;
         int shortest = Integer.MAX_VALUE;
@@ -105,16 +56,13 @@ final class BlastAutoBlacksmith {
     /** The crystal spire is damaged only by its native pickaxe interaction. */
     static boolean attackBoss(Hero hero, boolean[] safe, int[] distances) {
         Level level = Dungeon.level;
-        if (!(level instanceof MiningLevel) || !Blacksmith.Quest.given()
-                || Blacksmith.Quest.bossBeaten()
-                || hero.belongings.getItem(Pickaxe.class) == null) return false;
-        if (!goldCollected()) return false;
+        if (!active() || Blacksmith.Quest.Type() != Blacksmith.Quest.CRYSTAL
+                || Blacksmith.Quest.bossBeaten() || hero.belongings.getItem(Pickaxe.class) == null
+                || !goldCollected()) return false;
         for (Mob mob : level.mobs) {
-            if (mob instanceof CrystalGuardian && mob.isAlive()) return false;
-        }
-        if (Blacksmith.Quest.Type() != Blacksmith.Quest.CRYSTAL) return false;
-        for (Mob mob : level.mobs) {
-            if (!(mob instanceof CrystalSpire) || !mob.isAlive()) continue;
+            if (!(mob instanceof CrystalSpire) || !mob.isAlive()
+                    || !(hero.fieldOfView[mob.pos] || level.visited[mob.pos]
+                        || level.mapped[mob.pos])) continue;
             int stand = -1;
             int steps = Integer.MAX_VALUE;
             for (int offset : PathFinder.NEIGHBOURS8) {
@@ -124,14 +72,7 @@ final class BlastAutoBlacksmith {
                 stand = cell;
                 steps = distances[cell];
             }
-            if (stand < 0) return false;
-            if (!bossDemolitionDisabled) {
-                bossDemolitionWasEnabled = enabledDemolition
-                        ? previousDemolition : BlastSettings.testDemolition();
-                bossDemolitionDisabled = true;
-                enabledDemolition = false;
-            }
-            BlastSettings.setTestDemolition(false);
+            if (stand < 0 || (hero.rooted && hero.pos != stand)) return false;
             hero.curAction = hero.pos == stand
                     ? new HeroAction.Interact(mob)
                     : new HeroAction.Move(BlastAutoPlay.firstStep(stand, safe, distances));
@@ -142,8 +83,7 @@ final class BlastAutoBlacksmith {
 
     /** Special pickaxe strike for the geomancer's rock-armor phase. */
     static boolean attackArmoredGeomancer(Hero hero, boolean[] safe, int[] distances) {
-        if (!(Dungeon.level instanceof MiningLevel) || !Blacksmith.Quest.given()
-                || Blacksmith.Quest.Type() != Blacksmith.Quest.GNOLL
+        if (!active() || Blacksmith.Quest.Type() != Blacksmith.Quest.GNOLL
                 || hero.belongings.getItem(Pickaxe.class) == null
                 || !goldCollected()) return false;
         for (Mob mob : Dungeon.level.mobs) {
@@ -160,7 +100,7 @@ final class BlastAutoBlacksmith {
                     steps = distances[cell];
                 }
             }
-            if (stand < 0) return false;
+            if (stand < 0 || (hero.rooted && hero.pos != stand)) return false;
             hero.curAction = hero.pos == stand
                     ? new HeroAction.Interact(mob)
                     : new HeroAction.Move(BlastAutoPlay.firstStep(stand, safe, distances));
@@ -170,7 +110,7 @@ final class BlastAutoBlacksmith {
     }
 
     static boolean goldCollected() {
-        if (!(Dungeon.level instanceof MiningLevel)) return false;
+        if (!active()) return false;
         for (int cell = 0; cell < Dungeon.level.length(); cell++) {
             if (Dungeon.level.map[cell] == Terrain.WALL_DECO) return false;
         }

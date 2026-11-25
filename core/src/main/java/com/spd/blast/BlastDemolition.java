@@ -3,6 +3,10 @@ package com.spd.blast;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.CrystalGuardian;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.CrystalSpire;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.FungalCore;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.GnollGeomancer;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Tengu;
 import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
@@ -87,7 +91,11 @@ public final class BlastDemolition {
                 }
             }
             Char ch = Actor.findChar(cell);
-            if (ch instanceof Mob) demolition.mobs.add((Mob) ch);
+            if (ch instanceof Mob && !(ch instanceof CrystalSpire)
+                    && !(BlastAutoBlacksmith.active() && (ch instanceof CrystalGuardian
+                        || ch instanceof GnollGeomancer || ch instanceof FungalCore))) {
+                demolition.mobs.add((Mob) ch);
+            }
 
             // Remove traps before potions, fire, or other bomb effects can trigger them.
             if (destructive && (level.traps.get(cell) != null || terrain == Terrain.TRAP

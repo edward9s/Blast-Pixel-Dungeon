@@ -18,7 +18,8 @@ public final class BlastMovement {
     private BlastMovement() {}
 
     public static boolean enabled() {
-        return BlastSettings.testFreeMovement() || (Dungeon.hero != null
+        return BlastSettings.testFreeMovement() || BlastAutoBlacksmith.phase()
+                || (Dungeon.hero != null
                 && Dungeon.hero.buff(BlastFreeMovement.class) != null);
     }
 
