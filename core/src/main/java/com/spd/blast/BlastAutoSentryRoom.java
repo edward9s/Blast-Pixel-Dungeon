@@ -169,7 +169,7 @@ final class BlastAutoSentryRoom {
 
         Haste haste = hero.buff(Haste.class);
         PotionOfHaste potion = hero.belongings.getItem(PotionOfHaste.class);
-        if (haste == null && (potion == null || potion.quantity() == 0 || !potion.isKnown()))
+        if (haste == null && (potion == null || potion.quantity() <= 0))
             return BlastAutoSpecialRooms.Action.NONE;
         boolean[] map = crossing(hero, room, safe, hazards, barriers);
         int forward = reachable(exit, map)[treasure.pos];

@@ -236,7 +236,7 @@ final class BlastAutoSpecialRooms {
         if (safe[chest.pos] && distances[chest.pos] != Integer.MAX_VALUE) return Action.NONE;
 
         PotionOfLevitation potion = hero.belongings.getItem(PotionOfLevitation.class);
-        if (potion != null && potion.quantity() > 0 && potion.isKnown()) {
+        if (potion != null && potion.quantity() > 0) {
             boolean[] crossing = flightMap(hero, room, safe, hazards, specialBarriers);
             PathFinder.buildDistanceMap(exit, crossing);
             int toChest = PathFinder.distance[chest.pos];
@@ -288,7 +288,7 @@ final class BlastAutoSpecialRooms {
         }
         if (attemptedFire && fire.volume >= lastFireVolume) return Action.NONE;
         PotionOfFrost frost = hero.belongings.getItem(PotionOfFrost.class);
-        Item item = frost != null && frost.isKnown() && frost.quantity() > 0
+        Item item = frost != null && frost.quantity() > 0
                 ? frost : hero.belongings.getItem(AquaBrew.class);
         if (item == null || item.quantity() == 0) return Action.NONE;
         boolean aqua = item instanceof AquaBrew;
