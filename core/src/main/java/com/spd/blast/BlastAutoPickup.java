@@ -154,11 +154,6 @@ public final class BlastAutoPickup {
         return 0;
     }
 
-    static boolean hasCollectibleLoot(Hero hero, Heap heap) {
-        return heap != null && firstEligibleItem(heap,
-                item -> canCollect(hero, item, BlastAutoPickupPolicy::isInstantPickup)) != null;
-    }
-
     /**
      * Explain the closest currently visible floor item without altering pickup state.
      * Debug-only: prioritizes nearby gold, so a missed coin is easy to identify.
