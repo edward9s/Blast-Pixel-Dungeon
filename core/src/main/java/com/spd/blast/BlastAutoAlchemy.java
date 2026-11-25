@@ -20,6 +20,7 @@ import com.shatteredpixel.shatteredpixeldungeon.items.food.MeatPie;
 import com.shatteredpixel.shatteredpixeldungeon.items.food.Pasty;
 import com.shatteredpixel.shatteredpixeldungeon.items.potions.Potion;
 import com.shatteredpixel.shatteredpixeldungeon.items.potions.PotionOfLevitation;
+import com.shatteredpixel.shatteredpixeldungeon.items.potions.PotionOfStrength;
 import com.shatteredpixel.shatteredpixeldungeon.items.potions.brews.AquaBrew;
 import com.shatteredpixel.shatteredpixeldungeon.items.potions.exotic.ExoticPotion;
 import com.shatteredpixel.shatteredpixeldungeon.items.potions.exotic.PotionOfStormClouds;
@@ -39,6 +40,7 @@ import com.shatteredpixel.shatteredpixeldungeon.plants.Plant.Seed;
 import com.shatteredpixel.shatteredpixeldungeon.plants.Rotberry;
 import com.shatteredpixel.shatteredpixeldungeon.plants.Starflower;
 import com.shatteredpixel.shatteredpixeldungeon.plants.Stormvine;
+import com.watabou.utils.Reflection;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -167,6 +169,7 @@ final class BlastAutoAlchemy {
         if (pouch != null && !hasSlot(pouch)) {
             stones.sort(Comparator.comparingInt(Item::quantity));
             if (brewScroll(hero, potKnown, toolkit, seeds, stones, pouch)
+                    || brewPotion(hero, potKnown, toolkit, seeds, pouch)
                     || brewAlchemize(hero, potKnown, toolkit, seeds, stones, LOW_STOCK, pouch)) return true;
         }
 
@@ -181,21 +184,47 @@ final class BlastAutoAlchemy {
 
         if (brewScroll(hero, potKnown, toolkit, seeds, stones, null)) return true;
 
-        if (hasSlot(hero.belongings.getItem(PotionBandolier.class))) {
-            ArrayList<Item> mixed = new ArrayList<>(3);
-            for (Seed seed : seeds) {
-                // Matching seeds use the native single-type result. Never use the wandmaker's seed.
-                if (seed.quantity() >= 3 && !(seed instanceof Rotberry.Seed)
-                        && brew(hero, potKnown, toolkit, seeds, POTION,
-                                ingredients(seed, seed, seed), 0)) return true;
-                if (fuelSeed(seed) && Potion.SeedToPotion.types.containsKey(seed.getClass())) {
-                    for (int i = 0; i < seed.quantity() && mixed.size() < 3; i++) mixed.add(seed);
-                }
-            }
-            if (mixed.size() == 3 && brew(hero, potKnown, toolkit, seeds, POTION, mixed, 0)) return true;
+        return brewPotion(hero, potKnown, toolkit, seeds, null);
+    }
+
+    private static boolean brewPotion(Hero hero, boolean potKnown, AlchemistsToolkit toolkit,
+                                      ArrayList<Seed> seeds, VelvetPouch pouch) {
+        PotionBandolier bandolier = hero.belongings.getItem(PotionBandolier.class);
+        if (bandolier == null && pouch == null) return false;
+
+        HashMap<Class<?>, Integer> stock = new HashMap<>();
+        for (Potion potion : hero.belongings.getAllItems(Potion.class)) {
+            stock.merge(potion.getClass(), potion.quantity(), Integer::sum);
+        }
+        int highest = 0;
+        for (Class<? extends Potion> type : Potion.SeedToPotion.types.values()) {
+            if (type != PotionOfStrength.class) highest = Math.max(highest, stock.getOrDefault(type, 0));
         }
 
-        return false;
+        ArrayList<Seed> candidates = seeds;
+        if (pouch != null) {
+            candidates = new ArrayList<>(seeds);
+            candidates.sort(Comparator.comparingInt(Item::quantity));
+        }
+
+        ArrayList<Item> mixed = new ArrayList<>(3);
+        for (Seed seed : candidates) {
+            if (pouch != null && !pouch.items.contains(seed)) continue;
+            Class<? extends Potion> type = Potion.SeedToPotion.types.get(seed.getClass());
+            if (type == null || seed instanceof Rotberry.Seed
+                    || !belowHighestStock(stock.getOrDefault(type, 0), highest)) continue;
+
+            if (seed.quantity() >= 3 && canStore(hero, Reflection.newInstance(type))
+                    && brew(hero, potKnown, toolkit, seeds, POTION, ingredients(seed, seed, seed), 0)) {
+                return true;
+            }
+            if (fuelSeed(seed)) {
+                for (int i = 0; i < seed.quantity() && mixed.size() < 3; i++) mixed.add(seed);
+            }
+        }
+        return mixed.size() == 3
+                && (hasSlot(bandolier) || hasSlot(hero.belongings.backpack))
+                && brew(hero, potKnown, toolkit, seeds, POTION, mixed, 0);
     }
 
     private static boolean brewScroll(Hero hero, boolean potKnown, AlchemistsToolkit toolkit,
@@ -230,6 +259,10 @@ final class BlastAutoAlchemy {
     private static boolean restockScroll(Scroll scroll, int quantity, int highest) {
         if (scroll instanceof ScrollOfUpgrade || scroll instanceof ScrollOfTransmutation) return true;
         if (scroll instanceof ScrollOfRemoveCurse) return quantity < REMOVE_CURSE_STOCK;
+        return belowHighestStock(quantity, highest);
+    }
+
+    private static boolean belowHighestStock(int quantity, int highest) {
         return highest == 0 || quantity < highest;
     }
 
