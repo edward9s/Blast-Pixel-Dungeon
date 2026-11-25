@@ -1078,7 +1078,7 @@ public final class BlastAutoPlay {
             return hero.curAction == null;
         }
 
-        // Open prepared tombs; spawned wraiths go to the existing combat AI.
+        // Open discovered tombs; spawned wraiths go to the existing combat AI.
         debugDecision = "grave";
         BlastAutoSpecialRooms.Action grave =
                 BlastAutoGraves.openTomb(hero, idleSafe, idleDistances);
