@@ -73,6 +73,7 @@ final class BlastAutoSentryRoom {
                 if (level.map[cell] != Terrain.EMPTY_SP || !barriers[cell]
                         || level.solid[cell] || level.pit[cell] || !level.passable[cell]
                         || BlastAutoEnvironment.hazardousAt(cell, hazards)
+                        || !BlastAutoPlay.isTrapSafe(level.traps.get(cell))
                         || AutoPlayPlantSafety.isHarmful(level.plants.get(cell))) continue;
                 Char occupant = Actor.findChar(cell);
                 if (occupant == null || occupant == hero) map[cell] = true;
@@ -95,7 +96,7 @@ final class BlastAutoSentryRoom {
 
     /** A started sprint has priority over combat and routine exploration. */
     static BlastAutoSpecialRooms.Action continueRun(Hero hero, boolean[] safe,
-            int[] distances, Blob[] hazards, boolean[] barriers) {
+            Blob[] hazards, boolean[] barriers) {
         Level level = Dungeon.level;
         Haste haste = hero.buff(Haste.class);
         SentryRoom room = knownRoom(level, hero);
@@ -123,23 +124,35 @@ final class BlastAutoSentryRoom {
                         1f / hero.speed())) {
             if (hero.pos != activeTreasure) {
                 if (hero.rooted) return BlastAutoSpecialRooms.Action.NONE;
-                hero.curAction = new HeroAction.Move(
-                        BlastAutoPlay.firstStep(activeTreasure, map, travel));
+                move(hero, activeTreasure, map, travel, "run");
             } else if (heap.type == Heap.Type.CHEST) {
                 hero.curAction = new HeroAction.OpenChest(activeTreasure);
+                BlastLog.debug("auto-sentry action=open-chest chest=" + activeTreasure);
             } else {
+                BlastLog.debug("auto-sentry action=pickup chest=" + activeTreasure);
                 BlastAutoPickup.preparePickup(hero, heap, loot);
                 hero.curAction = new HeroAction.PickUp(activeTreasure);
             }
             return BlastAutoSpecialRooms.Action.MOVE;
         }
         if (hero.pos != exit && travel[exit] != Integer.MAX_VALUE && !hero.rooted) {
-            hero.curAction = new HeroAction.Move(
-                    BlastAutoPlay.firstStep(exit, map, travel));
+            move(hero, exit, map, travel, "return");
             return BlastAutoSpecialRooms.Action.MOVE;
+        }
+        if (pending) {
+            String reason = travel[activeTreasure] == Integer.MAX_VALUE ? "chest-unreachable"
+                    : travel[exit] == Integer.MAX_VALUE ? "exit-unreachable"
+                    : hero.rooted ? "rooted" : "haste-window";
+            BlastLog.debug("auto-sentry chest=" + activeTreasure + " blocked=" + reason);
         }
         reset();
         return BlastAutoSpecialRooms.Action.NONE;
+    }
+
+    private static void move(Hero hero, int goal, boolean[] map, int[] travel, String action) {
+        int step = BlastAutoPlay.firstStep(goal, map, travel);
+        hero.curAction = new HeroAction.Move(step);
+        BlastLog.debug("auto-sentry action=" + action + " from=" + hero.pos + " to=" + step);
     }
 
     static BlastAutoSpecialRooms.Action chooseAction(Hero hero, boolean[] safe,
@@ -189,6 +202,6 @@ final class BlastAutoSentryRoom {
             potion.execute(hero, Potion.AC_DRINK);
             return BlastAutoSpecialRooms.Action.USE;
         }
-        return continueRun(hero, safe, distances, hazards, barriers);
+        return continueRun(hero, safe, hazards, barriers);
     }
 }
