@@ -285,22 +285,15 @@ public final class BlastAutoPlay {
             clearInterruptedTravel();
             return false;
         }
+        int flameStep = vaultFlameStep(hero, interruptedDestination);
+        if (flameStep >= 0) {
+            blockedTravelTurns = 0;
+            queueFlameStep(hero, flameStep);
+            return true;
+        }
         if (safe[interruptedDestination] && distances[interruptedDestination] != Integer.MAX_VALUE) {
             blockedTravelTurns = 0;
             hero.curAction = new HeroAction.Move(firstStep(interruptedDestination, safe, distances));
-            return true;
-        }
-        // A temporarily burning tile must not erase the player's destination.
-        // Plan through the known flame grid, then execute only a currently safe step.
-        int flameStep = BlastAutoVault.nextFlameStep(
-                hero, Dungeon.level, interruptedDestination, safe);
-        if (flameStep >= 0) {
-            blockedTravelTurns = 0;
-            if (safe[flameStep]) {
-                hero.curAction = new HeroAction.Move(flameStep);
-            } else {
-                hero.spendAndNext(Actor.TICK);
-            }
             return true;
         }
         // Allow transient enemies, doors or hazards to clear; never wait indefinitely.
@@ -474,6 +467,11 @@ public final class BlastAutoPlay {
             }
             return false;
         }
+        int flameStep = vaultFlameStep(hero, pausedVaultDestination);
+        if (flameStep >= 0) {
+            queueFlameStep(hero, flameStep);
+            return hero.curAction == null;
+        }
         Blob[] hazards = BlastAutoEnvironment.activeHazards(level);
         boolean[] safe = safeCells(hero, hazards,
                 BlastAutoEnvironment.activeSpecialBarriers(level));
@@ -484,15 +482,6 @@ public final class BlastAutoPlay {
             hero.curAction = new HeroAction.Move(
                     firstStep(pausedVaultDestination, safe, distances));
             return false;
-        }
-        int step = BlastAutoVault.nextFlameStep(hero, level, pausedVaultDestination, safe);
-        if (step >= 0) {
-            if (safe[step]) {
-                hero.curAction = new HeroAction.Move(step);
-                return false;
-            }
-            hero.spendAndNext(Actor.TICK);
-            return true;
         }
         pausedVaultDestination = -1;
         return false;
@@ -672,10 +661,10 @@ public final class BlastAutoPlay {
 
         // Finish toxic-room loot even without protection; generic gas retreat
         // must not interrupt a deliberate crossing.
-        debugDecision = "toxic-room-loot";
         BlastAutoSpecialRooms.Action toxicLoot = BlastAutoToxicRoom.continueLoot(
                 hero, safe, hazards, specialBarriers);
         if (toxicLoot != BlastAutoSpecialRooms.Action.NONE) {
+            debugDecision = "toxic-room-loot";
             return toxicLoot == BlastAutoSpecialRooms.Action.USE;
         }
 
@@ -747,6 +736,17 @@ public final class BlastAutoPlay {
             }
             if (BlastAutoEnvironment.hazardousAt(hero.pos, hazards)
                     || specialBarriers[hero.pos]) {
+                Level level = Dungeon.level;
+                if (!specialBarriers[hero.pos] && BlastAutoVault.nearPeriodicFlames(hero, level)
+                        && !BlastAutoEnvironment.hazardousAt(hero.pos,
+                                BlastAutoEnvironment.activeHazards(level, true))) {
+                    int step = vaultFlameStep(hero, interruptedDestination);
+                    if (step >= 0 && step != hero.pos) {
+                        queueFlameStep(hero, step);
+                        return false;
+                    }
+                }
+                debugDecision = "hazard-retreat";
                 for (int offset : PathFinder.NEIGHBOURS8) {
                     int cell = hero.pos + offset;
                     if (Dungeon.level.insideMap(cell) && safe[cell] && distances[cell] == 1) {
@@ -982,7 +982,7 @@ public final class BlastAutoPlay {
         idleDistances = navigationDistances(hero.pos, safe, distances, idleSafe);
         if (resumeInterruptedTravel(hero, idleSafe, idleDistances)) {
             progress.intent(BlastAutoProgressGuard.Intent.TRAVEL);
-            return false;
+            return hero.curAction == null;
         }
 
         // Synchronized vault flames require blob immunity before entering.
@@ -1100,6 +1100,13 @@ public final class BlastAutoPlay {
                     return false;
                 }
             }
+        }
+
+        // Keep moving through a timed fire passage before optional harvesting can reverse course.
+        int flameStep = vaultFlameStep(hero, -1);
+        if (flameStep >= 0) {
+            queueFlameStep(hero, flameStep);
+            return hero.curAction == null;
         }
 
         // Harvesting belongs to ordinary auto-play even when auto-farming is disabled.
@@ -1437,6 +1444,11 @@ public final class BlastAutoPlay {
 
     private static boolean[] safeCells(Hero hero, Blob[] hazards, boolean[] specialBarriers,
                                        boolean allowGas, boolean crystalRoute) {
+        return safeCells(hero, hazards, specialBarriers, allowGas, crystalRoute, false);
+    }
+
+    private static boolean[] safeCells(Hero hero, Blob[] hazards, boolean[] specialBarriers,
+                                       boolean allowGas, boolean crystalRoute, boolean planFlames) {
         Level level = Dungeon.level;
         boolean[] safe = Dungeon.findPassable(hero, level.passable, hero.fieldOfView, true).clone();
         boolean phaseEnabled = BlastMovement.enabled();
@@ -1445,7 +1457,7 @@ public final class BlastAutoPlay {
         com.shatteredpixel.shatteredpixeldungeon.levels.rooms.secret.SecretChestChasmRoom chasmRoom =
                 BlastAutoChasmRoom.flightRoom(level, hero);
 
-        boolean[] vaultDanger = BlastAutoVault.imminent(hero, level);
+        boolean[] vaultDanger = BlastAutoVault.imminent(hero, level, planFlames);
         for (int cell = 0; cell < safe.length; cell++) {
             boolean crystal = crystalRoute && BlastAutoCrystalRooms.containsActive(cell);
             boolean known = level.visited[cell] || level.mapped[cell] || hero.fieldOfView[cell]
@@ -1591,6 +1603,31 @@ public final class BlastAutoPlay {
                     && isAwake(mob) && !isAutoAttackExcluded(mob)) return true;
         }
         return false;
+    }
+
+    private static int vaultFlameStep(Hero hero, int goal) {
+        Level level = Dungeon.level;
+        if (hero.rooted || !BlastAutoVault.nearPeriodicFlames(hero, level)) return -1;
+        boolean[] passable = safeCells(hero, BlastAutoEnvironment.activeHazards(level, true),
+                BlastAutoEnvironment.activeSpecialBarriers(level), false, false, true);
+        BlastAutoVault.FlameRoutes routes = BlastAutoVault.flameRoutes(hero, level, passable);
+        if (goal >= 0) return routes.toward(hero.pos, goal, passable);
+        BlastAutoVault.excludeVentDestinations(level, routes.turns);
+        int destination = roaming.chooseDestination(hero.pos, level.width(), passable, routes.turns,
+                level.visited, level.mapped, hero.fieldOfView, level.solid);
+        return destination < 0 ? -1 : routes.firstStep[destination];
+    }
+
+    private static void queueFlameStep(Hero hero, int step) {
+        if (step == hero.pos) {
+            debugDecision = "vault-flame-wait";
+            BlastLog.debug("auto-vault action=wait-flame pos=" + hero.pos);
+            hero.spendAndNext(Actor.TICK);
+        } else {
+            debugDecision = "vault-flame-move";
+            hero.curAction = new HeroAction.Move(step);
+            BlastLog.debug("auto-vault action=move-flame from=" + hero.pos + " to=" + step);
+        }
     }
 
     private static int roamStep(Hero hero, boolean[] safe, int[] distances) {
