@@ -22,6 +22,8 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroAction;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroClass;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Talent;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.RotHeart;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.RotLasher;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.CrystalMimic;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mimic;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
@@ -55,6 +57,9 @@ import java.util.Comparator;
 /** Non-bomb combat: estimate damage without rolling an actual attack or consuming charges. */
 final class BlastAutoCombat {
     enum Action { NONE, QUEUED, STARTED }
+
+    private static final int ROT_LASHER_HEALING = 5;
+    private static final int ROT_LASHER_AVERAGE_ARMOR = 4;
 
     private BlastAutoCombat() {}
 
@@ -111,7 +116,12 @@ final class BlastAutoCombat {
     }
 
     private static Action chooseAttack(Hero hero, Mob target, CombatEquipment equipment) {
+        boolean regeneratingLasher = target instanceof RotLasher
+                && !Dungeon.level.adjacent(hero.pos, target.pos);
         Choice wand = bestWand(hero, target, equipment);
+        if (regeneratingLasher && wand != null && !outpacesLasherHealing(wand.damage, target.HP)) {
+            wand = null;
+        }
         if (BlastAutoPlay.highEvasion(hero, target) && wand != null) {
             Action action = zap(hero, target, wand);
             if (action != Action.NONE) return action;
@@ -119,6 +129,12 @@ final class BlastAutoCombat {
         }
 
         Choice missile = bestMissile(hero, target, equipment);
+        if (regeneratingLasher && missile != null
+                && !outpacesLasherHealing(missile.damage - ROT_LASHER_AVERAGE_ARMOR, target.HP)) {
+            BlastLog.debug("auto-combat target=RotLasher@" + target.pos
+                    + " action=skip-shot reason=regeneration hp=" + target.HP);
+            missile = null;
+        }
         Choice remote = better(wand, missile);
         boolean canMelee = hero.canAttack(target) && meleeCollateralSafe(hero, target);
         float melee = canMelee ? meleeDamage(hero, target) : 0f;
@@ -141,6 +157,10 @@ final class BlastAutoCombat {
             if (action != Action.NONE) return action;
         }
         return canMelee ? attack(hero, target) : Action.NONE;
+    }
+
+    private static boolean outpacesLasherHealing(float damage, int hp) {
+        return damage > ROT_LASHER_HEALING || damage >= hp;
     }
 
     static boolean preferRemote(float remote, float melee) {
@@ -181,6 +201,7 @@ final class BlastAutoCombat {
                         !BlastAutoSacrifice.isRangedEnemy(mob.getClass())
                         && Dungeon.level.adjacent(hero.pos, mob.pos)
                         && mob.state == mob.HUNTING && mob.isTargeting(hero)))
+                .thenComparingInt(mob -> mob instanceof RotHeart ? 0 : 1)
                 .thenComparingInt(mob -> Dungeon.level.distance(hero.pos, mob.pos)));
         return targets;
     }
@@ -646,6 +667,11 @@ final class BlastAutoCombat {
         BlastAutoPlay.rememberCombatTarget(target);
         weapon.parent = null;
         weapon.setCurrent(hero);
+        if (target instanceof RotLasher) {
+            BlastLog.debug("auto-combat target=RotLasher@" + target.pos
+                    + " action=shoot weapon=" + weapon.getClass().getSimpleName()
+                    + " hp=" + target.HP);
+        }
         weapon.cast(hero, choice.aim);
         return Action.STARTED;
     }
