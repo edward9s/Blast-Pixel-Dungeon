@@ -6,10 +6,12 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.Blob;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.Regrowth;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.SacrificialFire;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.CrystalMimic;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Necromancer;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.NPC;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.Shopkeeper;
+import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
 import com.shatteredpixel.shatteredpixeldungeon.items.bombs.Bomb;
 import com.shatteredpixel.shatteredpixeldungeon.items.bombs.RegrowthBomb;
 
@@ -79,6 +81,30 @@ public final class BlastAutoBombAI {
             }
         }
         return chosen != null && detonate(hero, maniac, remoteThrow, chosen);
+    }
+
+    static boolean attackCrystalMimic(Hero hero, CrystalMimic target) {
+        if (!autoBombAvailable(hero)) return false;
+        BlastBombManiac maniac = BlastBombManiac.current();
+        if (maniac == null || maniac.remaining() == 0) return false;
+        Bomb bomb = maniac.selectedBomb();
+        if (bomb instanceof RegrowthBomb) return false;
+
+        boolean remoteThrow = BlastSettings.testRemoteThrow();
+        int center = remoteThrow ? BlastBombTrajectory.throwPos(hero.pos, target.pos) : hero.pos;
+        if (!Dungeon.level.insideMap(center) || Dungeon.level.pit[center]) return false;
+        boolean[] blast = bomb.blastWarningCells(center);
+        if (!BlastAutoBarricade.canDetonate(blast, target.pos, hero.pos, true)) return false;
+        if (bomb.explodesDestructively()) {
+            for (Heap heap : Dungeon.level.heaps.valueList()) {
+                if (blast[heap.pos] && BlastAutoBarricade.risksLoot(heap, BlastSettings.testDemolition())) {
+                    return false;
+                }
+            }
+        }
+        if (!detonate(hero, maniac, remoteThrow, target)) return false;
+        BlastLog.debug("auto-crystal-mimic action=bomb target=" + target.pos);
+        return true;
     }
 
     /** Returns true only when an automated bomb has started or spent a turn. */
