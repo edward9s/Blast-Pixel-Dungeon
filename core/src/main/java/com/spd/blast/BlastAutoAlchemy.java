@@ -258,7 +258,7 @@ final class BlastAutoAlchemy {
 
     private static boolean restockScroll(Scroll scroll, int quantity, int highest) {
         if (scroll instanceof ScrollOfUpgrade || scroll instanceof ScrollOfTransmutation) return true;
-        if (scroll instanceof ScrollOfRemoveCurse) return quantity < REMOVE_CURSE_STOCK;
+        if (scroll instanceof ScrollOfRemoveCurse && quantity < REMOVE_CURSE_STOCK) return true;
         return belowHighestStock(quantity, highest);
     }
 
@@ -278,15 +278,9 @@ final class BlastAutoAlchemy {
             }
         }
         if (seed == null) return Restock.ALCHEMIZE.blocked("no-eligible-seed");
-        int removeCurse = 0;
-        for (ScrollOfRemoveCurse scroll : hero.belongings.getAllItems(ScrollOfRemoveCurse.class)) {
-            removeCurse += scroll.quantity();
-        }
         boolean foundStone = false;
         for (Runestone stone : stones) {
-            if (stone.quantity() <= 0 || stone instanceof StoneOfEnchantment
-                    || stone instanceof StoneOfAugmentation
-                    || (stone instanceof StoneOfDetectMagic && removeCurse < REMOVE_CURSE_STOCK)) continue;
+            if (stone.quantity() <= 0 || importantStone(stone)) continue;
             if (pouch != null && !pouch.items.contains(stone) && !pouch.items.contains(seed)) continue;
             foundStone = true;
             if (brew(hero, potKnown, toolkit, seeds, SELL, ingredients(seed, stone), 0)) return true;
