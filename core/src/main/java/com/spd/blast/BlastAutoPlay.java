@@ -285,10 +285,10 @@ public final class BlastAutoPlay {
             clearInterruptedTravel();
             return false;
         }
-        int flameStep = vaultFlameStep(hero, interruptedDestination);
-        if (flameStep >= 0) {
+        int timedStep = vaultTimedStep(hero, interruptedDestination);
+        if (timedStep >= 0) {
             blockedTravelTurns = 0;
-            queueFlameStep(hero, flameStep);
+            queueTimedVaultStep(hero, timedStep);
             return true;
         }
         if (safe[interruptedDestination] && distances[interruptedDestination] != Integer.MAX_VALUE) {
@@ -467,9 +467,9 @@ public final class BlastAutoPlay {
             }
             return false;
         }
-        int flameStep = vaultFlameStep(hero, pausedVaultDestination);
-        if (flameStep >= 0) {
-            queueFlameStep(hero, flameStep);
+        int timedStep = vaultTimedStep(hero, pausedVaultDestination);
+        if (timedStep >= 0) {
+            queueTimedVaultStep(hero, timedStep);
             return hero.curAction == null;
         }
         Blob[] hazards = BlastAutoEnvironment.activeHazards(level);
@@ -734,19 +734,20 @@ public final class BlastAutoPlay {
                     return false;
                 }
             }
-            if (BlastAutoEnvironment.hazardousAt(hero.pos, hazards)
+            Level level = Dungeon.level;
+            boolean laser = BlastAutoVault.laserAboutToFireAt(hero, level);
+            if (laser || BlastAutoEnvironment.hazardousAt(hero.pos, hazards)
                     || specialBarriers[hero.pos]) {
-                Level level = Dungeon.level;
-                if (!specialBarriers[hero.pos] && BlastAutoVault.nearPeriodicFlames(hero, level)
+                if (!specialBarriers[hero.pos] && BlastAutoVault.nearTimedHazard(hero, level)
                         && !BlastAutoEnvironment.hazardousAt(hero.pos,
                                 BlastAutoEnvironment.activeHazards(level, true))) {
-                    int step = vaultFlameStep(hero, interruptedDestination);
+                    int step = vaultTimedStep(hero, interruptedDestination);
                     if (step >= 0 && step != hero.pos) {
-                        queueFlameStep(hero, step);
+                        queueTimedVaultStep(hero, step);
                         return false;
                     }
                 }
-                debugDecision = "hazard-retreat";
+                debugDecision = laser ? "vault-laser-retreat" : "hazard-retreat";
                 for (int offset : PathFinder.NEIGHBOURS8) {
                     int cell = hero.pos + offset;
                     if (Dungeon.level.insideMap(cell) && safe[cell] && distances[cell] == 1) {
@@ -1102,10 +1103,10 @@ public final class BlastAutoPlay {
             }
         }
 
-        // Keep moving through a timed fire passage before optional harvesting can reverse course.
-        int flameStep = vaultFlameStep(hero, -1);
-        if (flameStep >= 0) {
-            queueFlameStep(hero, flameStep);
+        // Finish crossing timed vault hazards before optional harvesting can reverse course.
+        int timedStep = vaultTimedStep(hero, -1);
+        if (timedStep >= 0) {
+            queueTimedVaultStep(hero, timedStep);
             return hero.curAction == null;
         }
 
@@ -1185,12 +1186,6 @@ public final class BlastAutoPlay {
             progress.intent(BlastAutoProgressGuard.Intent.ROAM);
             hero.curAction = new HeroAction.Move(step);
         } else {
-            if (BlastAutoVault.waitForLaser(hero, Dungeon.level, safe, distances)) {
-                debugDecision = "vault-laser-wait";
-                roaming.clearDestination();
-                hero.spendAndNext(Actor.TICK);
-                return true;
-            }
             int staging = BlastAutoVault.stagingCell(hero, Dungeon.level, safe, distances);
             if (staging >= 0 && !hero.rooted) {
                 roaming.clearDestination();
@@ -1448,7 +1443,7 @@ public final class BlastAutoPlay {
     }
 
     private static boolean[] safeCells(Hero hero, Blob[] hazards, boolean[] specialBarriers,
-                                       boolean allowGas, boolean crystalRoute, boolean planFlames) {
+                                       boolean allowGas, boolean crystalRoute, boolean planTimedHazards) {
         Level level = Dungeon.level;
         boolean[] safe = Dungeon.findPassable(hero, level.passable, hero.fieldOfView, true).clone();
         boolean phaseEnabled = BlastMovement.enabled();
@@ -1457,7 +1452,7 @@ public final class BlastAutoPlay {
         com.shatteredpixel.shatteredpixeldungeon.levels.rooms.secret.SecretChestChasmRoom chasmRoom =
                 BlastAutoChasmRoom.flightRoom(level, hero);
 
-        boolean[] vaultDanger = BlastAutoVault.imminent(hero, level, planFlames);
+        boolean[] vaultDanger = BlastAutoVault.imminent(hero, level, planTimedHazards);
         for (int cell = 0; cell < safe.length; cell++) {
             boolean crystal = crystalRoute && BlastAutoCrystalRooms.containsActive(cell);
             boolean known = level.visited[cell] || level.mapped[cell] || hero.fieldOfView[cell]
@@ -1605,28 +1600,33 @@ public final class BlastAutoPlay {
         return false;
     }
 
-    private static int vaultFlameStep(Hero hero, int goal) {
+    private static int vaultTimedStep(Hero hero, int goal) {
         Level level = Dungeon.level;
-        if (hero.rooted || !BlastAutoVault.nearPeriodicFlames(hero, level)) return -1;
+        if (hero.rooted || !BlastAutoVault.nearTimedHazard(hero, level)) return -1;
         boolean[] passable = safeCells(hero, BlastAutoEnvironment.activeHazards(level, true),
                 BlastAutoEnvironment.activeSpecialBarriers(level), false, false, true);
-        BlastAutoVault.FlameRoutes routes = BlastAutoVault.flameRoutes(hero, level, passable);
-        if (goal >= 0) return routes.toward(hero.pos, goal, passable);
-        BlastAutoVault.excludeVentDestinations(level, routes.turns);
+        BlastAutoVault.TimedRoutes routes = BlastAutoVault.timedRoutes(hero, level, passable);
+        if (goal >= 0 && goal != hero.pos) return routes.toward(hero.pos, goal, passable);
+        int treasureGoal = BlastAutoVault.laserTreasureGoal(hero, level, passable);
+        if (treasureGoal >= 0 && treasureGoal != hero.pos) {
+            int step = routes.toward(hero.pos, treasureGoal, passable);
+            if (step >= 0) return step;
+        }
+        BlastAutoVault.excludeVentDestinations(hero, level, routes.turns);
         int destination = roaming.chooseDestination(hero.pos, level.width(), passable, routes.turns,
                 level.visited, level.mapped, hero.fieldOfView, level.solid);
         return destination < 0 ? -1 : routes.firstStep[destination];
     }
 
-    private static void queueFlameStep(Hero hero, int step) {
+    private static void queueTimedVaultStep(Hero hero, int step) {
         if (step == hero.pos) {
-            debugDecision = "vault-flame-wait";
-            BlastLog.debug("auto-vault action=wait-flame pos=" + hero.pos);
+            debugDecision = "vault-timed-wait";
+            BlastLog.debug("auto-vault action=wait-timed pos=" + hero.pos);
             hero.spendAndNext(Actor.TICK);
         } else {
-            debugDecision = "vault-flame-move";
+            debugDecision = "vault-timed-move";
             hero.curAction = new HeroAction.Move(step);
-            BlastLog.debug("auto-vault action=move-flame from=" + hero.pos + " to=" + step);
+            BlastLog.debug("auto-vault action=move-timed from=" + hero.pos + " to=" + step);
         }
     }
 
