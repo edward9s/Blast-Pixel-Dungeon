@@ -734,20 +734,30 @@ public final class BlastAutoPlay {
         }
 
         // Extinguish burning in reachable water, but never detour more than four steps.
-        // Also leave an active environmental hazard before fighting or collecting loot.
-        if (!hero.rooted) {
-            if (hero.buff(Burning.class) != null && !hero.flying) {
-                int waterCell = BlastAutoEnvironment.nearbyWater(
-                        hero.pos, Dungeon.level.water, safe, distances);
-                if (waterCell >= 0) {
-                    hero.curAction = new HeroAction.Move(firstStep(waterCell, safe, distances));
-                    return false;
-                }
+        if (!hero.rooted && hero.buff(Burning.class) != null && !hero.flying) {
+            int waterCell = BlastAutoEnvironment.nearbyWater(hero.pos, Dungeon.level.water, safe, distances);
+            if (waterCell >= 0) {
+                hero.curAction = new HeroAction.Move(firstStep(waterCell, safe, distances));
+                return false;
             }
+        }
+
+        boolean hazardous = BlastAutoEnvironment.hazardousAt(hero.pos, hazards);
+        // An active sprint deliberately crosses the red floor before the generic retreat check.
+        if (!hazardous) {
+            BlastAutoSpecialRooms.Action sprint = BlastAutoSentryRoom.continueRun(
+                    hero, safe, hazards, specialBarriers);
+            if (sprint != BlastAutoSpecialRooms.Action.NONE) {
+                debugDecision = "sentry-run";
+                return sprint == BlastAutoSpecialRooms.Action.USE;
+            }
+        }
+
+        // Leave any other environmental hazard before fighting or collecting loot.
+        if (!hero.rooted) {
             Level level = Dungeon.level;
             boolean sentryAttack = BlastAutoVault.imminentAttackAt(hero, level);
-            if (sentryAttack || BlastAutoEnvironment.hazardousAt(hero.pos, hazards)
-                    || specialBarriers[hero.pos]) {
+            if (sentryAttack || hazardous || specialBarriers[hero.pos]) {
                 if (!specialBarriers[hero.pos] && BlastAutoVault.nearTimedHazard(hero, level)
                         && !BlastAutoEnvironment.hazardousAt(hero.pos,
                                 BlastAutoEnvironment.activeHazards(level, true))) {
@@ -790,13 +800,6 @@ public final class BlastAutoPlay {
         BlastAutoSpecialRooms.Action spirit = BlastAutoGraves.cleanse(hero, safe, distances);
         if (spirit != BlastAutoSpecialRooms.Action.NONE)
             return spirit == BlastAutoSpecialRooms.Action.USE;
-
-        // Finish a sprint before unrelated actions consume the haste window.
-        debugDecision = "sentry-run";
-        BlastAutoSpecialRooms.Action sentryRun = BlastAutoSentryRoom.continueRun(
-                hero, safe, distances, hazards, specialBarriers);
-        if (sentryRun != BlastAutoSpecialRooms.Action.NONE)
-            return sentryRun == BlastAutoSpecialRooms.Action.USE;
 
         // Finish a levitating crossing before ordinary idle tasks consume its duration.
         debugDecision = "special-flight";
