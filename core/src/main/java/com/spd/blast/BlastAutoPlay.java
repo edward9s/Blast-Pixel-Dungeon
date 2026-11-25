@@ -977,18 +977,22 @@ public final class BlastAutoPlay {
             return hero.curAction == null;
         }
 
-        // Resume interrupted player travel after tactical combat and before idle tasks.
-        debugDecision = "manual-route";
+        // Prepare at the entrance before manual travel can steer back from the fire.
         idleSafe = progress.safeFor(safe, hero.pos, BlastAutoProgressGuard.Intent.TRAVEL);
         idleDistances = navigationDistances(hero.pos, safe, distances, idleSafe);
-        if (resumeInterruptedTravel(hero, idleSafe, idleDistances)) {
+        debugDecision = "vault-purity";
+        if (BlastAutoVault.prepareForContinuousFlames(hero, Dungeon.level, idleSafe, idleDistances,
+                interruptedDestination)) {
             progress.intent(BlastAutoProgressGuard.Intent.TRAVEL);
             return hero.curAction == null;
         }
 
-        // Synchronized vault flames require blob immunity before entering.
-        debugDecision = "vault-purity";
-        if (BlastAutoVault.drinkPurity(hero, Dungeon.level)) return true;
+        // Resume interrupted player travel after tactical combat and before idle tasks.
+        debugDecision = "manual-route";
+        if (resumeInterruptedTravel(hero, idleSafe, idleDistances)) {
+            progress.intent(BlastAutoProgressGuard.Intent.TRAVEL);
+            return hero.curAction == null;
+        }
 
         // Strength potions, equipment upgrades, and ordinary gear cleanup run only while idle.
         // Equipment picked up for sale is handled by the native pickup-success callback.
