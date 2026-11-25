@@ -12,6 +12,7 @@ import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.bombs.Bomb;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
 import com.shatteredpixel.shatteredpixeldungeon.levels.RegularLevel;
+import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.Room;
 import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.secret.SecretRunestoneRoom;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
 import com.watabou.utils.PathFinder;
@@ -56,7 +57,10 @@ final class BlastAutoBarricade {
     /** Shared safety policy for blasts aimed at a destructible terrain cell. */
     static boolean canDetonate(boolean[] blast, int target, int origin,
                                        boolean protectedHero) {
-        if (!reachesSafely(blast, target, origin, protectedHero)) return false;
+        return reachesSafely(blast, target, origin, protectedHero) && safeMobCollateral(blast);
+    }
+
+    private static boolean safeMobCollateral(boolean[] blast) {
         for (Mob mob : Dungeon.level.mobs) {
             if (!mob.isAlive() || !blast[mob.pos]) continue;
             // Keep automatic combat's sleeping-enemy and protected-NPC rules.
@@ -94,6 +98,96 @@ final class BlastAutoBarricade {
         }
         if (!hitsWeb) return true;
 
+        boolean demolition = BlastSettings.testDemolition();
+        for (Heap heap : level.heaps.valueList()) {
+            if (blast[heap.pos] && risksLoot(heap, demolition)) return false;
+        }
+        return true;
+    }
+
+    /** Look for one destructible wall between the hero and an exit. */
+    static Action openRoomExit(Hero hero, Room room, int entrance, boolean[] walking,
+                               int[] distances) {
+        if (!BlastSettings.testAutoPlay() || BlastRemoteBomb.isTimedMode()) return Action.NONE;
+        BlastBombManiac maniac = BlastBombManiac.current();
+        if (maniac == null || maniac.remaining() == 0) return Action.NONE;
+        boolean protectedHero = hero.buff(BlastIndestructible.class) != null
+                || hero.buff(BlastTestBuffs.Indestructible.class) != null;
+        boolean remoteThrow = BlastSettings.testRemoteThrow();
+        if (!remoteThrow && !protectedHero) return Action.NONE;
+
+        Level level = Dungeon.level;
+        int width = level.width();
+        int[] fromEntrance = null;
+        if (walking[entrance]) {
+            PathFinder.buildDistanceMap(entrance, walking);
+            fromEntrance = PathFinder.distance;
+        }
+
+        Bomb bomb = maniac.bombAt(0);
+        int bestWall = -1;
+        int bestStand = -1;
+        int bestSteps = Integer.MAX_VALUE;
+        int range = remoteThrow ? 8 : bomb.blastExplosionRange();
+        for (int y = room.top; y <= room.bottom; y++) {
+            for (int x = room.left; x <= room.right; x++) {
+                int wall = x + y * width;
+                if (!level.insideMap(wall)
+                        || !(hero.fieldOfView[wall] || level.visited[wall] || level.mapped[wall])
+                        || !breakableExitWall(level, wall)
+                        || !connectsExit(level, room, wall, walking, distances, fromEntrance)) continue;
+
+                for (int stand = 0; stand < level.length(); stand++) {
+                    if (!walking[stand] || level.pit[stand] || distances[stand] >= bestSteps
+                            || level.distance(stand, wall) > range) continue;
+                    int center = remoteThrow ? BlastBombTrajectory.throwPos(stand, wall) : stand;
+                    if (!level.insideMap(center) || level.pit[center]
+                            || !BlastBombGeometry.reached(level, center, bomb.blastExplosionRange())[wall]
+                            || !safeExitBlast(level, bomb, center, stand, protectedHero)) continue;
+                    bestWall = wall;
+                    bestStand = stand;
+                    bestSteps = distances[stand];
+                }
+            }
+        }
+        if (bestWall < 0) return Action.NONE;
+        if (bestStand != hero.pos) {
+            hero.curAction = new HeroAction.Move(BlastAutoPlay.firstStep(bestStand, walking, distances));
+            BlastLog.debug("auto-crystal action=approach-breach wall=" + bestWall + " stand=" + bestStand);
+            return Action.MOVE;
+        }
+        boolean detonated = remoteThrow ? maniac.blastAutoThrowOrdinaryAndDetonate(bestWall)
+                : maniac.blastAutoPlaceOrdinaryAndDetonate();
+        if (!detonated) return Action.NONE;
+        if (!remoteThrow) hero.spendAndNext(1f);
+        BlastLog.debug("auto-crystal action=breach wall=" + bestWall);
+        return Action.DETONATE;
+    }
+
+    private static boolean breakableExitWall(Level level, int cell) {
+        int terrain = level.map[cell];
+        return (terrain == Terrain.WALL || terrain == Terrain.WALL_DECO || BlastWalls.rubbleAt(level, cell))
+                && level.blastWallStrength[cell] > 0;
+    }
+
+    private static boolean connectsExit(Level level, Room room, int wall, boolean[] walking,
+                                        int[] fromHero, int[] fromEntrance) {
+        boolean reachable = false;
+        boolean exit = false;
+        for (int offset : PathFinder.NEIGHBOURS4) {
+            int cell = wall + offset;
+            if (!walking[cell]) continue;
+            if (fromHero[cell] != Integer.MAX_VALUE) reachable = true;
+            else if (!room.inside(level.cellToPoint(cell))
+                    || (fromEntrance != null && fromEntrance[cell] != Integer.MAX_VALUE)) exit = true;
+        }
+        return reachable && exit;
+    }
+
+    private static boolean safeExitBlast(Level level, Bomb bomb, int center, int stand,
+                                         boolean protectedHero) {
+        boolean[] blast = bomb.blastWarningCells(center);
+        if ((!protectedHero && blast[stand]) || !safeMobCollateral(blast)) return false;
         boolean demolition = BlastSettings.testDemolition();
         for (Heap heap : level.heaps.valueList()) {
             if (blast[heap.pos] && risksLoot(heap, demolition)) return false;
