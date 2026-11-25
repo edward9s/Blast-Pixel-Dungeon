@@ -80,15 +80,14 @@ final class BlastAutoVault {
         if (flames != null && !hero.isImmune(VaultFlameTraps.class)) {
             for (int offset : PathFinder.NEIGHBOURS9) {
                 int cell = hero.pos + offset;
-                if (level.insideMap(cell) && periodic(flames, cell)) return true;
+                if (threatensNearbyStep(hero, level, cell) && periodic(flames, cell)) return true;
             }
         }
-        if (timedTreasureRoom(hero, level) != null) return true;
         for (Mob mob : level.mobs) {
             if (!mob.isAlive()) continue;
             if (mob instanceof VaultSentry) {
                 VaultSentry sentry = (VaultSentry) mob;
-                if (level.distance(hero.pos, sentry.pos) <= Math.ceil(sentry.scanLength) + 1) return true;
+                if (scanThreatensNearbyStep(hero, level, sentry)) return true;
             }
             if (!(mob instanceof VaultLaser)) continue;
             VaultLaser laser = (VaultLaser) mob;
@@ -97,11 +96,39 @@ final class BlastAutoVault {
             for (int direction : laser.laserDirs) {
                 Ballistica beam = laserBeam(laser, direction);
                 for (int cell : beam.subPath(1, beam.dist)) {
-                    if (level.distance(hero.pos, cell) <= 1) return true;
+                    if (threatensNearbyStep(hero, level, cell)) return true;
                 }
             }
         }
         return false;
+    }
+
+    private static boolean threatensNearbyStep(Hero hero, Level level, int cell) {
+        return level.insideMap(cell) && (level.passable[cell] || cell == hero.pos)
+                && level.distance(hero.pos, cell) <= 1
+                && (hero.fieldOfView[cell] || level.visited[cell] || level.mapped[cell]);
+    }
+
+    private static boolean scanThreatensNearbyStep(Hero hero, Level level, VaultSentry sentry) {
+        if (level.distance(hero.pos, sentry.pos) > Math.ceil(sentry.scanLength) + 1
+                || sentry.curCooldown > HAZARD_LOOKAHEAD) return false;
+        if (sentry.scanDirs == null || sentry.scanDirs.length == 0) {
+            throw new IllegalStateException("Invalid vault sentry scan sequence");
+        }
+        // Use the sentry's sight. Warden vision through grass is specific to the hero.
+        boolean[] sentryView = sentryView(level, sentry);
+        for (int direction = 0; direction < sentry.scanDirs.length; direction++) {
+            for (int cell : scanCells(sentry, direction)) {
+                if (threatensNearbyStep(hero, level, cell) && sentryView[cell]) return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean[] sentryView(Level level, VaultSentry sentry) {
+        boolean[] visible = new boolean[level.length()];
+        level.updateFieldOfView(sentry, visible);
+        return visible;
     }
 
     static boolean imminentAttackAt(Hero hero, Level level) {
@@ -117,6 +144,7 @@ final class BlastAutoVault {
             } else if (mob instanceof VaultSentry) {
                 VaultSentry sentry = (VaultSentry) mob;
                 if (hero.invisible == 0 && sentry.curCooldown <= 1
+                        && sentryView(level, sentry)[hero.pos]
                         && scanCells(sentry, sentry.scanDirIdx).contains(hero.pos)) {
                     return true;
                 }
@@ -307,10 +335,13 @@ final class BlastAutoVault {
             int cooldown = sentry.curCooldown;
             int direction = sentry.scanDirIdx;
             int scans = sentry.blastScansMade();
+            boolean[] visible = sentryView(level, sentry);
             for (int tick = 0; tick < danger.length; tick++) {
                 if (--cooldown > 0) continue;
                 if (tick >= invisibleTurns) {
-                    for (int cell : scanCells(sentry, direction)) danger[tick][cell] = true;
+                    for (int cell : scanCells(sentry, direction)) {
+                        if (visible[cell]) danger[tick][cell] = true;
+                    }
                 }
                 direction = (direction + 1) % sentry.scanDirs.length;
                 if (++scans < sentry.scansAfterCooldown) {
@@ -424,7 +455,10 @@ final class BlastAutoVault {
             } else if (mob instanceof VaultSentry) {
                 VaultSentry sentry = (VaultSentry) mob;
                 if (planTimedHazards || hero.invisible != 0 || sentry.curCooldown > 1) continue;
-                for (int cell : scanCells(sentry, sentry.scanDirIdx)) danger[cell] = true;
+                boolean[] visible = sentryView(level, sentry);
+                for (int cell : scanCells(sentry, sentry.scanDirIdx)) {
+                    if (visible[cell]) danger[cell] = true;
+                }
             }
         }
         return danger;
