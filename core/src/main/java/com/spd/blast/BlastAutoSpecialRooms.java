@@ -153,7 +153,6 @@ final class BlastAutoSpecialRooms {
             return Action.USE;
         }
         if (!retreat && chest != null && chest.type == Heap.Type.CHEST
-                && BlastAutoPickup.hasCollectibleLoot(hero, chest)
                 && safe[flightTreasure] && distances[flightTreasure] != Integer.MAX_VALUE) {
             PathFinder.buildDistanceMap(flightTreasure, safe);
             int back = PathFinder.distance[exit];
@@ -229,7 +228,7 @@ final class BlastAutoSpecialRooms {
         TrapsRoom room = (TrapsRoom) ((RegularLevel) level).room(TrapsRoom.class);
         if (room == null || room.entrance() == null) return Action.NONE;
         Heap chest = knownChest(level, room, hero);
-        if (!BlastAutoPickup.hasCollectibleLoot(hero, chest)) return Action.NONE;
+        if (chest == null) return Action.NONE;
         int exit = level.pointToCell(room.entrance());
         if (!level.insideMap(exit) || !safe[exit]
                 || distances[exit] == Integer.MAX_VALUE) return Action.NONE;

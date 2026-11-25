@@ -172,7 +172,7 @@ final class BlastAutoVault {
             if (!passable[heap.pos] || !(heap.seen || hero.fieldOfView[heap.pos])
                     || !room.inside(level.cellToPoint(heap.pos))) continue;
             int distance = level.distance(hero.pos, heap.pos);
-            if (distance < nearest && canCollectTreasure(hero, heap)) {
+            if (distance < nearest && hasTreasureAction(hero, heap)) {
                 target = heap.pos;
                 nearest = distance;
             }
@@ -180,8 +180,8 @@ final class BlastAutoVault {
         return target >= 0 ? target : level.pointToCell(room.entrance());
     }
 
-    private static boolean canCollectTreasure(Hero hero, Heap heap) {
-        if (heap.type == Heap.Type.CHEST) return BlastAutoPickup.hasCollectibleLoot(hero, heap);
+    private static boolean hasTreasureAction(Hero hero, Heap heap) {
+        if (heap.type == Heap.Type.CHEST) return true;
         return heap.type == Heap.Type.HEAP && BlastAutoPickup.firstEligibleItem(heap,
                 item -> (BlastAutoPickup.isPickupType(item, BlastAutoPickupPolicy::isInstantPickup)
                         || BlastAutoEquipment.canPickup(hero, item))
@@ -421,7 +421,7 @@ final class BlastAutoVault {
                                               int[] distances) {
         for (Heap heap : level.heaps.valueList()) {
             if (distances[heap.pos] == Integer.MAX_VALUE && room.inside(level.cellToPoint(heap.pos))
-                    && canCollectTreasure(hero, heap)) return true;
+                    && hasTreasureAction(hero, heap)) return true;
         }
         return false;
     }
