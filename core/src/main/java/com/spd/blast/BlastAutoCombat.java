@@ -122,7 +122,7 @@ final class BlastAutoCombat {
         Choice remote = better(wand, missile);
         boolean canMelee = hero.canAttack(target) && meleeCollateralSafe(hero, target);
         float melee = canMelee ? meleeDamage(hero, target) : 0f;
-        if (target instanceof CrystalMimic && !target.rooted && target.buff(Chill.class) == null
+        if (target instanceof CrystalMimic && target.paralysed == 0 && !target.rooted && target.buff(Chill.class) == null
                 && target.buff(Frost.class) == null && melee < target.HP
                 && (remote == null || remote.damage < target.HP)
                 && hero.buff(MagicImmune.class) == null) {
