@@ -73,10 +73,12 @@ public final class BlastDemolition {
     }
 
     public static BlastDemolition prepare(Bomb bomb, int center) {
-        if (!BlastSettings.testDemolition()) return null;
+        boolean general = BlastSettings.testDemolition();
+        boolean guardians = BlastAutoBlacksmith.guardianDemolition();
+        if (!general && !guardians) return null;
         Level level = Dungeon.level;
         BlastDemolition demolition = new BlastDemolition(level, bomb);
-        boolean destructive = bomb.explodesDestructively();
+        boolean destructive = general && bomb.explodesDestructively();
         boolean[] cells = bomb.blastWarningCells(center);
         for (int cell = 0; cell < cells.length; cell++) {
             if (!cells[cell]) continue;
@@ -91,9 +93,7 @@ public final class BlastDemolition {
                 }
             }
             Char ch = Actor.findChar(cell);
-            if (ch instanceof Mob && !(ch instanceof CrystalSpire)
-                    && !(BlastAutoBlacksmith.active() && (ch instanceof CrystalGuardian
-                        || ch instanceof GnollGeomancer || ch instanceof FungalCore))) {
+            if (ch instanceof Mob && kills((Mob) ch, general, guardians)) {
                 demolition.mobs.add((Mob) ch);
             }
 
@@ -105,6 +105,13 @@ public final class BlastDemolition {
             }
         }
         return demolition;
+    }
+
+    private static boolean kills(Mob mob, boolean general, boolean guardians) {
+        if (mob instanceof CrystalGuardian && BlastAutoBlacksmith.active()) return guardians;
+        return general && !(mob instanceof CrystalSpire)
+                && !(BlastAutoBlacksmith.active()
+                    && (mob instanceof GnollGeomancer || mob instanceof FungalCore));
     }
 
     public void finish() {

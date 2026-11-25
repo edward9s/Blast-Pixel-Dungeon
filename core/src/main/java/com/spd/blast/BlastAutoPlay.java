@@ -659,6 +659,7 @@ public final class BlastAutoPlay {
         hero.resting = false;
 
         BlastAutoCrystalRooms.updatePhase(hero);
+        BlastAutoBlacksmith.finishDownedGuardians(hero);
         Blob[] hazards = BlastAutoEnvironment.activeHazards(Dungeon.level);
         boolean[] specialBarriers = BlastAutoEnvironment.activeSpecialBarriers(Dungeon.level);
         boolean[] safe = safeCells(hero, hazards, specialBarriers);
