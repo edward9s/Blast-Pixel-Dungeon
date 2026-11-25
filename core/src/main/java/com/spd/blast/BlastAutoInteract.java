@@ -4,7 +4,6 @@ import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
-import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.Blacksmith;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.VaultTokenDoor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.VaultMirror;
 import com.shatteredpixel.shatteredpixeldungeon.items.quest.DwarfToken;
@@ -59,19 +58,6 @@ public final class BlastAutoInteract {
         Level level = Dungeon.level;
         if (safe.length != level.length() || distances.length != level.length()) {
             throw new IllegalArgumentException("Invalid auto-interaction distance map");
-        }
-
-        if (!Blacksmith.Quest.given()) {
-            for (Mob mob : level.mobs) {
-                if (!(mob instanceof Blacksmith) || !mob.isAlive()
-                        || !hero.fieldOfView[mob.pos]) continue;
-                int candidate = nearestStand(level, mob.pos, false, safe, distances);
-                if (candidate < 0) continue;
-                hero.curAction = hero.pos == candidate
-                        ? new HeroAction.Interact(mob)
-                        : new HeroAction.Move(BlastAutoPlay.firstStep(candidate, safe, distances));
-                return true;
-            }
         }
 
         // Vault NPC objects are opened through their native interaction dialogs.

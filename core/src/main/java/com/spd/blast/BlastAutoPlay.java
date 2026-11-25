@@ -10,7 +10,10 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Burning;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroAction;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.CrystalGuardian;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.CrystalSpire;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.DemonSpawner;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.GnollGeomancer;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Necromancer;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Thief;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Wraith;
@@ -205,7 +208,6 @@ public final class BlastAutoPlay {
         BlastAutoTrapClearer.reset();
         BlastAutoSpecialRooms.reset();
         BlastAutoCrystalRooms.resetPhase();
-        BlastAutoBlacksmith.reset();
         BlastAutoSacrifice.reset();
         BlastAutoFood.stopFeeding();
 
@@ -657,7 +659,6 @@ public final class BlastAutoPlay {
         hero.resting = false;
 
         BlastAutoCrystalRooms.updatePhase(hero);
-        BlastAutoBlacksmith.update();
         Blob[] hazards = BlastAutoEnvironment.activeHazards(Dungeon.level);
         boolean[] specialBarriers = BlastAutoEnvironment.activeSpecialBarriers(Dungeon.level);
         boolean[] safe = safeCells(hero, hazards, specialBarriers);
@@ -1306,11 +1307,11 @@ public final class BlastAutoPlay {
     /** Exclude service NPCs and demon spawners from all automatic attacks. */
     static boolean isAutoAttackExcluded(Mob mob) {
         return mob instanceof NPC || mob instanceof DemonSpawner
-                || (Dungeon.level instanceof com.shatteredpixel.shatteredpixeldungeon.levels.MiningLevel
-                    && (mob instanceof com.shatteredpixel.shatteredpixeldungeon.actors.mobs.CrystalSpire
-                        || (mob instanceof com.shatteredpixel.shatteredpixeldungeon.actors.mobs.GnollGeomancer
-                            && (!BlastAutoBlacksmith.goldCollected()
-                                || mob.heroShouldInteract()))));
+                || (BlastAutoBlacksmith.active()
+                    && (mob instanceof CrystalSpire
+                        || (mob instanceof CrystalGuardian && ((CrystalGuardian) mob).recovering())
+                        || (mob instanceof GnollGeomancer
+                            && (!BlastAutoBlacksmith.goldCollected() || mob.heroShouldInteract()))));
     }
 
     /** Sleeping enemies are deliberately left alone by automatic combat. */
