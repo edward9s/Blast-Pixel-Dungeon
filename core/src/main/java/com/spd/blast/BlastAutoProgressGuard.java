@@ -4,7 +4,7 @@ import java.util.function.IntPredicate;
 
 /** Tracks unsafe retreats and temporary failed steps per automatic task. */
 final class BlastAutoProgressGuard {
-    enum Intent { OTHER, TRAVEL, PICKUP, CRYSTAL, INTERACT, ROAM, HARVEST, FARM, RETREAT }
+    enum Intent { OTHER, TRAVEL, PICKUP, CRYSTAL, INTERACT, ROAM, HARVEST, FARM, VAULT, RETREAT }
 
     private static final int HISTORY_SIZE = 9;
     private static final int MAX_BLOCKED_CELLS = 12;
@@ -65,6 +65,10 @@ final class BlastAutoProgressGuard {
                 }
                 if (++failedMoves >= FAILED_MOVE_LIMIT) {
                     block(lastDestination, lastIntent);
+                    if (lastIntent == Intent.VAULT) {
+                        BlastLog.debug("auto-vault blocked=movement-failed from="
+                                + lastOrigin + " to=" + lastDestination);
+                    }
                     failedMoves = 0;
                 }
             } else {
@@ -172,6 +176,9 @@ final class BlastAutoProgressGuard {
                 Intent intent = arrivals[index];
                 if (intent == Intent.OTHER || intent == Intent.RETREAT) continue;
                 block(positions[index], intent);
+                if (intent == Intent.VAULT) {
+                    BlastLog.debug("auto-vault blocked=repeated-route cell=" + positions[index]);
+                }
                 historySize = 0;
                 return;
             }
