@@ -64,28 +64,35 @@ final class BlastAutoCrystalRooms {
         toStage = null;
         phaseMove = null;
         SpecialRoom room = null;
+        SpecialRoom inside = null;
+        boolean canPhase = Dungeon.branch == 0
+                && Notes.keyCount(new CrystalKey(Dungeon.depth)) == 0
+                && hero.buff(LostInventory.class) == null;
         if (level instanceof RegularLevel) {
             RegularLevel regular = (RegularLevel) level;
             CrystalPathRoom path = (CrystalPathRoom) regular.room(CrystalPathRoom.class);
             CrystalChoiceRoom choice = (CrystalChoiceRoom) regular.room(CrystalChoiceRoom.class);
-            if (path != null && remainingCrystalDoors(level, path) <= 3
-                    && hasUncollectedLoot(hero, level, path)) room = path;
-            else if (choice != null && remainingCrystalDoors(level, choice) <= 1
-                    && hasUncollectedLoot(hero, level, choice)) room = choice;
+            int pathDoors = path == null ? 0 : remainingCrystalDoors(level, path);
+            if (path != null && pathDoors <= 3) {
+                if (hasUncollectedLoot(hero, level, path)) room = path;
+                if (pathDoors > 0 && path.inside(level.cellToPoint(hero.pos))) inside = path;
+            }
+            int choiceDoors = choice == null ? 0 : remainingCrystalDoors(level, choice);
+            if (choice != null && choiceDoors <= 1) {
+                if (room == null && hasUncollectedLoot(hero, level, choice)) room = choice;
+                if (choiceDoors > 0 && choice.inside(level.cellToPoint(hero.pos))) inside = choice;
+            }
         }
         lootPending = room != null;
         boolean ready = false;
-        if (room != null && room.entrance() != null && Dungeon.branch == 0
-                && Notes.keyCount(new CrystalKey(Dungeon.depth)) == 0
-                && hero.buff(LostInventory.class) == null) {
+        if (canPhase && room != null && room.entrance() != null) {
             int entrance = level.pointToCell(room.entrance());
             if (level.visited[entrance] || level.mapped[entrance] || hero.fieldOfView[entrance]) {
                 ArrayList<Item> prizes = new ArrayList<>();
                 for (Heap heap : level.heaps.valueList()) {
                     if (!room.inside(level.cellToPoint(heap.pos))) continue;
                     for (Item item : heap.items) {
-                        if (!staged.contains(item)
-                                && !BlastAutoEquipment.blocksCursedPickup(hero, item)) prizes.add(item);
+                        if (eligiblePrize(hero, item)) prizes.add(item);
                     }
                 }
                 int required = requiredSlots(hero, prizes);
@@ -100,6 +107,12 @@ final class BlastAutoCrystalRooms {
                 }
             }
         }
+        // Recover the exit route after reloading a save inside the room.
+        if (canPhase && phaseRoom == null && inside != null && inside.entrance() != null) {
+            int entrance = level.pointToCell(inside.entrance());
+            PathFinder.buildDistanceMap(hero.pos, level.passable);
+            if (PathFinder.distance[entrance] == Integer.MAX_VALUE) phaseRoom = inside;
+        }
         if (phaseRoom != null && (!ready || phaseRoom != room)
                 && containsActive(hero.pos)) {
             leaving = true;
@@ -113,11 +126,15 @@ final class BlastAutoCrystalRooms {
     private static boolean hasUncollectedLoot(Hero hero, Level level, Room room) {
         for (Heap heap : level.heaps.valueList()) {
             if (room.inside(level.cellToPoint(heap.pos))
-                    && heap.items.stream().anyMatch(item -> !staged.contains(item)
-                            && (heap.type != Heap.Type.HEAP
-                                || !BlastAutoEquipment.blocksCursedPickup(hero, item)))) return true;
+                    && heap.items.stream().anyMatch(item -> heap.type == Heap.Type.HEAP
+                            ? eligiblePrize(hero, item) : !staged.contains(item))) return true;
         }
         return false;
+    }
+
+    private static boolean eligiblePrize(Hero hero, Item item) {
+        return !staged.contains(item) && !(item instanceof Wand && item.cursed)
+                && !BlastAutoEquipment.blocksCursedPickup(hero, item);
     }
 
     /** The room starts with six locks and generates three crystal keys. */
@@ -170,14 +187,7 @@ final class BlastAutoCrystalRooms {
         }
         if (!hasRoute()) return false;
         Level level = Dungeon.level;
-        if (leaving) {
-            int entrance = level.pointToCell(phaseRoom.entrance());
-            if (hero.rooted || !safe[entrance] || distances[entrance] == Integer.MAX_VALUE) {
-                return false;
-            }
-            move(hero, BlastAutoPlay.firstStep(entrance, safe, distances));
-            return true;
-        }
+        if (leaving) return leave(hero, level, safe, distances);
 
         Heap target = null;
         Item prize = null;
@@ -205,7 +215,9 @@ final class BlastAutoCrystalRooms {
                 }
             }
         }
-        if (target == null) return false;
+        if (target == null) {
+            return containsActive(hero.pos) && leave(hero, level, safe, distances);
+        }
         if (hero.pos == destination) {
             if (target.type == Heap.Type.HEAP) {
                 BlastAutoPickup.preparePickup(hero, target, prize);
@@ -216,6 +228,17 @@ final class BlastAutoCrystalRooms {
         } else if (!hero.rooted) {
             move(hero, BlastAutoPlay.firstStep(destination, safe, distances));
         } else return false;
+        return true;
+    }
+
+    private static boolean leave(Hero hero, Level level, boolean[] safe, int[] distances) {
+        int entrance = level.pointToCell(phaseRoom.entrance());
+        if (hero.rooted || !safe[entrance] || distances[entrance] == Integer.MAX_VALUE
+                || hero.pos == entrance) return false;
+        int step = BlastAutoPlay.firstStep(entrance, safe, distances);
+        BlastLog.debug("auto-crystal action=leave from=" + hero.pos + " to=" + step
+                + " exit=" + entrance);
+        move(hero, step);
         return true;
     }
 
