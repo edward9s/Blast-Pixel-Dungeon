@@ -233,13 +233,45 @@ final class BlastAutoCrystalRooms {
 
     private static boolean leave(Hero hero, Level level, boolean[] safe, int[] distances) {
         int entrance = level.pointToCell(phaseRoom.entrance());
-        if (hero.rooted || !safe[entrance] || distances[entrance] == Integer.MAX_VALUE
-                || hero.pos == entrance) return false;
-        int step = BlastAutoPlay.firstStep(entrance, safe, distances);
-        BlastLog.debug("auto-crystal action=leave from=" + hero.pos + " to=" + step
-                + " exit=" + entrance);
-        move(hero, step);
+        if (hero.rooted || hero.pos == entrance) return false;
+
+        boolean[] walking = safe.clone();
+        for (int cell = 0; cell < walking.length; cell++) {
+            if (!level.passable[cell] && cell != hero.pos) walking[cell] = false;
+        }
+        PathFinder.buildDistanceMap(hero.pos, walking);
+        int[] walkingDistances = PathFinder.distance.clone();
+        int exit = -1;
+        if (walkingDistances[entrance] != Integer.MAX_VALUE) {
+            exit = entrance;
+        } else {
+            int nearest = Integer.MAX_VALUE;
+            for (int cell = 0; cell < walking.length; cell++) {
+                if (walking[cell] && walkingDistances[cell] < nearest && !containsActive(cell)) {
+                    exit = cell;
+                    nearest = walkingDistances[cell];
+                }
+            }
+        }
+        if (exit >= 0) {
+            leaveStep(hero, exit, walking, walkingDistances);
+            return true;
+        }
+
+        BlastAutoBarricade.Action breach = BlastAutoBarricade.openRoomExit(
+                hero, phaseRoom, entrance, walking, walkingDistances);
+        if (breach != BlastAutoBarricade.Action.NONE) return true;
+
+        if (!safe[entrance] || distances[entrance] == Integer.MAX_VALUE) return false;
+        leaveStep(hero, entrance, safe, distances);
         return true;
+    }
+
+    private static void leaveStep(Hero hero, int exit, boolean[] safe, int[] distances) {
+        int step = BlastAutoPlay.firstStep(exit, safe, distances);
+        BlastLog.debug("auto-crystal action=leave from=" + hero.pos + " to=" + step
+                + " exit=" + exit);
+        move(hero, step);
     }
 
     /** Reserve space for distinct prizes after accounting for stacks and specialized bags. */
