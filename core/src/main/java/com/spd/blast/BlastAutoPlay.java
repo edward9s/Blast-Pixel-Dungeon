@@ -1136,6 +1136,19 @@ public final class BlastAutoPlay {
             return hero.curAction == null;
         }
 
+        // When the treasure route is clear, use ordinary walking within the room.
+        int treasureGoal = BlastAutoVault.timedTreasureGoal(hero, Dungeon.level, safe);
+        if (treasureGoal >= 0 && treasureGoal != hero.pos && !hero.rooted) {
+            boolean[] route = progress.safeFor(safe, hero.pos, BlastAutoProgressGuard.Intent.VAULT);
+            int[] routeDistances = navigationDistances(hero.pos, safe, distances, route);
+            if (route[treasureGoal] && routeDistances[treasureGoal] != Integer.MAX_VALUE) {
+                debugDecision = "vault-treasure";
+                progress.intent(BlastAutoProgressGuard.Intent.VAULT);
+                hero.curAction = new HeroAction.Move(firstStep(treasureGoal, route, routeDistances));
+                return false;
+            }
+        }
+
         // Harvesting belongs to ordinary auto-play even when auto-farming is disabled.
         idleSafe = progress.safeFor(safe, hero.pos, BlastAutoProgressGuard.Intent.HARVEST);
         idleDistances = navigationDistances(hero.pos, safe, distances, idleSafe);
