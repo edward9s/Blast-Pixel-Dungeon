@@ -1,8 +1,9 @@
 package com.spd.blast;
 
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.VaultFlameTraps;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Invisibility;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
-import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.BlobImmunity;
+import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroAction;
 import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
 import com.shatteredpixel.shatteredpixeldungeon.items.potions.Potion;
 import com.shatteredpixel.shatteredpixeldungeon.items.potions.PotionOfPurity;
@@ -115,7 +116,8 @@ final class BlastAutoVault {
                 if (beam.subPath(1, beam.dist).contains(hero.pos)) return true;
             } else if (mob instanceof VaultSentry) {
                 VaultSentry sentry = (VaultSentry) mob;
-                if (sentry.curCooldown <= 1 && scanCells(sentry, sentry.scanDirIdx).contains(hero.pos)) {
+                if (hero.invisible == 0 && sentry.curCooldown <= 1
+                        && scanCells(sentry, sentry.scanDirIdx).contains(hero.pos)) {
                     return true;
                 }
             }
@@ -141,20 +143,22 @@ final class BlastAutoVault {
         for (Heap heap : level.heaps.valueList()) {
             if (!passable[heap.pos] || !(heap.seen || hero.fieldOfView[heap.pos])
                     || !room.inside(level.cellToPoint(heap.pos))) continue;
-            boolean pending = heap.type == Heap.Type.CHEST
-                    ? BlastAutoPickup.hasCollectibleLoot(hero, heap)
-                    : heap.type == Heap.Type.HEAP && BlastAutoPickup.firstEligibleItem(heap,
-                            item -> (BlastAutoPickup.isPickupType(item, BlastAutoPickupPolicy::isInstantPickup)
-                                    || BlastAutoEquipment.canPickup(hero, item))
-                                    && BlastAutoPickup.canCollect(hero, item,
-                                            BlastAutoPickupPolicy::isInstantPickup)) != null;
             int distance = level.distance(hero.pos, heap.pos);
-            if (pending && distance < nearest) {
+            if (distance < nearest && canCollectTreasure(hero, heap)) {
                 target = heap.pos;
                 nearest = distance;
             }
         }
         return target >= 0 ? target : level.pointToCell(room.entrance());
+    }
+
+    private static boolean canCollectTreasure(Hero hero, Heap heap) {
+        if (heap.type == Heap.Type.CHEST) return BlastAutoPickup.hasCollectibleLoot(hero, heap);
+        return heap.type == Heap.Type.HEAP && BlastAutoPickup.firstEligibleItem(heap,
+                item -> (BlastAutoPickup.isPickupType(item, BlastAutoPickupPolicy::isInstantPickup)
+                        || BlastAutoEquipment.canPickup(hero, item))
+                        && BlastAutoPickup.canCollect(hero, item,
+                                BlastAutoPickupPolicy::isInstantPickup)) != null;
     }
 
     private static Ballistica laserBeam(VaultLaser laser, int direction) {
@@ -218,7 +222,7 @@ final class BlastAutoVault {
 
         boolean[][] danger = new boolean[HAZARD_LOOKAHEAD][length];
         addLaserForecast(level, danger);
-        addScanForecast(level, danger);
+        addScanForecast(hero, level, danger);
         if (flames != null && !hero.isImmune(VaultFlameTraps.class)) {
             addFlameForecast(flames, passable, danger);
         }
@@ -291,7 +295,11 @@ final class BlastAutoVault {
         }
     }
 
-    private static void addScanForecast(Level level, boolean[][] danger) {
+    private static void addScanForecast(Hero hero, Level level, boolean[][] danger) {
+        int invisibleTurns = hero.invisible == 0 ? 0 : 1;
+        for (Invisibility buff : hero.buffs(Invisibility.class)) {
+            invisibleTurns = Math.max(invisibleTurns, (int) buff.visualcooldown());
+        }
         for (Mob mob : level.mobs) {
             if (!(mob instanceof VaultSentry) || !mob.isAlive()) continue;
             VaultSentry sentry = (VaultSentry) mob;
@@ -301,7 +309,9 @@ final class BlastAutoVault {
             int scans = sentry.blastScansMade();
             for (int tick = 0; tick < danger.length; tick++) {
                 if (--cooldown > 0) continue;
-                for (int cell : scanCells(sentry, direction)) danger[tick][cell] = true;
+                if (tick >= invisibleTurns) {
+                    for (int cell : scanCells(sentry, direction)) danger[tick][cell] = true;
+                }
                 direction = (direction + 1) % sentry.scanDirs.length;
                 if (++scans < sentry.scansAfterCooldown) {
                     cooldown = 1;
@@ -335,18 +345,54 @@ final class BlastAutoVault {
         return true;
     }
 
-    static boolean drinkPurity(Hero hero, Level level) {
-        if (!(level instanceof RegularLevel) || hero.buff(BlobImmunity.class) != null
+    static boolean prepareForContinuousFlames(Hero hero, Level level, boolean[] safe,
+                                               int[] distances, int destination) {
+        if (!(level instanceof VaultLevel) || hero.rooted || hero.isImmune(VaultFlameTraps.class)
                 || hero.belongings.lostInventory()) return false;
+        PotionOfPurity potion = hero.belongings.getItem(PotionOfPurity.class);
+        if (potion == null || potion.quantity() <= 0) return false;
+
         VaultFlamesTreasureRoom room = (VaultFlamesTreasureRoom)
                 ((RegularLevel) level).room(VaultFlamesTreasureRoom.class);
-        if (room == null || room.entrance() == null) return false;
+        if (room == null || room.entrance() == null || !hasContinuousFlames(level, room)) return false;
         int entrance = level.pointToCell(room.entrance());
-        if (level.distance(hero.pos, entrance) > 1) return false;
-        PotionOfPurity potion = hero.belongings.getItem(PotionOfPurity.class);
-        if (potion == null || potion.quantity() <= 0 || !potion.isKnown()) return false;
-        potion.execute(hero, Potion.AC_DRINK);
+        boolean inside = room.inside(level.cellToPoint(hero.pos));
+        if (destination >= 0) {
+            if (distances[destination] != Integer.MAX_VALUE
+                    || (!inside && !room.inside(level.cellToPoint(destination)))) return false;
+        } else if (!hasBlockedTreasure(hero, level, room, distances)) {
+            return false;
+        }
+
+        if (inside || hero.pos == entrance) {
+            BlastLog.debug("auto-vault action=drink-purity room=continuous-flames known=" + potion.isKnown());
+            potion.execute(hero, Potion.AC_DRINK);
+            return true;
+        }
+        if (!safe[entrance] || distances[entrance] == Integer.MAX_VALUE) return false;
+        hero.curAction = new HeroAction.Move(BlastAutoPlay.firstStep(entrance, safe, distances));
         return true;
+    }
+
+    private static boolean hasContinuousFlames(Level level, VaultFlamesTreasureRoom room) {
+        VaultFlameTraps flames = (VaultFlameTraps) level.blobs.get(VaultFlameTraps.class);
+        if (flames == null || flames.afterTriggerCooldowns == null) return false;
+        for (int y = room.top + 1; y < room.bottom; y++) {
+            for (int x = room.left + 1; x < room.right; x++) {
+                int cell = x + y * level.width();
+                if (flames.afterTriggerCooldowns[cell] > 0 && !periodic(flames, cell)) return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean hasBlockedTreasure(Hero hero, Level level, VaultFlamesTreasureRoom room,
+                                              int[] distances) {
+        for (Heap heap : level.heaps.valueList()) {
+            if (distances[heap.pos] == Integer.MAX_VALUE && room.inside(level.cellToPoint(heap.pos))
+                    && canCollectTreasure(hero, heap)) return true;
+        }
+        return false;
     }
 
     static boolean[] imminent(Hero hero, Level level, boolean planTimedHazards) {
@@ -377,7 +423,7 @@ final class BlastAutoVault {
                 for (int cell : beam.subPath(1, beam.dist)) danger[cell] = true;
             } else if (mob instanceof VaultSentry) {
                 VaultSentry sentry = (VaultSentry) mob;
-                if (planTimedHazards || sentry.curCooldown > 1) continue;
+                if (planTimedHazards || hero.invisible != 0 || sentry.curCooldown > 1) continue;
                 for (int cell : scanCells(sentry, sentry.scanDirIdx)) danger[cell] = true;
             }
         }
