@@ -643,6 +643,9 @@ public final class BlastAutoPlay {
         if (!(action instanceof HeroAction.PickUp)) {
             progress.record(hero.pos, action instanceof HeroAction.Move ? action.dst : -1);
         }
+        if (action instanceof HeroAction.Move && BlastSettings.debugLog()) {
+            BlastAutoToxicRoom.logDoorMove(hero.pos, action.dst, debugDecision);
+        }
         logNearbyLoot(hero, action, started);
         return started;
     }
@@ -672,7 +675,9 @@ public final class BlastAutoPlay {
         debugDecision = "toxic-room-loot";
         BlastAutoSpecialRooms.Action toxicLoot = BlastAutoToxicRoom.continueLoot(
                 hero, safe, hazards, specialBarriers);
-        if (toxicLoot != BlastAutoSpecialRooms.Action.NONE) return false;
+        if (toxicLoot != BlastAutoSpecialRooms.Action.NONE) {
+            return toxicLoot == BlastAutoSpecialRooms.Action.USE;
+        }
 
         int toxicRetreat = BlastAutoTrapClearer.gasRetreatStep(hero, safe);
 
