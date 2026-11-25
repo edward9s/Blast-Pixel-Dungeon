@@ -711,7 +711,7 @@ final class BlastAutoTrapClearer {
                     }
                     if (stand < 0 && fireTrap(trap)) {
                         PotionOfFrost potion = hero.belongings.getItem(PotionOfFrost.class);
-                        if (potion != null && potion.quantity() > 0 && potion.isKnown()) {
+                        if (potion != null && potion.quantity() > 0) {
                             stand = side == 0
                                     ? nearbyStand(level, cell, cell, 1, false, trap,
                                             safe, distances, hero, aimed)
@@ -769,12 +769,11 @@ final class BlastAutoTrapClearer {
         }
         Item item = bestCorrosion ? null : bestFrost ? hero.belongings.getItem(PotionOfFrost.class)
                 : chooseThrowItem(hero.belongings.backpack, candidate -> candidate.isEquipped(hero));
-        // If no spare item exists, a known frost potion can still clear a fire trap.
+        // If no spare item exists, a frost potion can still clear a fire trap.
         if (!bestCorrosion && item == null && bestTarget == chosen.pos && fireTrap(chosen)) {
             item = hero.belongings.getItem(PotionOfFrost.class);
         }
-        if (!bestCorrosion && (item == null || (item instanceof PotionOfFrost
-                && (!((PotionOfFrost) item).isKnown() || item.quantity() <= 0)))) {
+        if (!bestCorrosion && (item == null || item.quantity() <= 0)) {
             if (!aimedOnly) {
                 Action aqua = douseWithAqua(hero, safe, distances);
                 if (aqua != Action.NONE) return aqua;
