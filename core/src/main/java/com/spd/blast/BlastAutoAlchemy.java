@@ -6,12 +6,14 @@ import com.shatteredpixel.shatteredpixeldungeon.Statistics;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.items.EnergyCrystal;
+import com.shatteredpixel.shatteredpixeldungeon.items.Generator;
 import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.Recipe;
 import com.shatteredpixel.shatteredpixeldungeon.items.bags.Bag;
 import com.shatteredpixel.shatteredpixeldungeon.items.bags.PotionBandolier;
 import com.shatteredpixel.shatteredpixeldungeon.items.bags.ScrollHolder;
+import com.shatteredpixel.shatteredpixeldungeon.items.bags.VelvetPouch;
 import com.shatteredpixel.shatteredpixeldungeon.items.artifacts.AlchemistsToolkit;
 import com.shatteredpixel.shatteredpixeldungeon.items.food.Food;
 import com.shatteredpixel.shatteredpixeldungeon.items.food.MeatPie;
@@ -22,6 +24,9 @@ import com.shatteredpixel.shatteredpixeldungeon.items.potions.brews.AquaBrew;
 import com.shatteredpixel.shatteredpixeldungeon.items.potions.exotic.ExoticPotion;
 import com.shatteredpixel.shatteredpixeldungeon.items.potions.exotic.PotionOfStormClouds;
 import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.Scroll;
+import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfRemoveCurse;
+import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfTransmutation;
+import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfUpgrade;
 import com.shatteredpixel.shatteredpixeldungeon.items.spells.Alchemize;
 import com.shatteredpixel.shatteredpixeldungeon.items.stones.Runestone;
 import com.shatteredpixel.shatteredpixeldungeon.items.stones.StoneOfAugmentation;
@@ -37,11 +42,14 @@ import com.shatteredpixel.shatteredpixeldungeon.plants.Stormvine;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
 
 /** Idle alchemy using a known pot or a ready equipped toolkit. */
 final class BlastAutoAlchemy {
 
     private static final int LEVITATION_RESERVE = 2;
+    private static final int REMOVE_CURSE_STOCK = 9;
     private static final int LOW_STOCK = 2;
     private static final int POT_ALCHEMIZE_STOCK = 32;
     private static final int POT_AQUA_STOCK = 16;
@@ -155,26 +163,23 @@ final class BlastAutoAlchemy {
 
         ArrayList<Seed> seeds = hero.belongings.getAllItems(Seed.class);
         ArrayList<Runestone> stones = hero.belongings.getAllItems(Runestone.class);
+        VelvetPouch pouch = hero.belongings.getItem(VelvetPouch.class);
+        if (pouch != null && !hasSlot(pouch)) {
+            stones.sort(Comparator.comparingInt(Item::quantity));
+            if (brewScroll(hero, potKnown, toolkit, seeds, stones, pouch)
+                    || brewAlchemize(hero, potKnown, toolkit, seeds, stones, LOW_STOCK, pouch)) return true;
+        }
+
         if (brew(hero, potKnown, toolkit, seeds, PIE,
                 pieIngredients(hero.belongings.getAllItems(Food.class)), 0)) return true;
 
         // Refill either nearly empty stock before using a pot for larger reserves.
-        if (brewAlchemize(hero, potKnown, toolkit, seeds, stones, LOW_STOCK)
+        if (brewAlchemize(hero, potKnown, toolkit, seeds, stones, LOW_STOCK, null)
                 || brewAqua(hero, potKnown, toolkit, seeds, LOW_STOCK)) return true;
-        if (toolkit == null && (brewAlchemize(hero, potKnown, null, seeds, stones, POT_ALCHEMIZE_STOCK)
+        if (toolkit == null && (brewAlchemize(hero, potKnown, null, seeds, stones, POT_ALCHEMIZE_STOCK, null)
                 || brewAqua(hero, potKnown, null, seeds, POT_AQUA_STOCK))) return true;
 
-        boolean hasScrollHolder = hero.belongings.getItem(ScrollHolder.class) != null;
-        for (boolean important : new boolean[]{true, false}) {
-            for (Runestone stone : stones) {
-                if (stone.quantity() < 2 || importantStone(stone) != important
-                        || (!hasScrollHolder && !(stone instanceof StoneOfEnchantment))) continue;
-                ArrayList<Item> inputs = ingredients(stone, stone);
-                Scroll output = SCROLL.outputFor(inputs);
-                if (output != null && canStore(hero, output)
-                        && brew(hero, potKnown, toolkit, seeds, SCROLL, inputs, 0)) return true;
-            }
-        }
+        if (brewScroll(hero, potKnown, toolkit, seeds, stones, null)) return true;
 
         if (hasSlot(hero.belongings.getItem(PotionBandolier.class))) {
             ArrayList<Item> mixed = new ArrayList<>(3);
@@ -193,10 +198,45 @@ final class BlastAutoAlchemy {
         return false;
     }
 
+    private static boolean brewScroll(Hero hero, boolean potKnown, AlchemistsToolkit toolkit,
+                                      ArrayList<Seed> seeds, ArrayList<Runestone> stones, VelvetPouch pouch) {
+        HashMap<Class<?>, Integer> stock = new HashMap<>();
+        for (Scroll scroll : hero.belongings.getAllItems(Scroll.class)) {
+            stock.merge(scroll.getClass(), scroll.quantity(), Integer::sum);
+        }
+        int highest = 0;
+        for (Class<?> type : Generator.Category.SCROLL.classes) {
+            if (type != ScrollOfUpgrade.class && type != ScrollOfTransmutation.class) {
+                highest = Math.max(highest, stock.getOrDefault(type, 0));
+            }
+        }
+
+        boolean hasScrollHolder = hero.belongings.getItem(ScrollHolder.class) != null;
+        for (boolean important : new boolean[]{true, false}) {
+            for (Runestone stone : stones) {
+                if (stone.quantity() < 2 || importantStone(stone) != important) continue;
+                if (pouch != null && !pouch.items.contains(stone)) continue;
+                if (pouch == null && !hasScrollHolder && !(stone instanceof StoneOfEnchantment)) continue;
+                ArrayList<Item> inputs = ingredients(stone, stone);
+                Scroll output = SCROLL.outputFor(inputs);
+                if (output != null && restockScroll(output, stock.getOrDefault(output.getClass(), 0), highest)
+                        && canStore(hero, output)
+                        && brew(hero, potKnown, toolkit, seeds, SCROLL, inputs, 0)) return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean restockScroll(Scroll scroll, int quantity, int highest) {
+        if (scroll instanceof ScrollOfUpgrade || scroll instanceof ScrollOfTransmutation) return true;
+        if (scroll instanceof ScrollOfRemoveCurse) return quantity < REMOVE_CURSE_STOCK;
+        return highest == 0 || quantity < highest;
+    }
+
     private static boolean brewAlchemize(Hero hero, boolean potKnown, AlchemistsToolkit toolkit,
                                          ArrayList<Seed> seeds, ArrayList<Runestone> stones,
-                                         int minimumStock) {
-        if (!needsRestock(hero.belongings.getItem(Alchemize.class), minimumStock)) return false;
+                                         int minimumStock, VelvetPouch pouch) {
+        if (pouch == null && !needsRestock(hero.belongings.getItem(Alchemize.class), minimumStock)) return false;
         if (waitingForSpace(hero, new Alchemize())) return Restock.ALCHEMIZE.blocked("output-on-floor");
         Seed seed = null;
         for (Seed candidate : seeds) {
@@ -205,9 +245,16 @@ final class BlastAutoAlchemy {
             }
         }
         if (seed == null) return Restock.ALCHEMIZE.blocked("no-eligible-seed");
+        int removeCurse = 0;
+        for (ScrollOfRemoveCurse scroll : hero.belongings.getAllItems(ScrollOfRemoveCurse.class)) {
+            removeCurse += scroll.quantity();
+        }
         boolean foundStone = false;
         for (Runestone stone : stones) {
-            if (stone.quantity() <= 0 || importantStone(stone)) continue;
+            if (stone.quantity() <= 0 || stone instanceof StoneOfEnchantment
+                    || stone instanceof StoneOfAugmentation
+                    || (stone instanceof StoneOfDetectMagic && removeCurse < REMOVE_CURSE_STOCK)) continue;
+            if (pouch != null && !pouch.items.contains(stone) && !pouch.items.contains(seed)) continue;
             foundStone = true;
             if (brew(hero, potKnown, toolkit, seeds, SELL, ingredients(seed, stone), 0)) return true;
         }
