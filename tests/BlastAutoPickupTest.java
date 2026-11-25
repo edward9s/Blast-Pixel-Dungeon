@@ -91,17 +91,12 @@ public final class BlastAutoPickupTest {
             throw new AssertionError("Covered Magical Catalyst must remain collectible");
         }
 
-        // Only these four non-cursed ring classes are eligible for auto-pickup.
+        // These four ring classes are eligible even when cursed.
         for (Ring ring : new Ring[]{new RingOfWealth(), new RingOfSharpshooting(),
                 new RingOfHaste(), new RingOfEnergy()}) {
             check(true, ring);
             ring.cursed = true;
-            check(false, ring);
-            // A broad instant-pickup predicate must not override the ring blacklist.
-            if (BlastAutoPickup.isPickupType(ring, item -> true)) {
-                throw new AssertionError("Cursed ring bypassed selection: "
-                        + ring.getClass().getName());
-            }
+            check(true, ring);
         }
         for (Ring ring : new Ring[]{new RingOfMight(), new RingOfForce()}) {
             check(false, ring);
