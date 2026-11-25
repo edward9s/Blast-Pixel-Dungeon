@@ -735,8 +735,8 @@ public final class BlastAutoPlay {
                 }
             }
             Level level = Dungeon.level;
-            boolean laser = BlastAutoVault.laserAboutToFireAt(hero, level);
-            if (laser || BlastAutoEnvironment.hazardousAt(hero.pos, hazards)
+            boolean sentryAttack = BlastAutoVault.imminentAttackAt(hero, level);
+            if (sentryAttack || BlastAutoEnvironment.hazardousAt(hero.pos, hazards)
                     || specialBarriers[hero.pos]) {
                 if (!specialBarriers[hero.pos] && BlastAutoVault.nearTimedHazard(hero, level)
                         && !BlastAutoEnvironment.hazardousAt(hero.pos,
@@ -747,7 +747,7 @@ public final class BlastAutoPlay {
                         return false;
                     }
                 }
-                debugDecision = laser ? "vault-laser-retreat" : "hazard-retreat";
+                debugDecision = sentryAttack ? "vault-sentry-retreat" : "hazard-retreat";
                 for (int offset : PathFinder.NEIGHBOURS8) {
                     int cell = hero.pos + offset;
                     if (Dungeon.level.insideMap(cell) && safe[cell] && distances[cell] == 1) {
@@ -1607,7 +1607,7 @@ public final class BlastAutoPlay {
                 BlastAutoEnvironment.activeSpecialBarriers(level), false, false, true);
         BlastAutoVault.TimedRoutes routes = BlastAutoVault.timedRoutes(hero, level, passable);
         if (goal >= 0 && goal != hero.pos) return routes.toward(hero.pos, goal, passable);
-        int treasureGoal = BlastAutoVault.laserTreasureGoal(hero, level, passable);
+        int treasureGoal = BlastAutoVault.timedTreasureGoal(hero, level, passable);
         if (treasureGoal >= 0 && treasureGoal != hero.pos) {
             int step = routes.toward(hero.pos, treasureGoal, passable);
             if (step >= 0) return step;

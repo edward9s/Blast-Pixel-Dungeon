@@ -7,13 +7,18 @@ import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
 import com.shatteredpixel.shatteredpixeldungeon.items.potions.Potion;
 import com.shatteredpixel.shatteredpixeldungeon.items.potions.PotionOfPurity;
 import com.shatteredpixel.shatteredpixeldungeon.levels.RegularLevel;
+import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.Room;
+import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.quest.vault.treasure.VaultCircleScanTreasureRoom;
 import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.quest.vault.treasure.VaultFlamesTreasureRoom;
 import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.quest.vault.treasure.VaultHardLaserTreasureRoom;
 import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.quest.vault.treasure.VaultLaserTreasureRoom;
+import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.quest.vault.treasure.VaultManyScansRoom;
 import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.quest.vault.treasure.VaultTreasureRoom;
 import com.watabou.utils.PathFinder;
 
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.VaultLaser;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.VaultSentry;
@@ -77,9 +82,14 @@ final class BlastAutoVault {
                 if (level.insideMap(cell) && periodic(flames, cell)) return true;
             }
         }
-        if (laserTreasureRoom(hero, level) != null) return true;
+        if (timedTreasureRoom(hero, level) != null) return true;
         for (Mob mob : level.mobs) {
-            if (!(mob instanceof VaultLaser) || !mob.isAlive()) continue;
+            if (!mob.isAlive()) continue;
+            if (mob instanceof VaultSentry) {
+                VaultSentry sentry = (VaultSentry) mob;
+                if (level.distance(hero.pos, sentry.pos) <= Math.ceil(sentry.scanLength) + 1) return true;
+            }
+            if (!(mob instanceof VaultLaser)) continue;
             VaultLaser laser = (VaultLaser) mob;
             if (laser.afterShotCooldown == Integer.MAX_VALUE && laser.curCooldown > HAZARD_LOOKAHEAD) continue;
             validateLaser(laser);
@@ -93,30 +103,38 @@ final class BlastAutoVault {
         return false;
     }
 
-    static boolean laserAboutToFireAt(Hero hero, Level level) {
+    static boolean imminentAttackAt(Hero hero, Level level) {
         if (!(level instanceof VaultLevel)) return false;
         for (Mob mob : level.mobs) {
-            if (!(mob instanceof VaultLaser) || !mob.isAlive()) continue;
-            VaultLaser laser = (VaultLaser) mob;
-            if (laser.curCooldown > 1) continue;
-            validateLaser(laser);
-            Ballistica beam = laserBeam(laser, laser.laserDirs[laser.laserDirIdx]);
-            if (beam.subPath(1, beam.dist).contains(hero.pos)) return true;
+            if (!mob.isAlive()) continue;
+            if (mob instanceof VaultLaser) {
+                VaultLaser laser = (VaultLaser) mob;
+                if (laser.curCooldown > 1) continue;
+                validateLaser(laser);
+                Ballistica beam = laserBeam(laser, laser.laserDirs[laser.laserDirIdx]);
+                if (beam.subPath(1, beam.dist).contains(hero.pos)) return true;
+            } else if (mob instanceof VaultSentry) {
+                VaultSentry sentry = (VaultSentry) mob;
+                if (sentry.curCooldown <= 1 && scanCells(sentry, sentry.scanDirIdx).contains(hero.pos)) {
+                    return true;
+                }
+            }
         }
         return false;
     }
 
-    private static VaultTreasureRoom laserTreasureRoom(Hero hero, Level level) {
+    private static VaultTreasureRoom timedTreasureRoom(Hero hero, Level level) {
         if (!(level instanceof VaultLevel)) return null;
-        RegularLevel regular = (RegularLevel) level;
-        VaultTreasureRoom room = (VaultTreasureRoom) regular.room(VaultLaserTreasureRoom.class);
-        if (room != null && room.inside(level.cellToPoint(hero.pos))) return room;
-        room = (VaultTreasureRoom) regular.room(VaultHardLaserTreasureRoom.class);
-        return room != null && room.inside(level.cellToPoint(hero.pos)) ? room : null;
+        Room room = ((RegularLevel) level).room(hero.pos);
+        if (room instanceof VaultLaserTreasureRoom || room instanceof VaultHardLaserTreasureRoom
+                || room instanceof VaultCircleScanTreasureRoom || room instanceof VaultManyScansRoom) {
+            return (VaultTreasureRoom) room;
+        }
+        return null;
     }
 
-    static int laserTreasureGoal(Hero hero, Level level, boolean[] passable) {
-        VaultTreasureRoom room = laserTreasureRoom(hero, level);
+    static int timedTreasureGoal(Hero hero, Level level, boolean[] passable) {
+        VaultTreasureRoom room = timedTreasureRoom(hero, level);
         if (room == null || room.entrance() == null) return -1;
         int target = -1;
         int nearest = Integer.MAX_VALUE;
@@ -200,6 +218,7 @@ final class BlastAutoVault {
 
         boolean[][] danger = new boolean[HAZARD_LOOKAHEAD][length];
         addLaserForecast(level, danger);
+        addScanForecast(level, danger);
         if (flames != null && !hero.isImmune(VaultFlameTraps.class)) {
             addFlameForecast(flames, passable, danger);
         }
@@ -272,6 +291,43 @@ final class BlastAutoVault {
         }
     }
 
+    private static void addScanForecast(Level level, boolean[][] danger) {
+        for (Mob mob : level.mobs) {
+            if (!(mob instanceof VaultSentry) || !mob.isAlive()) continue;
+            VaultSentry sentry = (VaultSentry) mob;
+            if (sentry.curCooldown > danger.length) continue;
+            int cooldown = sentry.curCooldown;
+            int direction = sentry.scanDirIdx;
+            int scans = sentry.blastScansMade();
+            for (int tick = 0; tick < danger.length; tick++) {
+                if (--cooldown > 0) continue;
+                for (int cell : scanCells(sentry, direction)) danger[tick][cell] = true;
+                direction = (direction + 1) % sentry.scanDirs.length;
+                if (++scans < sentry.scansAfterCooldown) {
+                    cooldown = 1;
+                } else {
+                    scans = 0;
+                    cooldown = sentry.afterScanCooldown;
+                }
+            }
+        }
+    }
+
+    private static Set<Integer> scanCells(VaultSentry sentry, int direction) {
+        if (sentry.scanDirs == null || direction < 0 || direction >= sentry.scanDirs.length) {
+            throw new IllegalStateException("Invalid vault sentry scan sequence");
+        }
+        Set<Integer> cells = new HashSet<>();
+        for (int target : sentry.scanDirs[direction]) {
+            Ballistica aim = new Ballistica(sentry.pos, target, Ballistica.WONT_STOP);
+            ConeAOE scan = new ConeAOE(aim, sentry.scanLength, sentry.scanWidth,
+                    Ballistica.STOP_SOLID | Ballistica.STOP_TARGET);
+            if (scan.cells.isEmpty() && aim.path.size() >= 2) scan.cells.add(aim.path.get(1));
+            cells.addAll(scan.cells);
+        }
+        return cells;
+    }
+
     private static boolean safeForMove(boolean[][] danger, int cell, int tick, int moveTicks) {
         for (int i = tick; i < tick + moveTicks; i++) {
             if (danger[i][cell]) return false;
@@ -321,20 +377,8 @@ final class BlastAutoVault {
                 for (int cell : beam.subPath(1, beam.dist)) danger[cell] = true;
             } else if (mob instanceof VaultSentry) {
                 VaultSentry sentry = (VaultSentry) mob;
-                if (sentry.curCooldown > 1) continue;
-                if (sentry.scanDirs == null || sentry.scanDirs.length == 0)
-                    throw new IllegalStateException("Vault sentry has no scan directions");
-                for (int direction : sentry.scanDirs[sentry.scanDirIdx]) {
-                    Ballistica aim = new Ballistica(sentry.pos, direction, Ballistica.WONT_STOP);
-                    ConeAOE scan = new ConeAOE(aim, sentry.scanLength, sentry.scanWidth,
-                            Ballistica.STOP_SOLID | Ballistica.STOP_TARGET);
-                    if (scan.cells.isEmpty() && aim.path.size() >= 2)
-                        scan.cells.add(aim.path.get(1));
-                    for (int cell : scan.cells) {
-                        // When the sentry FOV has not been initialized, conservatively block the cone.
-                        danger[cell] = true;
-                    }
-                }
+                if (planTimedHazards || sentry.curCooldown > 1) continue;
+                for (int cell : scanCells(sentry, sentry.scanDirIdx)) danger[cell] = true;
             }
         }
         return danger;
