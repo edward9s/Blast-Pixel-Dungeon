@@ -285,10 +285,10 @@ public final class BlastAutoPickup {
         if (item instanceof Bomb || item instanceof BlastDeathBomb) return !uncollectibleBomb(item);
         if (item instanceof Wand) return !item.cursed && BlastAutoCombat.supportsWand((Wand) item);
         if (item instanceof Ring) {
-            return !item.cursed && (item instanceof RingOfWealth
+            return item instanceof RingOfWealth
                     || item instanceof RingOfSharpshooting
                     || item instanceof RingOfHaste
-                    || item instanceof RingOfEnergy);
+                    || item instanceof RingOfEnergy;
         }
         return item instanceof TrinketCatalyst || item.stackable || instantPickup.test(item);
     }
