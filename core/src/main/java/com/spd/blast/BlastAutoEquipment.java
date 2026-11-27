@@ -149,6 +149,7 @@ final class BlastAutoEquipment {
         boolean canSell = !hero.belongings.lostInventory() && availableAlchemize(hero) != null
                 && Shopkeeper.canSell(item);
         if (isCursed(item)) return canSell ? Pickup.SELL : Pickup.SKIP;
+        if (canSell && isObsoleteStarter(hero, item)) return Pickup.SELL;
         if (worthPickingWithoutAlchemize(
                 item, hero.belongings, hero.belongings.armor(), hero.STR())) return Pickup.KEEP;
         return canSell && isSaleCandidate(hero, item) ? Pickup.SELL : Pickup.SKIP;
@@ -207,10 +208,21 @@ final class BlastAutoEquipment {
         return false;
     }
 
-    private static boolean isSaleCandidate(Hero hero, Item item) {
+    static boolean isSaleCandidate(Hero hero, Item item) {
         Item equipped = item instanceof MeleeWeapon ? hero.belongings.weapon()
                 : item instanceof Armor ? hero.belongings.armor() : null;
-        return isRedundant(item, equipped);
+        return isRedundant(item, equipped) || isObsoleteStarter(hero, item);
+    }
+
+    /** Plain tier-one weapons follow the same comparison that picked their replacement. */
+    private static boolean isObsoleteStarter(Hero hero, Item item) {
+        if (!(item instanceof MeleeWeapon)) return false;
+        MeleeWeapon starter = (MeleeWeapon) item;
+        KindOfWeapon equipped = hero.belongings.weapon();
+        return starter.tier == 1 && starter.trueLevel() == 0 && !starter.unique
+                && starter.enchantment == null && starter.augment == Weapon.Augment.NONE
+                && equipped instanceof MeleeWeapon
+                && betterWeapon(hero, (MeleeWeapon) equipped, starter);
     }
 
     /** Explain the two failed routes for floor gear already rejected by pickup(). */

@@ -1,5 +1,6 @@
 package com.spd.blast;
 
+import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.items.armor.LeatherArmor;
 import com.shatteredpixel.shatteredpixeldungeon.items.armor.WarriorArmor;
 import com.shatteredpixel.shatteredpixeldungeon.items.BrokenSeal;
@@ -19,7 +20,9 @@ import com.shatteredpixel.shatteredpixeldungeon.items.weapon.enchantments.Vampir
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.enchantments.Venomous;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.enchantments.Vorpal;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.Dagger;
+import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.Cudgel;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.Glaive;
+import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.Gloves;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.Greatsword;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.enchantments.Crystal;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.Shortsword;
@@ -38,7 +41,36 @@ public final class BlastAutoEquipmentTest {
         if (!condition) throw new AssertionError(message);
     }
 
+    private static void testStarterSale() {
+        Hero hero = new Hero();
+        Dagger replacement = new Dagger();
+        replacement.level(2);
+        hero.belongings.weapon = replacement;
+        Gloves gloves = new Gloves();
+        Cudgel cudgel = new Cudgel();
+
+        check(!BlastAutoEquipment.isRedundant(gloves, replacement)
+                        && !BlastAutoEquipment.isRedundant(cudgel, replacement),
+                "The usual spare comparison still values speed and accuracy");
+        check(BlastAutoEquipment.isSaleCandidate(hero, gloves)
+                        && BlastAutoEquipment.isSaleCandidate(hero, cudgel),
+                "A weaker plain starter can be sold after switching to a better weapon");
+
+        gloves.level(1);
+        cudgel.enchant(new Grim());
+        check(!BlastAutoEquipment.isSaleCandidate(hero, gloves)
+                        && !BlastAutoEquipment.isSaleCandidate(hero, cudgel),
+                "Upgraded or protected starters must retain the usual spare comparison");
+
+        Gloves stronger = new Gloves();
+        stronger.level(5);
+        hero.belongings.weapon = new Gloves();
+        check(!BlastAutoEquipment.isSaleCandidate(hero, stronger),
+                "A stronger starter must remain available to equip");
+    }
+
     public static void main(String[] args) {
+        testStarterSale();
         Dagger plain = new Dagger();
         Dagger upgraded = new Dagger();
         upgraded.level(6);
