@@ -90,7 +90,7 @@ final class BlastAutoSentryRoom {
     private static Item eligibleLoot(Hero hero, Heap heap) {
         if (heap == null || heap.type != Heap.Type.HEAP || heap.isEmpty()) return null;
         return BlastAutoPickup.firstEligibleItem(heap, item ->
-                BlastAutoPickup.canCollect(hero, item,
+                BlastAutoPickup.canCollectFromHeap(hero, item,
                         BlastAutoPickupPolicy::isInstantPickup));
     }
 
@@ -130,7 +130,6 @@ final class BlastAutoSentryRoom {
             } else {
                 BlastLog.debug("auto-sentry action=pickup chest=" + activeTreasure);
                 BlastAutoPickup.preparePickup(hero, heap, loot);
-                hero.curAction = new HeroAction.PickUp(activeTreasure);
             }
             return BlastAutoSpecialRooms.Action.MOVE;
         }

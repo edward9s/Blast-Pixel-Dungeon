@@ -1,5 +1,7 @@
 package com.spd.blast;
 
+import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.items.Dewdrop;
 import com.shatteredpixel.shatteredpixeldungeon.items.EnergyCrystal;
 import com.shatteredpixel.shatteredpixeldungeon.items.Gold;
@@ -10,9 +12,11 @@ import com.shatteredpixel.shatteredpixeldungeon.items.keys.IronKey;
 import com.shatteredpixel.shatteredpixeldungeon.items.keys.WornKey;
 import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
+import com.shatteredpixel.shatteredpixeldungeon.items.armor.LeatherArmor;
 import com.shatteredpixel.shatteredpixeldungeon.items.bombs.Bomb;
 import com.shatteredpixel.shatteredpixeldungeon.items.potions.PotionOfHealing;
 import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfIdentify;
+import com.shatteredpixel.shatteredpixeldungeon.items.spells.Alchemize;
 import com.shatteredpixel.shatteredpixeldungeon.items.stones.Runestone;
 import com.shatteredpixel.shatteredpixeldungeon.items.trinkets.TrinketCatalyst;
 import com.shatteredpixel.shatteredpixeldungeon.items.rings.Ring;
@@ -24,6 +28,9 @@ import com.shatteredpixel.shatteredpixeldungeon.items.rings.RingOfSharpshooting;
 import com.shatteredpixel.shatteredpixeldungeon.items.rings.RingOfWealth;
 import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfFireblast;
 import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfMagicMissile;
+import com.shatteredpixel.shatteredpixeldungeon.items.weapon.enchantments.Grim;
+import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.Dagger;
+import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.Greatsword;
 import com.shatteredpixel.shatteredpixeldungeon.plants.Sungrass;
 
 import java.util.function.Predicate;
@@ -36,6 +43,60 @@ public final class BlastAutoPickupTest {
         if (BlastAutoPickup.isPickupType(item, BLAST_INSTANT) != expected) {
             throw new AssertionError("Incorrect pickup selection for " + item.getClass().getName());
         }
+    }
+
+    private static void checkFullBackpack(Hero hero, Item spare, Item upgrade, Item weaker) {
+        Alchemize spell = new Alchemize();
+        hero.belongings.backpack.items.add(spell);
+        hero.belongings.backpack.items.add(spare);
+        while (hero.belongings.backpack.items.size() < hero.belongings.backpack.capacity()) {
+            hero.belongings.backpack.items.add(new Item());
+        }
+
+        if (BlastAutoPickup.canCollect(hero, upgrade, BLAST_INSTANT)
+                || !BlastAutoPickup.canCollectFromHeap(hero, upgrade, BLAST_INSTANT)
+                || BlastAutoEquipment.spareForUpgrade(hero, upgrade) != spare
+                || BlastAutoPickup.canCollectFromHeap(hero, weaker, BLAST_INSTANT)
+                || BlastAutoPickup.canCollectFromHeap(hero, new Greatsword(), BLAST_INSTANT)) {
+            throw new AssertionError("A full backpack should make room only for a wearable upgrade");
+        }
+        if (!hero.belongings.backpack.items.contains(spare) || spell.quantity() != 1) {
+            throw new AssertionError("Checking loot eligibility must not perform the sale");
+        }
+
+        hero.belongings.backpack.items.remove(spell);
+        hero.belongings.backpack.items.add(new Item());
+        if (BlastAutoPickup.canCollectFromHeap(hero, upgrade, BLAST_INSTANT)) {
+            throw new AssertionError("A full backpack cannot make room without Alchemize");
+        }
+        hero.belongings.backpack.items.remove(spare);
+        hero.belongings.backpack.items.add(spell);
+        if (BlastAutoPickup.canCollectFromHeap(hero, upgrade, BLAST_INSTANT)) {
+            throw new AssertionError("Only gear eligible for sale can make room for an upgrade");
+        }
+    }
+
+    private static void testFullBackpack() {
+        Hero armed = Dungeon.hero = new Hero();
+        armed.belongings.weapon = new Dagger();
+        Dagger upgrade = new Dagger();
+        upgrade.level(3);
+        checkFullBackpack(armed, new Dagger(), upgrade, new Dagger());
+
+        Dagger protectedSpare = new Dagger();
+        protectedSpare.enchant(new Grim());
+        armed.belongings.backpack.items.set(0, protectedSpare);
+        if (BlastAutoPickup.canCollectFromHeap(armed, upgrade, BLAST_INSTANT)) {
+            throw new AssertionError("Protected equipment must not be sold to make space");
+        }
+
+        Hero armored = Dungeon.hero = new Hero();
+        armored.STR = 14;
+        armored.belongings.armor = new LeatherArmor();
+        LeatherArmor better = new LeatherArmor();
+        better.level(3);
+        checkFullBackpack(armored, new LeatherArmor(), better, new LeatherArmor());
+        Dungeon.hero = null;
     }
 
     public static void main(String[] args) {
@@ -175,6 +236,7 @@ public final class BlastAutoPickupTest {
                 || BlastAutoPickupPolicy.isInstantPickup(new Gold())) {
             throw new AssertionError("Only BlastPickup items bypass inventory capacity");
         }
+        testFullBackpack();
         System.out.println("BlastAutoPickupTest passed");
     }
 }

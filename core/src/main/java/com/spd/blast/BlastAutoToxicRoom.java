@@ -104,7 +104,7 @@ final class BlastAutoToxicRoom {
                 item -> (BlastAutoPickup.isPickupType(item,
                             BlastAutoPickupPolicy::isInstantPickup)
                         || BlastAutoEquipment.canPickup(hero, item))
-                        && BlastAutoPickup.canCollect(hero, item,
+                        && BlastAutoPickup.canCollectFromHeap(hero, item,
                                 BlastAutoPickupPolicy::isInstantPickup));
     }
 
@@ -190,7 +190,6 @@ final class BlastAutoToxicRoom {
             Item item = collectibleItem(hero, closest);
             if (item == null) return BlastAutoSpecialRooms.Action.NONE;
             BlastAutoPickup.preparePickup(hero, closest, item);
-            hero.curAction = new HeroAction.PickUp(target);
         } else if (!hero.rooted) {
             hero.curAction = new HeroAction.Move(BlastAutoPlay.firstStep(target, route, distances));
         } else {

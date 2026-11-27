@@ -42,7 +42,7 @@ public final class BlastAutoPickup {
     private static Hero currentHero;
     private static Level currentLevel;
     private static Item attemptedItem;
-    private static int attemptedCell = -1;
+    private static HeroAction.PickUp attemptedAction;
     private static final IdentityHashMap<Item, Integer> retries = new IdentityHashMap<>();
 
     private BlastAutoPickup() {}
@@ -51,16 +51,22 @@ public final class BlastAutoPickup {
         currentHero = null;
         currentLevel = null;
         attemptedItem = null;
-        attemptedCell = -1;
+        attemptedAction = null;
         retries.clear();
+    }
+
+    /** Recheck space at native pickup, after reaching the selected item. */
+    public static void onPickupAttempt(Hero hero, Item item, int cell) {
+        if (isAttempt(hero, item, cell)) {
+            BlastAutoEquipment.makeRoomForUpgrade(hero, item);
+        }
     }
 
     /** Sell equipment picked up for sale as part of the successful native pickup. */
     public static void onPickupSuccess(Hero hero, Item item, int cell) {
-        if (hero == currentHero && Dungeon.level == currentLevel
-                && item == attemptedItem && cell == attemptedCell) {
+        if (isAttempt(hero, item, cell)) {
             attemptedItem = null;
-            attemptedCell = -1;
+            attemptedAction = null;
             BlastAutoPlay.onPickupProgress();
             BlastAutoEquipment.onPickupCompleted(hero, item);
         }
@@ -68,13 +74,18 @@ public final class BlastAutoPickup {
 
     /** Only native pickup failure starts a retry cooldown. */
     public static void onPickupFailure(Hero hero, Item item, int cell) {
-        if (hero == currentHero && Dungeon.level == currentLevel
-                && item == attemptedItem && cell == attemptedCell) {
+        if (isAttempt(hero, item, cell)) {
             BlastAutoEquipment.onPickupFailed(item);
             attemptedItem = null;
-            attemptedCell = -1;
+            attemptedAction = null;
             retries.put(item, RETRY_TURNS);
         }
+    }
+
+    private static boolean isAttempt(Hero hero, Item item, int cell) {
+        return attemptedAction != null && hero.curAction == attemptedAction
+                && hero == currentHero && Dungeon.level == currentLevel
+                && item == attemptedItem && cell == attemptedAction.dst;
     }
 
     static void advanceRetries() {
@@ -126,7 +137,7 @@ public final class BlastAutoPickup {
                         || BlastAutoWandmaker.isPlacedCandle(level, cell, item)
                         || !(isPickupType(item, instantPickup)
                             || BlastAutoEquipment.canPickup(hero, item))
-                        || !canCollect(hero, item, instantPickup)
+                        || !canCollectFromHeap(hero, item, instantPickup)
                         || (lastSlot && !BlastAutoEquipment.useLastSlot(hero, item))) continue;
                 nearest = cell;
                 shortest = distances[cell];
@@ -139,7 +150,6 @@ public final class BlastAutoPickup {
         if (nearest < 0) return false;
         if (nearest == hero.pos) {
             preparePickup(hero, nearestHeap, nearestItem);
-            hero.curAction = new HeroAction.PickUp(nearest);
         } else {
             hero.curAction = new HeroAction.Move(BlastAutoPlay.firstStep(nearest, safe, distances));
         }
@@ -178,7 +188,7 @@ public final class BlastAutoPickup {
                     !BlastAutoWandmaker.isPlacedCandle(level, cell, item)
                     && (isPickupType(item, instantPickup)
                             || BlastAutoEquipment.canPickup(hero, item))
-                    && canCollect(hero, item, instantPickup));
+                    && canCollectFromHeap(hero, item, instantPickup));
             if (candidate == null) candidate = heap.peek();
             if (selected == null
                     || (candidate instanceof Gold && !(selectedItem instanceof Gold))
@@ -205,7 +215,7 @@ public final class BlastAutoPickup {
         else if (!isPickupType(item, instantPickup)
                 && !BlastAutoEquipment.canPickup(hero, item)) status = "type";
         else if (retries.containsKey(item)) status = "cooldown";
-        else if (!canCollect(hero, item, instantPickup)) {
+        else if (!canCollectFromHeap(hero, item, instantPickup)) {
             if (item instanceof DriedRose.Petal) status = "rose-unavailable";
             else if (item instanceof Dewdrop) status = "dew-full";
             else if (hero.buff(LostInventory.class) != null
@@ -262,7 +272,8 @@ public final class BlastAutoPickup {
         }
         exposeForPickup(heap, item);
         attemptedItem = item;
-        attemptedCell = heap.pos;
+        attemptedAction = new HeroAction.PickUp(heap.pos);
+        hero.curAction = attemptedAction;
         BlastAutoEquipment.onPickupScheduled(hero, item);
     }
 
@@ -304,7 +315,16 @@ public final class BlastAutoPickup {
         return rose != null && rose.level() < MAX_ROSE_LEVEL;
     }
 
+    static boolean canCollectFromHeap(Hero hero, Item item, Predicate<Item> instantPickup) {
+        return canCollect(hero, item, instantPickup, true);
+    }
+
     static boolean canCollect(Hero hero, Item item, Predicate<Item> instantPickup) {
+        return canCollect(hero, item, instantPickup, false);
+    }
+
+    private static boolean canCollect(Hero hero, Item item, Predicate<Item> instantPickup,
+                                      boolean fromHeap) {
         if (retries.containsKey(item) || uncollectibleBomb(item)
                 || (item instanceof Wand && item.cursed)
                 || BlastAutoEquipment.blocksCursedPickup(hero, item)) return false;
@@ -334,6 +354,6 @@ public final class BlastAutoPickup {
         for (Item held : backpack) {
             if (held instanceof Bag && ((Bag) held).canHold(item)) return true;
         }
-        return false;
+        return fromHeap && BlastAutoEquipment.spareForUpgrade(hero, item) != null;
     }
 }

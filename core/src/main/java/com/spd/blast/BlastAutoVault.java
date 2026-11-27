@@ -185,7 +185,7 @@ final class BlastAutoVault {
         return heap.type == Heap.Type.HEAP && BlastAutoPickup.firstEligibleItem(heap,
                 item -> (BlastAutoPickup.isPickupType(item, BlastAutoPickupPolicy::isInstantPickup)
                         || BlastAutoEquipment.canPickup(hero, item))
-                        && BlastAutoPickup.canCollect(hero, item,
+                        && BlastAutoPickup.canCollectFromHeap(hero, item,
                                 BlastAutoPickupPolicy::isInstantPickup)) != null;
     }
 
