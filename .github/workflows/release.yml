@@ -266,14 +266,13 @@ jobs:
           PREV_TAG: ${{ steps.previous.outputs.tag }}
         run: |
           set -euo pipefail
-          rm -f release-notes-ai.md
           if [[ -n "$PREV_TAG" ]] && git rev-parse --verify "$PREV_TAG^{commit}" >/dev/null 2>&1; then
             SCOPE="Compare git tag $PREV_TAG to HEAD using git log and git diff. Describe only the final player-visible changes since that release."
           else
             SCOPE="This is the first Blast release or its previous tag is unavailable. Inspect the current Blast code and git history, and summarize the main player-visible Blast gameplay features."
           fi
 
-          copilot -p "Generate concise player-facing changelog notes for Blast Pixel Dungeon.
+          notes=$(copilot -s -p "Generate concise player-facing changelog notes for Blast Pixel Dungeon.
 
           $SCOPE
 
@@ -284,13 +283,21 @@ jobs:
           - Ignore version bumps, CI/build/release workflow changes, docs-only changes, refactors, tests, and reverted changes unless they affect gameplay.
           - Ignore Shattered Pixel Dungeon upstream changes and Shattered Master Mode changes; their versions are listed separately.
           - Do not invent features or behavior.
-          - Use concise English with at most 8 Markdown bullet points. No heading, preamble, links or commentary.
-          - If there are no player-visible changes, write exactly: NO_USER_FACING_CHANGES
-          - Write only the final result to release-notes-ai.md in the current directory." \
+          - Return the changelog as your final text response. Use 1 to 8 concise English bullets, each on one line starting with '- '. No heading, preamble, links or commentary.
+          - If there are no player-visible changes, return exactly: NO_USER_FACING_CHANGES" \
             --allow-tool='shell(git:*)' \
-            --allow-tool=write \
-            --no-ask-user
-          test -s release-notes-ai.md
+            --no-ask-user)
+
+          if [[ "$notes" != "NO_USER_FACING_CHANGES" ]] && ! awk '
+            /^[[:space:]]*$/ { next }
+            /^- [^[:space:]]/ { bullets++; next }
+            { invalid = 1 }
+            END { exit (invalid || bullets < 1 || bullets > 8) }
+          ' <<< "$notes"; then
+            echo "::error::Copilot must return 1 to 8 Markdown bullets or NO_USER_FACING_CHANGES."
+            exit 1
+          fi
+          printf '%s\n' "$notes" > release-notes-ai.md
 
       - name: Compose release notes
         if: needs.prepare.outputs.mode == 'formal' || needs.prepare.outputs.mode == 'manual'
