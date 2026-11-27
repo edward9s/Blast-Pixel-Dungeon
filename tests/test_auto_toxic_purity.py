@@ -54,7 +54,6 @@ class AutoToxicLootTest(unittest.TestCase):
     def test_room_pickup_preserves_native_callbacks(self):
         self.assertIn("BlastAutoPickup.preparePickup(hero, closest, item)", TOXIC)
         self.assertIn("static void preparePickup(Hero hero, Heap heap, Item item)", PICKUP)
-        self.assertIn("BlastAutoEquipment.onPickupScheduled(hero, item)", PICKUP)
         self.assertIn("attemptedItem = item;", PICKUP)
         self.assertIn("attemptedAction = new HeroAction.PickUp(heap.pos);", PICKUP)
         self.assertIn("hero.curAction = attemptedAction;", PICKUP)

@@ -319,13 +319,11 @@ def patch(path: Path) -> None:
         "Hero.damage attack source"
     )
 
-    # A cursed item is sold only once the original pickup has really succeeded.
-    # Hook after heap.pickUp() to avoid the following idle-turn/combat delay.
+    # Auto-pickup may need a spare backpack slot and can sell the collected gear.
     s = replace_once(
         s,
         "\t\t\t\tif (item.doPickUp( this )) {\n\t\t\t\t\theap.pickUp();",
-        "\t\t\t\tcom.spd.blast.BlastAutoPickup.onPickupAttempt(this, item, pos);\n"
-        "\t\t\t\tif (item.doPickUp( this )) {\n"
+        "\t\t\t\tif (com.spd.blast.BlastAutoPickup.pickUp(this, item, pos)) {\n"
         "\t\t\t\t\theap.pickUp();\n"
         "\t\t\t\t\tcom.spd.blast.BlastAutoPickup.onPickupSuccess(this, item, pos);",
         "Hero.actPickUp report native pickup success"

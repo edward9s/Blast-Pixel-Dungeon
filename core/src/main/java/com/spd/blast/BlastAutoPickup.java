@@ -55,27 +55,23 @@ public final class BlastAutoPickup {
         retries.clear();
     }
 
-    /** Recheck space at native pickup, after reaching the selected item. */
-    public static void onPickupAttempt(Hero hero, Item item, int cell) {
-        if (isAttempt(hero, item, cell)) {
-            BlastAutoEquipment.makeRoomForUpgrade(hero, item);
-        }
+    /** Combine automatic gear sales with native pickup after reaching the selected item. */
+    public static boolean pickUp(Hero hero, Item item, int cell) {
+        return isAttempt(hero, item, cell) ? BlastAutoEquipment.pickUp(hero, item) : item.doPickUp(hero);
     }
 
-    /** Sell equipment picked up for sale as part of the successful native pickup. */
+    /** Clear the automatic action after a successful native pickup. */
     public static void onPickupSuccess(Hero hero, Item item, int cell) {
         if (isAttempt(hero, item, cell)) {
             attemptedItem = null;
             attemptedAction = null;
             BlastAutoPlay.onPickupProgress();
-            BlastAutoEquipment.onPickupCompleted(hero, item);
         }
     }
 
     /** Only native pickup failure starts a retry cooldown. */
     public static void onPickupFailure(Hero hero, Item item, int cell) {
         if (isAttempt(hero, item, cell)) {
-            BlastAutoEquipment.onPickupFailed(item);
             attemptedItem = null;
             attemptedAction = null;
             retries.put(item, RETRY_TURNS);
@@ -274,7 +270,6 @@ public final class BlastAutoPickup {
         attemptedItem = item;
         attemptedAction = new HeroAction.PickUp(heap.pos);
         hero.curAction = attemptedAction;
-        BlastAutoEquipment.onPickupScheduled(hero, item);
     }
 
     /** Reorder only during automatic pickup; native doPickUp still owns the result. */
@@ -354,6 +349,6 @@ public final class BlastAutoPickup {
         for (Item held : backpack) {
             if (held instanceof Bag && ((Bag) held).canHold(item)) return true;
         }
-        return fromHeap && BlastAutoEquipment.spareForUpgrade(hero, item) != null;
+        return fromHeap && BlastAutoEquipment.canMakeRoom(hero, item);
     }
 }
