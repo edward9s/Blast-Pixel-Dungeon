@@ -68,6 +68,12 @@ final class BlastAutoChasmRoom {
         return steps * timePerStep < remaining;
     }
 
+    static boolean canLand(Levitation buff, int steps, float timePerStep) {
+        // Only the steps before reaching solid ground need levitation.
+        return steps != Integer.MAX_VALUE
+                && (steps <= 1 || !buff.detachesWithinDelay((steps - 1) * timePerStep));
+    }
+
     private static Item eligibleLoot(Hero hero, Heap heap) {
         if (heap == null || heap.type != Heap.Type.HEAP || heap.isEmpty()) return null;
         return BlastAutoPickup.firstEligibleItem(heap, item ->
@@ -129,6 +135,25 @@ final class BlastAutoChasmRoom {
         return BlastAutoSpecialRooms.Action.NONE;
     }
 
+    private static BlastAutoSpecialRooms.Action renew(Hero hero, PotionOfLevitation potion,
+                                                      Levitation buff, int destination) {
+        BlastLog.debug("auto-room action=chasm-renew-levitation goal=" + destination
+                + " remaining=" + buff.cooldown() + " potions=" + potion.quantity());
+        potion.execute(hero, Potion.AC_DRINK);
+        return BlastAutoSpecialRooms.Action.USE;
+    }
+
+    private static BlastAutoSpecialRooms.Action move(Hero hero, int destination, boolean[] flight,
+            int[] reach, Levitation buff, float timePerStep, PotionOfLevitation spare) {
+        int step = BlastAutoPlay.firstStep(destination, flight, reach);
+        if (spare != null && spare.quantity() > 0 && Dungeon.level.pit[step]
+                && buff.detachesWithinDelay(timePerStep)) {
+            return renew(hero, spare, buff, destination);
+        }
+        hero.curAction = new HeroAction.Move(step);
+        return BlastAutoSpecialRooms.Action.MOVE;
+    }
+
     /** Active floating takes priority over food, collection and exploration. */
     static BlastAutoSpecialRooms.Action continueFlight(Hero hero, boolean[] safe,
                                                        int[] distances,
@@ -149,20 +174,21 @@ final class BlastAutoChasmRoom {
         boolean last = spare == null || spare.quantity() == 0;
         int goal = target(hero, room, flight, reach, exit,
                 buff.cooldown(), last, perStep);
+        if (goal < 0 && !last && !hero.rooted) {
+            // Allow the route a fresh potion would cover, but finish using the current buff first.
+            goal = target(hero, room, flight, reach, exit, Levitation.DURATION - 1f,
+                    spare.quantity() == 1, perStep);
+        }
         if (goal >= 0) {
             if (goal == hero.pos) return actAt(hero);
             if (!hero.rooted) {
-                hero.curAction = new HeroAction.Move(
-                        BlastAutoPlay.firstStep(goal, flight, reach));
-                return BlastAutoSpecialRooms.Action.MOVE;
+                return move(hero, goal, flight, reach, buff, perStep, spare);
             }
         }
-        // All rewards are collected: return to solid ground, never wait over a pit.
-        // A short remaining buff does not make the entrance an invalid destination.
-        int landing = -1;
-        if (reach[exit] != Integer.MAX_VALUE) {
-            landing = exit;
-        } else {
+        boolean overPit = level.pit[hero.pos];
+        int landing = reach[exit] == Integer.MAX_VALUE ? -1 : exit;
+        // When a spare can finish the trip to the exit, avoid stranding on an island.
+        if (landing < 0 || (overPit && last && !canLand(buff, reach[exit], perStep))) {
             int shortest = Integer.MAX_VALUE;
             for (int cell = 0; cell < flight.length; cell++) {
                 if (!flight[cell] || level.pit[cell] || reach[cell] == Integer.MAX_VALUE
@@ -171,15 +197,15 @@ final class BlastAutoChasmRoom {
                 landing = cell;
             }
         }
-        if (landing < 0) {
-            // No known landing tile: do not deliberately burn levitation over a pit.
+        if (landing < 0 || hero.rooted) {
+            // Keep floating if the hero is temporarily unable to move or reach solid ground.
+            if (overPit && !last && buff.detachesWithinDelay(2 * Actor.TICK)) {
+                return renew(hero, spare, buff, landing);
+            }
             return BlastAutoSpecialRooms.Action.NONE;
         }
         if (hero.pos != landing) {
-            if (hero.rooted) return BlastAutoSpecialRooms.Action.NONE;
-            hero.curAction = new HeroAction.Move(
-                    BlastAutoPlay.firstStep(landing, flight, reach));
-            return BlastAutoSpecialRooms.Action.MOVE;
+            return move(hero, landing, flight, reach, buff, perStep, overPit ? spare : null);
         }
         if (level.pit[hero.pos]) {
             throw new IllegalStateException("Chasm flight selected a pit as landing");
