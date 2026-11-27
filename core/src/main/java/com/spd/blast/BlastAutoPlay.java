@@ -1495,7 +1495,7 @@ public final class BlastAutoPlay {
     }
 
     /** Use native actor-time expiry, not the render-thread fade of a warning icon. */
-    private static boolean attackWarningAt(int cell) {
+    static boolean attackWarningAt(int cell) {
         synchronized (TargetedCell.cells) {
             TargetedCell warning = TargetedCell.cells.get(cell);
             return warning != null && warning.time >= Actor.now();

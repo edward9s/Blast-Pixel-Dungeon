@@ -210,14 +210,12 @@ final class BlastAutoAqua {
             }
         }
         // Unlike traps, the red sentry's EMPTY_SP floor has no Trap instance.
-        // Aqua Brew turns these cells into WATER and disables their beam trigger.
+        // The sentry planner has already verified the room entrance and unopened chest.
         if (room instanceof SentryRoom) {
             for (int y = room.top + 1; y < room.bottom; y++) {
                 for (int x = room.left + 1; x < room.right; x++) {
                     int cell = x + y * width;
                     if (level.map[cell] != Terrain.EMPTY_SP || !specialBarriers[cell]
-                            || !(level.visited[cell] || level.mapped[cell]
-                                    || hero.fieldOfView[cell])
                             || !canFlood(level, cell) || level.plants.get(cell) != null
                             || Actor.findChar(cell) != null) continue;
                     trapCells.add(cell);

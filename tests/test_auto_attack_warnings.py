@@ -25,7 +25,7 @@ class AttackWarningTests(unittest.TestCase):
                         action.index('debugDecision = "combat"'))
 
     def test_native_warning_expiry_and_synchronization(self):
-        check = PLAY.split("private static boolean attackWarningAt(int cell) {", 1)[1].split(
+        check = PLAY.split("static boolean attackWarningAt(int cell) {", 1)[1].split(
             "private static void excludeAttackWarnings", 1)[0]
         mask = PLAY.split("private static void excludeAttackWarnings(boolean[] safe) {", 1)[1].split(
             "private static boolean[] safeCells", 1)[0]

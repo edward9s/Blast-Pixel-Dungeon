@@ -41,9 +41,11 @@ final class BlastAutoSentryRoom {
         SentryRoom room = (SentryRoom) ((RegularLevel) level).room(SentryRoom.class);
         if (room == null || room.entrance() == null) return null;
         int door = level.pointToCell(room.entrance());
-        return level.insideMap(door)
-                && (level.visited[door] || level.mapped[door] || hero.fieldOfView[door])
-                ? room : null;
+        return level.insideMap(door) && knownCell(level, hero, door) ? room : null;
+    }
+
+    private static boolean knownCell(Level level, Hero hero, int cell) {
+        return level.visited[cell] || level.mapped[cell] || hero.fieldOfView[cell];
     }
 
     private static boolean activeSentry(Level level, SentryRoom room) {
@@ -54,26 +56,32 @@ final class BlastAutoSentryRoom {
         return false;
     }
 
-    private static Heap chest(Level level, SentryRoom room, Hero hero) {
+    private static Heap chest(Level level, SentryRoom room) {
+        // The entrance is known; short vision can still hide the unopened chest.
         for (Heap heap : level.heaps.valueList())
             if (heap.type == Heap.Type.CHEST
-                    && (heap.seen || hero.fieldOfView[heap.pos])
                     && room.inside(level.cellToPoint(heap.pos))) return heap;
         return null;
     }
 
-    /** Allow only the sentry's own EMPTY_SP cells, retaining other safety checks. */
-    private static boolean[] crossing(Hero hero, SentryRoom room, boolean[] safe,
-                                      Blob[] hazards, boolean[] barriers) {
+    /** Plan within the discovered room when short vision hides part of its route. */
+    private static boolean[] roomPath(Hero hero, SentryRoom room, boolean[] safe,
+                                      Blob[] hazards, boolean[] barriers, boolean sprint) {
         Level level = Dungeon.level;
         boolean[] map = safe.clone();
         for (int y = room.top + 1; y < room.bottom; y++) {
             for (int x = room.left + 1; x < room.right; x++) {
                 int cell = x + y * level.width();
-                if (level.map[cell] != Terrain.EMPTY_SP || !barriers[cell]
-                        || level.solid[cell] || level.pit[cell] || !level.passable[cell]
+                if (map[cell]) continue;
+                if (barriers[cell]) {
+                    if (!sprint || level.map[cell] != Terrain.EMPTY_SP) continue;
+                } else if (knownCell(level, hero, cell)) {
+                    continue;
+                }
+                if (level.solid[cell] || level.pit[cell] || !level.passable[cell]
                         || BlastAutoEnvironment.hazardousAt(cell, hazards)
                         || !BlastAutoPlay.isTrapSafe(level.traps.get(cell))
+                        || BlastAutoPlay.attackWarningAt(cell)
                         || AutoPlayPlantSafety.isHarmful(level.plants.get(cell))) continue;
                 Char occupant = Actor.findChar(cell);
                 if (occupant == null || occupant == hero) map[cell] = true;
@@ -106,13 +114,13 @@ final class BlastAutoSentryRoom {
         }
         int exit = level.pointToCell(room.entrance());
         if (activeEntrance < 0 && room.inside(level.cellToPoint(hero.pos))) {
-            Heap discovered = chest(level, room, hero);
+            Heap discovered = chest(level, room);
             activeEntrance = exit;
             activeTreasure = discovered == null ? -1 : discovered.pos;
         }
         if (activeEntrance != exit) return BlastAutoSpecialRooms.Action.NONE;
 
-        boolean[] map = crossing(hero, room, safe, hazards, barriers);
+        boolean[] map = roomPath(hero, room, safe, hazards, barriers, true);
         int[] travel = reachable(hero.pos, map);
         Heap heap = activeTreasure < 0 ? null : level.heaps.get(activeTreasure);
         Item loot = eligibleLoot(hero, heap);
@@ -166,15 +174,21 @@ final class BlastAutoSentryRoom {
         int exit = level.pointToCell(room.entrance());
         if (!safe[exit] || distances[exit] == Integer.MAX_VALUE)
             return BlastAutoSpecialRooms.Action.NONE;
-        Heap treasure = chest(level, room, hero);
-        // A missing chest can mean undiscovered, opened, or emptied. Leave the
-        // room reachable through ordinary roaming and pickup in all cases.
+        Heap treasure = chest(level, room);
         if (treasure == null) return BlastAutoSpecialRooms.Action.NONE;
         if (safe[treasure.pos] && distances[treasure.pos] != Integer.MAX_VALUE)
             return BlastAutoSpecialRooms.Action.NONE;
 
+        boolean[] walk = roomPath(hero, room, safe, hazards, barriers, false);
+        int[] walkingDistances = reachable(hero.pos, walk);
+        if (walkingDistances[treasure.pos] != Integer.MAX_VALUE) {
+            if (hero.rooted) return BlastAutoSpecialRooms.Action.NONE;
+            move(hero, treasure.pos, walk, walkingDistances, "approach-chest");
+            return BlastAutoSpecialRooms.Action.MOVE;
+        }
+
         BlastAutoAqua.Action aqua = BlastAutoAqua.chooseAction(
-                hero, safe, distances, room, treasure.pos, hazards, barriers);
+                hero, walk, walkingDistances, room, treasure.pos, hazards, barriers);
         if (aqua == BlastAutoAqua.Action.MOVE) return BlastAutoSpecialRooms.Action.MOVE;
         if (aqua == BlastAutoAqua.Action.THROW) return BlastAutoSpecialRooms.Action.USE;
 
@@ -182,7 +196,7 @@ final class BlastAutoSentryRoom {
         PotionOfHaste potion = hero.belongings.getItem(PotionOfHaste.class);
         if (haste == null && (potion == null || potion.quantity() <= 0))
             return BlastAutoSpecialRooms.Action.NONE;
-        boolean[] map = crossing(hero, room, safe, hazards, barriers);
+        boolean[] map = roomPath(hero, room, walk, hazards, barriers, true);
         int forward = reachable(exit, map)[treasure.pos];
         int backward = reachable(treasure.pos, map)[exit];
         float speed = hero.speed() * (haste == null ? 3f : 1f);
