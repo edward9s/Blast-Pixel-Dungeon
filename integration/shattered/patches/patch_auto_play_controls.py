@@ -59,8 +59,8 @@ def patch_toolbar(path: Path) -> None:
     source = path.read_text(encoding="utf-8")
     ready = "Dungeon.hero.ready"
     count = source.count(ready)
-    if count != 11:
-        raise SystemExit(f"Toolbar readiness: expected 11 occurrences, found {count}")
+    if count != 12:
+        raise SystemExit(f"Toolbar readiness: expected 12 occurrences, found {count}")
     source = source.replace(
         ready, "(Dungeon.hero.ready || com.spd.blast.BlastSettings.testAutoPlay())"
     )
