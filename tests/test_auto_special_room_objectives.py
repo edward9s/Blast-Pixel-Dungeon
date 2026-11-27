@@ -69,7 +69,7 @@ class SpecialRoomObjectivesTest(unittest.TestCase):
     def test_live_hazards_keep_their_separate_retreat_rules(self):
         self.assertIn("hero.pos != exit && travel[exit]", source("BlastAutoSentryRoom.java"))
         chasm = source("BlastAutoChasmRoom.java")
-        self.assertIn("if (reach[exit] != Integer.MAX_VALUE) {\n            landing = exit;", chasm)
+        self.assertIn("int landing = reach[exit] == Integer.MAX_VALUE ? -1 : exit;", chasm)
         self.assertIn("if (!flight[cell] || level.pit[cell]", chasm)
 
 
