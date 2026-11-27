@@ -112,6 +112,14 @@ public final class BlastAutoCombatTest {
         rank(1, BlastAutoCombat.blastWaveOutsideRadius(20, 21, 7) ? 1 : 0,
                 "row wrapping is not adjacency");
 
+        // SPD 4.0.3 Force bonus scales with weapon tier; estimates never roll RNG.
+        check(true, BlastAutoCombat.forceAverageDamage(0, 5) == 0f, "no Force bonus");
+        check(true, BlastAutoCombat.forceAverageDamage(3, 1) == 3f, "tier one Force");
+        check(true, BlastAutoCombat.forceAverageDamage(3, 2) == 3.5f, "integer maximum");
+        check(true, BlastAutoCombat.forceAverageDamage(3, 5) == 6f, "tier five Force");
+        check(true, BlastAutoCombat.forceAverageDamage(-3, 2) == -3.5f, "cursed Force");
+        check(true, BlastAutoCombat.forceAverageDamage(-3, 5) == -6f, "cursed tier five Force");
+
         System.out.println("BlastAutoCombatTest passed");
     }
 }
