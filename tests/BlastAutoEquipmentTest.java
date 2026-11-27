@@ -66,6 +66,20 @@ public final class BlastAutoEquipmentTest {
                 "A stronger starter must remain available to equip");
     }
 
+    private static void testReachUpgrade() {
+        Hero hero = new Hero();
+        Dagger worn = new Dagger();
+        worn.level(1);
+        hero.belongings.weapon = worn;
+        Dagger candidate = new Dagger();
+        candidate.DLY = 0.75f;
+        check(!BlastAutoEquipment.useLastSlot(hero, candidate),
+                "Speed alone should leave this lower-damage candidate behind");
+        candidate.RCH = 2;
+        check(BlastAutoEquipment.useLastSlot(hero, candidate),
+                "The opening attack should turn the same candidate into an upgrade");
+    }
+
     private static void testEngagementScore() {
         double normal = BlastAutoEquipment.engagementScore(20, 1, 1, 1);
         check(Math.abs(normal - 36) < 0.0001, "A reference weapon should hit half the time");
@@ -86,6 +100,7 @@ public final class BlastAutoEquipmentTest {
 
     public static void main(String[] args) {
         testEngagementScore();
+        testReachUpgrade();
         testStarterSale();
         Dagger plain = new Dagger();
         Dagger upgraded = new Dagger();
