@@ -18,6 +18,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.VaultFlameTraps;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.Web;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.levels.CavesBossLevel;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
 import com.shatteredpixel.shatteredpixeldungeon.levels.RegularLevel;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
@@ -112,9 +113,25 @@ public final class BlastAutoEnvironment {
         return goal;
     }
 
-    /** Mark active special-room barriers once before auto-play pathfinding. */
+    /** Water conducts on the next PylonEnergy tick even before its blob cell is seeded. */
+    static boolean pylonDanger(Blob energy, boolean water, int cell) {
+        return energy != null && energy.volume > 0 && (water || energy.cur[cell] > 0);
+    }
+
+    static Blob pylonEnergy(Level level) {
+        return level instanceof CavesBossLevel
+                ? level.blobs.get(CavesBossLevel.PylonEnergy.class) : null;
+    }
+
+    /** Mark active environmental barriers once before auto-play pathfinding. */
     static boolean[] activeSpecialBarriers(Level level) {
         boolean[] dangerous = new boolean[level.length()];
+        Blob energy = pylonEnergy(level);
+        if (energy != null && energy.volume > 0) {
+            for (int cell = 0; cell < dangerous.length; cell++) {
+                dangerous[cell] = pylonDanger(energy, level.water[cell], cell);
+            }
+        }
         if (!(level instanceof RegularLevel)) return dangerous;
 
         List<Room> rooms = null;

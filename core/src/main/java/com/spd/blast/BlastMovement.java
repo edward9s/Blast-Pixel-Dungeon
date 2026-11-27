@@ -2,6 +2,7 @@ package com.spd.blast;
 
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
+import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.Blob;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.Sheep;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
@@ -76,16 +77,38 @@ public final class BlastMovement {
                 && Actor.findChar(cell) instanceof Sheep;
     }
 
+    /** Reject live DM-300 electrical tiles even on an already cached route. */
+    public static boolean pylonDanger(int cell) {
+        Level level = Dungeon.level;
+        return BlastAutoEnvironment.pylonDanger(
+                BlastAutoEnvironment.pylonEnergy(level), level.water[cell], cell);
+    }
+
     /** Preserve normal character collisions during hero pathfinding, except for sheep. */
     public static PathFinder.Path findPath(int target, boolean[] traversable, boolean[] visible) {
-        if (!enabled()) {
+        boolean phase = enabled();
+        Blob energy = BlastAutoEnvironment.pylonEnergy(Dungeon.level);
+        boolean live = energy != null && energy.volume > 0;
+        if (!phase && !live) {
             return Dungeon.findPath(Dungeon.hero, target, traversable, visible, true);
         }
 
         boolean[] pathPassable = Dungeon.findPassable(Dungeon.hero, traversable, visible, true);
-        for (Char character : Actor.chars()) {
-            if (character instanceof Sheep && visible[character.pos]) {
-                pathPassable[character.pos] = traversable[character.pos];
+        if (phase) {
+            for (Char character : Actor.chars()) {
+                if (character instanceof Sheep && visible[character.pos]) {
+                    pathPassable[character.pos] = traversable[character.pos];
+                }
+            }
+        }
+        if (live) {
+            // The pathfinder permits an occupied goal; do not permit a hazardous
+            // empty destination. An enemy can still be approached from safe ground.
+            if (pylonDanger(target) && Actor.findChar(target) == null) return null;
+            for (int cell = 0; cell < pathPassable.length; cell++) {
+                if (BlastAutoEnvironment.pylonDanger(energy, Dungeon.level.water[cell], cell)) {
+                    pathPassable[cell] = false;
+                }
             }
         }
         return PathFinder.find(Dungeon.hero.pos, target, pathPassable);

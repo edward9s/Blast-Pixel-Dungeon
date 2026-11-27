@@ -3,6 +3,7 @@ package com.spd.blast;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.Blob;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.Fire;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.ToxicGas;
+import com.shatteredpixel.shatteredpixeldungeon.levels.CavesBossLevel;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
 import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.special.MagicalFireRoom;
 import com.watabou.utils.Point;
@@ -47,6 +48,17 @@ public final class BlastAutoEnvironmentTest {
         check(false, BlastAutoEnvironment.gasOnlyAt(2, hazards),
                 "overlapping fire cannot be crossed as gas");
         fire.cur[2] = 0;
+
+        CavesBossLevel.PylonEnergy energy = new CavesBossLevel.PylonEnergy();
+        energy.cur = new int[]{0, 1, 0};
+        energy.volume = 1;
+        check(false, BlastAutoEnvironment.pylonDanger(energy, false, 0), "dry floor");
+        check(true, BlastAutoEnvironment.pylonDanger(energy, false, 1), "live exposed wire");
+        check(true, BlastAutoEnvironment.pylonDanger(energy, true, 2), "water before energy spreads");
+        energy.volume = 0;
+        check(false, BlastAutoEnvironment.pylonDanger(energy, true, 2), "water after power off");
+        check(false, BlastAutoEnvironment.pylonDanger(energy, false, 1), "wire after power off");
+        check(false, BlastAutoEnvironment.pylonDanger(null, true, 2), "water outside active arena");
 
         boolean[] clean = {true, false, false, true, true};
         int[] gasRoute = {0, 1, 2, 3, Integer.MAX_VALUE};
