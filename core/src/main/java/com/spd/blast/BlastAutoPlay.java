@@ -21,6 +21,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.NPC;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.Sheep;
 import com.shatteredpixel.shatteredpixeldungeon.effects.TargetedCell;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
+import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.Room;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.Trap;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
@@ -1495,7 +1496,7 @@ public final class BlastAutoPlay {
     }
 
     /** Use native actor-time expiry, not the render-thread fade of a warning icon. */
-    private static boolean attackWarningAt(int cell) {
+    static boolean attackWarningAt(int cell) {
         synchronized (TargetedCell.cells) {
             TargetedCell warning = TargetedCell.cells.get(cell);
             return warning != null && warning.time >= Actor.now();
@@ -1529,6 +1530,12 @@ public final class BlastAutoPlay {
 
     private static boolean[] safeCells(Hero hero, Blob[] hazards, boolean[] specialBarriers,
                                        boolean allowGas, boolean crystalRoute, boolean planTimedHazards) {
+        return safeCells(hero, hazards, specialBarriers, allowGas, crystalRoute, planTimedHazards, null);
+    }
+
+    private static boolean[] safeCells(Hero hero, Blob[] hazards, boolean[] specialBarriers,
+                                       boolean allowGas, boolean crystalRoute, boolean planTimedHazards,
+                                       Room plannedRoom) {
         Level level = Dungeon.level;
         boolean[] safe = Dungeon.findPassable(hero, level.passable, hero.fieldOfView, true).clone();
         boolean phaseEnabled = BlastMovement.enabled();
@@ -1542,6 +1549,7 @@ public final class BlastAutoPlay {
             boolean crystal = crystalRoute && BlastAutoCrystalRooms.containsActive(cell);
             boolean known = level.visited[cell] || level.mapped[cell] || hero.fieldOfView[cell]
                     || crystal;
+            boolean planned = plannedRoom != null && plannedRoom.inside(level.cellToPoint(cell));
             boolean airborne = known && flightRoom != null
                     && BlastAutoSpecialRooms.flightTile(level, flightRoom, cell);
             airborne |= chasmRoom != null && BlastAutoChasmRoom.flightTile(level, chasmRoom, cell);
@@ -1549,7 +1557,7 @@ public final class BlastAutoPlay {
                     || (phaseEnabled && known && BlastMovement.canPhase(cell))
                     || (crystal && level.map[cell] == Terrain.CRYSTAL_DOOR)
                     || airborne;
-            safe[cell] = (known || airborne) && level.insideMap(cell) && traversable
+            safe[cell] = (known || airborne || planned) && level.insideMap(cell) && traversable
                     && (!level.pit[cell] || airborne)
                     && (isTrapSafe(level.traps.get(cell)) || airborne)
                     && !AutoPlayPlantSafety.isHarmful(level.plants.get(cell))
@@ -1690,9 +1698,13 @@ public final class BlastAutoPlay {
 
     private static int vaultTimedStep(Hero hero, int goal) {
         Level level = Dungeon.level;
-        if (hero.rooted || !BlastAutoVault.nearTimedHazard(hero, level)) return -1;
+        if (hero.rooted) return -1;
+        Room room = goal < 0 ? BlastAutoVault.timedTreasureRoom(hero, level) : null;
+        boolean treasure = room != null && BlastAutoVault.hasTimedTreasure(hero, level, room);
+        if (!treasure && !BlastAutoVault.nearTimedHazard(hero, level)) return -1;
         boolean[] passable = safeCells(hero, BlastAutoEnvironment.activeHazards(level, true),
-                BlastAutoEnvironment.activeSpecialBarriers(level), false, false, true);
+                BlastAutoEnvironment.activeSpecialBarriers(level), false, false, true,
+                treasure ? room : null);
         passable = progress.safeFor(passable, hero.pos, BlastAutoProgressGuard.Intent.VAULT);
         BlastAutoVault.TimedRoutes routes = BlastAutoVault.timedRoutes(hero, level, passable);
         if (goal >= 0 && goal != hero.pos) return routes.toward(hero.pos, goal, passable);

@@ -44,11 +44,7 @@ final class BlastAutoSummoningRoom {
         if (!(level instanceof RegularLevel)) return null;
         SecretSummoningRoom room = (SecretSummoningRoom)
                 ((RegularLevel) level).room(SecretSummoningRoom.class);
-        if (room == null || room.entrance() == null) return null;
-        int door = level.pointToCell(room.entrance());
-        return level.insideMap(door)
-                && (level.visited[door] || level.mapped[door] || hero.fieldOfView[door])
-                ? room : null;
+        return BlastAutoSpecialRooms.knownEntrance(level, hero, room) ? room : null;
     }
 
     private static boolean inside(Level level, SecretSummoningRoom room, int cell) {
@@ -113,19 +109,8 @@ final class BlastAutoSummoningRoom {
 
         boolean inside = inside(level, room, hero.pos);
         int door = level.pointToCell(room.entrance());
-        boolean[] path = safe.clone();
-        for (int y = room.top + 1; y < room.bottom; y++) {
-            for (int x = room.left + 1; x < room.right; x++) {
-                int cell = x + y * level.width();
-                if (!isActiveSummoning(level, cell)
-                        || !(level.visited[cell] || level.mapped[cell] || hero.fieldOfView[cell])
-                        || specialBarriers[cell]
-                        || BlastAutoEnvironment.hazardousAt(cell, hazards)
-                        || AutoPlayPlantSafety.isHarmful(level.plants.get(cell))
-                        || Actor.findChar(cell) != null) continue;
-                path[cell] = true;
-            }
-        }
+        boolean[] path = BlastAutoSpecialRooms.roomPath(hero, room, safe, hazards,
+                specialBarriers, cell -> isActiveSummoning(level, cell));
         // Outside the room, plan from its entrance before claiming control.
         // A cleared room has no actionable trap and must be left to roaming.
         int origin = inside ? hero.pos : door;

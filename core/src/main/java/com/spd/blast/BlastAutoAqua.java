@@ -13,6 +13,7 @@ import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
 import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.Room;
 import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.special.SentryRoom;
 import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.special.ToxicGasRoom;
+import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.special.TrapsRoom;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.Trap;
 import com.shatteredpixel.shatteredpixeldungeon.mechanics.Ballistica;
 import com.shatteredpixel.shatteredpixeldungeon.tiles.CustomTilemap;
@@ -193,8 +194,9 @@ final class BlastAutoAqua {
             boolean vent = room instanceof ToxicGasRoom
                     && BlastAutoToxicRoom.activeVent(level, trap);
             if ((safe[cell] && !vent)
-                    || !(level.visited[cell] || level.mapped[cell] || hero.fieldOfView[cell])
                     || (room != null && !room.inside(level.cellToPoint(cell)))
+                    || (!(room instanceof TrapsRoom)
+                            && !BlastAutoSpecialRooms.knownCell(level, hero, cell))
                     || (!BlastAutoTrapClearer.canDouse(trap, level.map[cell]) && !vent)
                     || level.plants.get(cell) != null || Actor.findChar(cell) != null
                     || !canFlood(level, cell)) continue;
@@ -210,14 +212,12 @@ final class BlastAutoAqua {
             }
         }
         // Unlike traps, the red sentry's EMPTY_SP floor has no Trap instance.
-        // Aqua Brew turns these cells into WATER and disables their beam trigger.
+        // The sentry planner has already verified the room entrance and unopened chest.
         if (room instanceof SentryRoom) {
             for (int y = room.top + 1; y < room.bottom; y++) {
                 for (int x = room.left + 1; x < room.right; x++) {
                     int cell = x + y * width;
                     if (level.map[cell] != Terrain.EMPTY_SP || !specialBarriers[cell]
-                            || !(level.visited[cell] || level.mapped[cell]
-                                    || hero.fieldOfView[cell])
                             || !canFlood(level, cell) || level.plants.get(cell) != null
                             || Actor.findChar(cell) != null) continue;
                     trapCells.add(cell);
