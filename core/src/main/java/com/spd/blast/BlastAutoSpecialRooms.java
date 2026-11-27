@@ -174,11 +174,10 @@ final class BlastAutoSpecialRooms {
         if (!retreat && chest != null && chest.type == Heap.Type.HEAP
                 && hero.pos == flightTreasure) {
             Item loot = BlastAutoPickup.firstEligibleItem(chest,
-                    item -> BlastAutoPickup.canCollect(hero, item,
+                    item -> BlastAutoPickup.canCollectFromHeap(hero, item,
                             BlastAutoPickupPolicy::isInstantPickup));
             if (loot != null) {
                 BlastAutoPickup.preparePickup(hero, chest, loot);
-                hero.curAction = new HeroAction.PickUp(flightTreasure);
                 return Action.MOVE;
             }
         }

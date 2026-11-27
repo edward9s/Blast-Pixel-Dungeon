@@ -44,13 +44,13 @@ class AutoLootDebugTest(unittest.TestCase):
 
     def test_nearby_visible_loot_only_and_no_pickup_side_effects(self):
         diagnostic = PICKUP.split("static String nearbyDiagnostic(", 1)[1].split(
-            "static boolean isPickupType(", 1
+            "static void preparePickup(", 1
         )[0]
         self.assertIn("hero.fieldOfView[cell]", diagnostic)
         self.assertIn("distance > 2", diagnostic)
         self.assertIn("candidate instanceof Gold", diagnostic)
         self.assertIn("!isPickupType(item, instantPickup)", diagnostic)
-        self.assertIn("!canCollect(hero, item, instantPickup)", diagnostic)
+        self.assertIn("!canCollectFromHeap(hero, item, instantPickup)", diagnostic)
         self.assertIn('status = "full"', diagnostic)
         self.assertIn('status = "lost-inventory"', diagnostic)
         self.assertIn('status = "dew-full"', diagnostic)

@@ -40,7 +40,7 @@ class AutoToxicLootTest(unittest.TestCase):
         self.assertIn("barriers[cell]", TOXIC)
         self.assertIn("Actor.findChar(cell)", TOXIC)
         self.assertIn("new HeroAction.OpenChest(target)", TOXIC)
-        self.assertIn("new HeroAction.PickUp(target)", TOXIC)
+        self.assertIn("BlastAutoPickup.preparePickup(hero, closest, item)", TOXIC)
         self.assertIn("new HeroAction.Move(BlastAutoPlay.firstStep(target, route, distances))", TOXIC)
         self.assertNotIn("enoughPurity(", TOXIC)
         self.assertNotIn("shortestOrder(", TOXIC)
@@ -56,7 +56,8 @@ class AutoToxicLootTest(unittest.TestCase):
         self.assertIn("static void preparePickup(Hero hero, Heap heap, Item item)", PICKUP)
         self.assertIn("BlastAutoEquipment.onPickupScheduled(hero, item)", PICKUP)
         self.assertIn("attemptedItem = item;", PICKUP)
-        self.assertIn("attemptedCell = heap.pos;", PICKUP)
+        self.assertIn("attemptedAction = new HeroAction.PickUp(heap.pos);", PICKUP)
+        self.assertIn("hero.curAction = attemptedAction;", PICKUP)
 
 
 if __name__ == "__main__":

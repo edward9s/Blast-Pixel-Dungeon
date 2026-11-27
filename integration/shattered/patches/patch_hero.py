@@ -308,6 +308,7 @@ def patch(path: Path) -> None:
     s = replace_once(
         s,
         "\t\t\t\tif (item.doPickUp( this )) {\n\t\t\t\t\theap.pickUp();",
+        "\t\t\t\tcom.spd.blast.BlastAutoPickup.onPickupAttempt(this, item, pos);\n"
         "\t\t\t\tif (item.doPickUp( this )) {\n"
         "\t\t\t\t\theap.pickUp();\n"
         "\t\t\t\t\tcom.spd.blast.BlastAutoPickup.onPickupSuccess(this, item, pos);",

@@ -10,6 +10,7 @@ import com.shatteredpixel.shatteredpixeldungeon.items.BrokenSeal;
 import com.shatteredpixel.shatteredpixeldungeon.items.KindOfWeapon;
 import com.shatteredpixel.shatteredpixeldungeon.items.armor.Armor;
 import com.shatteredpixel.shatteredpixeldungeon.items.armor.ClassArmor;
+import com.shatteredpixel.shatteredpixeldungeon.items.bags.Bag;
 import com.shatteredpixel.shatteredpixeldungeon.items.potions.Potion;
 import com.shatteredpixel.shatteredpixeldungeon.items.potions.PotionOfStrength;
 import com.shatteredpixel.shatteredpixeldungeon.items.spells.Alchemize;
@@ -79,10 +80,38 @@ final class BlastAutoEquipment {
     static boolean useLastSlot(Hero hero, Item item) {
         if (!(item instanceof MeleeWeapon || item instanceof Armor)) return true;
         if (pickup(hero, item) == Pickup.SELL || isProtectedEquipment(item)) return true;
+        return isUpgrade(hero, item);
+    }
+
+    private static boolean isUpgrade(Hero hero, Item item) {
         if (item instanceof MeleeWeapon) {
             return betterWeapon(hero, (MeleeWeapon) item, hero.belongings.weapon());
         }
-        return betterArmor(hero, (Armor) item, hero.belongings.armor());
+        return item instanceof Armor && betterArmor(hero, (Armor) item, hero.belongings.armor());
+    }
+
+    /** Only sell a spare if removing it will make enough room for a wearable upgrade. */
+    static Item spareForUpgrade(Hero hero, Item upgrade) {
+        Bag backpack = hero.belongings.backpack;
+        if (!(upgrade instanceof MeleeWeapon || upgrade instanceof Armor)
+                || backpack.items.size() != backpack.capacity()
+                || hero.belongings.lostInventory()
+                || !isUpgrade(hero, upgrade)
+                || availableAlchemize(hero) == null) return null;
+
+        for (Item spare : backpack.items) {
+            if (!spare.isEquipped(hero)
+                    && (isSaleCandidate(hero, spare) || isRedundant(spare, upgrade))
+                    && Shopkeeper.canSell(spare)) return spare;
+        }
+        return null;
+    }
+
+    static void makeRoomForUpgrade(Hero hero, Item upgrade) {
+        Item spare = spareForUpgrade(hero, upgrade);
+        if (spare != null && !sellWithAlchemize(hero, spare)) {
+            throw new IllegalStateException("Could not sell spare equipment for a floor upgrade");
+        }
     }
 
     private static Pickup pickup(Hero hero, Item item) {

@@ -200,7 +200,7 @@ final class BlastAutoCrystalRooms {
             int stand = loose ? heap.pos : adjacentStand(level, heap.pos, safe, distances);
             if (stand < 0 || !safe[stand] || distances[stand] == Integer.MAX_VALUE) continue;
             for (Item item : heap.items) {
-                if (staged.contains(item) || (loose && !BlastAutoPickup.canCollect(
+                if (staged.contains(item) || (loose && !BlastAutoPickup.canCollectFromHeap(
                         hero, item, BlastAutoPickupPolicy::isInstantPickup))) continue;
                 int score = item instanceof ScrollOfTransmutation
                         || item instanceof ScrollOfMetamorphosis ? 30
@@ -221,7 +221,6 @@ final class BlastAutoCrystalRooms {
         if (hero.pos == destination) {
             if (target.type == Heap.Type.HEAP) {
                 BlastAutoPickup.preparePickup(hero, target, prize);
-                hero.curAction = new HeroAction.PickUp(target.pos);
             } else {
                 hero.curAction = new HeroAction.OpenChest(target.pos);
             }

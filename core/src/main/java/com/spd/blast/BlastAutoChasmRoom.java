@@ -88,7 +88,7 @@ final class BlastAutoChasmRoom {
     private static Item eligibleLoot(Hero hero, Heap heap) {
         if (heap == null || heap.type != Heap.Type.HEAP || heap.isEmpty()) return null;
         return BlastAutoPickup.firstEligibleItem(heap, item ->
-                BlastAutoPickup.canCollect(hero, item,
+                BlastAutoPickup.canCollectFromHeap(hero, item,
                         BlastAutoPickupPolicy::isInstantPickup));
     }
 
@@ -135,7 +135,6 @@ final class BlastAutoChasmRoom {
         Item loot = eligibleLoot(hero, heap);
         if (loot != null) {
             BlastAutoPickup.preparePickup(hero, heap, loot);
-            hero.curAction = new HeroAction.PickUp(hero.pos);
             return BlastAutoSpecialRooms.Action.MOVE;
         }
         if (heap != null && heap.type == Heap.Type.LOCKED_CHEST
