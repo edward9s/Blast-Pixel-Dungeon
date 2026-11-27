@@ -49,9 +49,6 @@ public final class BlastAutoEquipmentTest {
         Gloves gloves = new Gloves();
         Cudgel cudgel = new Cudgel();
 
-        check(!BlastAutoEquipment.isRedundant(gloves, replacement)
-                        && !BlastAutoEquipment.isRedundant(cudgel, replacement),
-                "The usual spare comparison still values speed and accuracy");
         check(BlastAutoEquipment.isSaleCandidate(hero, gloves)
                         && BlastAutoEquipment.isSaleCandidate(hero, cudgel),
                 "A weaker plain starter can be sold after switching to a better weapon");
@@ -69,21 +66,40 @@ public final class BlastAutoEquipmentTest {
                 "A stronger starter must remain available to equip");
     }
 
+    private static void testEngagementScore() {
+        double normal = BlastAutoEquipment.engagementScore(20, 1, 1, 1);
+        check(Math.abs(normal - 36) < 0.0001, "A reference weapon should hit half the time");
+        check(Math.abs(normal - BlastAutoEquipment.engagementScore(10, 0.5, 1, 1)) < 0.0001,
+                "Twice the speed should offset half the damage");
+        check(Math.abs(normal - BlastAutoEquipment.engagementScore(40, 1, 0.5, 1)) < 0.0001,
+                "Accuracy should affect expected damage rather than veto the comparison");
+        check(BlastAutoEquipment.engagementScore(16, 1, 2, 1) > normal,
+                "An accurate weapon may beat a harder-hitting option");
+        check(BlastAutoEquipment.engagementScore(18, 1, 1, 2) > normal,
+                "An extra cell of reach can offset a small damage deficit");
+        check(BlastAutoEquipment.engagementScore(18, 1, 1, 3)
+                        > BlastAutoEquipment.engagementScore(18, 1, 1, 2),
+                "A longer opening should add another attack opportunity");
+        check(BlastAutoEquipment.engagementScore(10, 1, 1, 3) < normal,
+                "Reach alone should not offset a large damage deficit");
+    }
+
     public static void main(String[] args) {
+        testEngagementScore();
         testStarterSale();
         Dagger plain = new Dagger();
         Dagger upgraded = new Dagger();
         upgraded.level(6);
         check(!plain.levelKnown && !upgraded.levelKnown, "Gear must remain unidentified");
-        check(BlastAutoEquipment.weaponRating(upgraded)
-                        > BlastAutoEquipment.weaponRating(plain),
+        check(BlastAutoEquipment.weaponScore(upgraded, 12)
+                        > BlastAutoEquipment.weaponScore(plain, 12),
                 "Actual upgrades must affect weapon selection without identification");
         check(upgraded.STRReq(upgraded.trueLevel()) < plain.STRReq(plain.trueLevel()),
                 "Strength requirement must use the real upgrade level");
 
         Shortsword higherTier = new Shortsword();
-        check(BlastAutoEquipment.weaponRating(upgraded)
-                        > BlastAutoEquipment.weaponRating(higherTier),
+        check(BlastAutoEquipment.weaponScore(upgraded, 12)
+                        > BlastAutoEquipment.weaponScore(higherTier, 12),
                 "High-level weapons may outrank a higher tier's base stats");
 
         LeatherArmor basicArmor = new LeatherArmor();
@@ -184,76 +200,57 @@ public final class BlastAutoEquipmentTest {
         Dagger inferiorWeapon = new Dagger();
         Dagger superiorWeapon = new Dagger();
         superiorWeapon.level(4);
-        check(BlastAutoEquipment.weaponDominates(superiorWeapon, inferiorWeapon),
-                "Higher damage with equal speed, accuracy and range dominates");
-        check(BlastAutoEquipment.isRedundant(inferiorWeapon, superiorWeapon),
-                "Clearly inferior ordinary weapon should be eligible for cleanup");
-        inferiorWeapon.RCH++;
-        check(!BlastAutoEquipment.weaponDominates(superiorWeapon, inferiorWeapon),
-                "Extra attack range prevents a weapon from being unambiguously dominated");
-        inferiorWeapon.RCH--;
-        inferiorWeapon.ACC *= 2;
-        check(!BlastAutoEquipment.isRedundant(inferiorWeapon, superiorWeapon),
-                "Better accuracy should protect an otherwise weaker weapon");
-        inferiorWeapon.ACC /= 2;
-        inferiorWeapon.DLY *= 0.5f;
-        check(!BlastAutoEquipment.isRedundant(inferiorWeapon, superiorWeapon),
-                "Faster attacks should protect an otherwise weaker weapon");
-        check(!BlastAutoEquipment.isRedundant(privileged, superiorWeapon),
-                "Augmented weapon cannot be marked redundant");
+        superiorWeapon.DLY = 1.1f;
+        superiorWeapon.ACC = 0.9f;
+        check(BlastAutoEquipment.isRedundant(inferiorWeapon, superiorWeapon, 20),
+                "A clear expected damage advantage can offset lower speed and accuracy");
 
-        // A +0 glaive's extra reach must not preserve it against a +14
-        // crystal-enchanted greatsword with overwhelmingly higher damage.
+        Dagger longerWeapon = new Dagger();
+        longerWeapon.RCH = 2;
+        Dagger modestReplacement = new Dagger();
+        modestReplacement.level(1);
+        check(!BlastAutoEquipment.isRedundant(longerWeapon, modestReplacement, 20),
+                "A small lead against a longer weapon should keep the backup");
+        check(BlastAutoEquipment.isRedundant(inferiorWeapon, new Dagger(), 20),
+                "Identical ordinary weapons remain sellable");
+
         Greatsword dominantGreatsword = new Greatsword();
         dominantGreatsword.level(14);
         dominantGreatsword.enchant(new Crystal());
         Glaive obsoleteGlaive = new Glaive();
-        check(!BlastAutoEquipment.weaponDominates(dominantGreatsword, obsoleteGlaive),
-                "The original strict comparison must recognize the glaive's longer reach");
-        check(BlastAutoEquipment.weaponOverwhelms(dominantGreatsword, obsoleteGlaive),
-                "A +14 greatsword must overwhelmingly outclass a +0 glaive");
-        check(BlastAutoEquipment.isRedundant(obsoleteGlaive, dominantGreatsword),
-                "Unenchanted +0 glaive should be sold with Alchemize");
+        check(BlastAutoEquipment.isRedundant(obsoleteGlaive, dominantGreatsword, 20),
+                "A much stronger greatsword should outweigh the glaive's reach");
         check(!BlastAutoEquipment.worthPickingWithoutAlchemize(obsoleteGlaive,
                         Collections.<Item>singletonList(dominantGreatsword), null, 20),
-                "Without Alchemize, do not hoard a +0 glaive with a +14 greatsword");
+                "An overwhelmingly weaker floor weapon may be skipped without Alchemize");
 
-        Greatsword comparableGreatsword = new Greatsword();
-        comparableGreatsword.level(3);
-        check(!BlastAutoEquipment.weaponOverwhelms(comparableGreatsword, obsoleteGlaive),
-                "A modest damage advantage must not discard a reach alternative");
-        check(!BlastAutoEquipment.isRedundant(obsoleteGlaive, comparableGreatsword),
-                "Reach advantage is still worth keeping when damage is comparable");
-
-        obsoleteGlaive.DLY = 0.5f;
-        check(!BlastAutoEquipment.isRedundant(obsoleteGlaive, dominantGreatsword),
-                "A genuinely faster long-reach weapon still has tactical value");
+        obsoleteGlaive.DLY = 0.3f;
+        check(!BlastAutoEquipment.isRedundant(obsoleteGlaive, dominantGreatsword, 20),
+                "A sufficiently fast longer weapon can still justify a slot");
         obsoleteGlaive.DLY = 1.5f;
-        obsoleteGlaive.ACC = 2f;
-        check(!BlastAutoEquipment.isRedundant(obsoleteGlaive, dominantGreatsword),
-                "A more accurate long-reach weapon should remain a backup");
-        obsoleteGlaive.ACC = 1f;
         obsoleteGlaive.enchant(new Grim());
-        check(!BlastAutoEquipment.isRedundant(obsoleteGlaive, dominantGreatsword),
+        check(!BlastAutoEquipment.isRedundant(obsoleteGlaive, dominantGreatsword, 20),
                 "Protected weapon enchantments override numeric obsolescence");
         obsoleteGlaive.enchant(null);
         obsoleteGlaive.augment = Weapon.Augment.DAMAGE;
-        check(!BlastAutoEquipment.isRedundant(obsoleteGlaive, dominantGreatsword),
+        check(!BlastAutoEquipment.isRedundant(obsoleteGlaive, dominantGreatsword, 20),
                 "Stone-augmented weapons must not be sold automatically");
+        check(!BlastAutoEquipment.isRedundant(privileged, superiorWeapon, 20),
+                "Augmented weapon cannot be marked redundant");
 
         LeatherArmor inferiorArmor = new LeatherArmor();
         LeatherArmor superiorArmor = new LeatherArmor();
         LeatherArmor equalArmor = new LeatherArmor();
-        check(BlastAutoEquipment.isRedundant(equalArmor, inferiorArmor),
+        check(BlastAutoEquipment.isRedundant(equalArmor, inferiorArmor, 20),
                 "Ordinary spare armor with equal defense should be eligible for cleanup");
         equalArmor.augment = Armor.Augment.EVASION;
-        check(!BlastAutoEquipment.isRedundant(equalArmor, inferiorArmor),
+        check(!BlastAutoEquipment.isRedundant(equalArmor, inferiorArmor, 20),
                 "Equal-defense augmented armor should be preserved");
         superiorArmor.level(4);
-        check(BlastAutoEquipment.isRedundant(inferiorArmor, superiorArmor),
+        check(BlastAutoEquipment.isRedundant(inferiorArmor, superiorArmor, 20),
                 "Inferior unprotected armor should be eligible for cleanup");
         inferiorArmor.augment = Armor.Augment.EVASION;
-        check(!BlastAutoEquipment.isRedundant(inferiorArmor, superiorArmor),
+        check(!BlastAutoEquipment.isRedundant(inferiorArmor, superiorArmor, 20),
                 "Augmented evasion armor should be preserved");
 
 
@@ -301,7 +298,7 @@ public final class BlastAutoEquipmentTest {
                 "The first available weapon remains collectible");
 
         Dagger fasterFloorWeapon = new Dagger();
-        fasterFloorWeapon.DLY = 0.5f;
+        fasterFloorWeapon.DLY = 0.35f;
         check(BlastAutoEquipment.worthPickingWithoutAlchemize(fasterFloorWeapon,
                         Collections.<Item>singletonList(wornWeapon), null, 12),
                 "A faster but weaker weapon is a valid tactical alternative");
@@ -355,7 +352,7 @@ public final class BlastAutoEquipmentTest {
         classArmor.charge = 73f;
         check(BlastAutoEquipment.isProtectedEquipment(classArmor),
                 "Class armor itself must always be retained");
-        check(!BlastAutoEquipment.isRedundant(classArmor, superiorArmor),
+        check(!BlastAutoEquipment.isRedundant(classArmor, superiorArmor, 20),
                 "Class armor cannot be discarded as an ordinary inferior armor");
 
         classArmor.inscribe(new Camouflage());

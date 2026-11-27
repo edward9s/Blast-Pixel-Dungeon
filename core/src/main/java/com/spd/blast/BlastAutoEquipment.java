@@ -41,6 +41,7 @@ import java.util.ArrayList;
 final class BlastAutoEquipment {
 
     private static final ThreadLocal<Boolean> automaticItemUse = new ThreadLocal<>();
+    private static final double SALE_ADVANTAGE = 1.25;
     private static boolean pendingStrengthCleanup;
 
     private BlastAutoEquipment() {}
@@ -179,12 +180,13 @@ final class BlastAutoEquipment {
         if (candidate instanceof MeleeWeapon) {
             MeleeWeapon weapon = (MeleeWeapon) candidate;
             boolean wearable = weapon.STRReq(weapon.trueLevel()) <= strength;
+            double score = weaponScore(weapon, strength);
             for (Item item : owned) {
                 if (!(item instanceof MeleeWeapon) || isCursed(item)) continue;
                 MeleeWeapon other = (MeleeWeapon) item;
                 if (wearable && other.STRReq(other.trueLevel()) > strength) continue;
-                if (weaponAtLeastAsGood(other, weapon)
-                        || weaponOverwhelms(other, weapon)) return false;
+                if (weaponAtLeastAsGood(other, weapon, strength)
+                        || weaponScore(other, strength) >= SALE_ADVANTAGE * score) return false;
             }
             return true;
         }
@@ -211,7 +213,7 @@ final class BlastAutoEquipment {
     static boolean isSaleCandidate(Hero hero, Item item) {
         Item equipped = item instanceof MeleeWeapon ? hero.belongings.weapon()
                 : item instanceof Armor ? hero.belongings.armor() : null;
-        return isRedundant(item, equipped) || isObsoleteStarter(hero, item);
+        return isRedundant(item, equipped, hero.STR()) || isObsoleteStarter(hero, item);
     }
 
     /** Plain tier-one weapons follow the same comparison that picked their replacement. */
@@ -244,11 +246,38 @@ final class BlastAutoEquipment {
         return reason;
     }
 
-    /** Use persistent true upgrades, never unknown UI values or temporary buffs. */
-    static int weaponRating(MeleeWeapon weapon) {
+    /** Estimate the damage dealt over three representative melee engagements. */
+    static double weaponScore(MeleeWeapon weapon, int strength) {
+        return engagementScore(weaponDamage(weapon, strength), weaponDelay(weapon),
+                weapon.ACC, weaponReach(weapon));
+    }
+
+    static double engagementScore(double damage, double delay, double accuracy, int reach) {
+        // SPD rolls accuracy and evasion independently. Set reference evasion to
+        // the hero's unmodified accuracy, so a weapon at 1x accuracy hits 50%.
+        double hit = accuracy <= 1 ? accuracy / 2 : 1 - 0.5 / accuracy;
+        // Adjacent short fight (50%), two-cell short fight (30%), and
+        // three-cell sustained fight (20%). The reference enemy closes one cell per turn.
+        int nearOpening = Math.min(reach, 2) - 1;
+        int farOpening = Math.min(reach, 3) - 1;
+        double turns = 0.5 * 3 + 0.3 * (3 + nearOpening) + 0.2 * (6 + farOpening);
+        return damage * hit * turns / delay;
+    }
+
+    private static double weaponDamage(MeleeWeapon weapon, int strength) {
         int level = weapon.trueLevel();
-        return weapon.augment.damageFactor(weapon.min(level))
-                + weapon.augment.damageFactor(weapon.max(level));
+        double min = weapon.augment.damageFactor(weapon.min(level));
+        double max = weapon.augment.damageFactor(weapon.max(level));
+        double excessStrength = Math.max(0, strength - weapon.STRReq(level)) * 0.5;
+        return (min + max) * 0.5 + excessStrength;
+    }
+
+    private static double weaponDelay(MeleeWeapon weapon) {
+        return weapon.augment.delayFactor(weapon.DLY);
+    }
+
+    private static int weaponReach(MeleeWeapon weapon) {
+        return Math.max(1, weapon.RCH) + (weapon.enchantment instanceof Projecting ? 1 : 0);
     }
 
     static int armorRating(Armor armor) {
@@ -296,44 +325,24 @@ final class BlastAutoEquipment {
                 && current.glyph.getClass() != replacement.glyph.getClass();
     }
 
-    /** Equal equipment also dominates a floor pickup; never hoard duplicates. */
-    private static boolean weaponAtLeastAsGood(MeleeWeapon superior, MeleeWeapon inferior) {
-        return weaponRating(superior) >= weaponRating(inferior)
-                && superior.augment.delayFactor(superior.DLY)
-                    <= inferior.augment.delayFactor(inferior.DLY)
-                && superior.ACC >= inferior.ACC && superior.RCH >= inferior.RCH;
-    }
-
-    /**
-     * At double the raw damage, the stronger weapon outweighs a reach-only
-     * advantage if its attack speed and accuracy are no worse. Other trade-offs
-     * still use the strict multi-stat comparison.
-     */
-    static boolean weaponOverwhelms(MeleeWeapon superior, MeleeWeapon inferior) {
-        return (long) weaponRating(superior) >= 2L * weaponRating(inferior)
-                && superior.augment.delayFactor(superior.DLY)
-                    <= inferior.augment.delayFactor(inferior.DLY)
-                && superior.ACC >= inferior.ACC;
-    }
-
-    /** Evaluate independent weapon traits without inventing trade-off weights. */
-    static boolean weaponDominates(MeleeWeapon superior, MeleeWeapon inferior) {
-        if (!weaponAtLeastAsGood(superior, inferior)) return false;
-        return weaponRating(superior) > weaponRating(inferior)
-                || superior.augment.delayFactor(superior.DLY)
-                    < inferior.augment.delayFactor(inferior.DLY)
-                || superior.ACC > inferior.ACC || superior.RCH > inferior.RCH;
+    /** Recognize duplicates and equipment with no advantage worth a backpack slot. */
+    private static boolean weaponAtLeastAsGood(MeleeWeapon superior, MeleeWeapon inferior, int strength) {
+        return weaponDamage(superior, strength) >= weaponDamage(inferior, strength)
+                && weaponDelay(superior) <= weaponDelay(inferior)
+                && superior.ACC >= inferior.ACC && weaponReach(superior) >= weaponReach(inferior);
     }
 
     /** Keep protected gear; ordinary spare armor can be sold even at equal defense. */
-    static boolean isRedundant(Item candidate, Item equipped) {
+    static boolean isRedundant(Item candidate, Item equipped, int strength) {
         if (isProtectedEquipment(candidate)) return false;
         if (candidate instanceof MeleeWeapon && equipped instanceof MeleeWeapon) {
             MeleeWeapon worn = (MeleeWeapon) equipped;
             MeleeWeapon spare = (MeleeWeapon) candidate;
-            return weaponDominates(worn, spare) || weaponOverwhelms(worn, spare)
+            if (isCursed(worn) || (worn.STRReq(worn.trueLevel()) > strength
+                    && spare.STRReq(spare.trueLevel()) <= strength)) return false;
+            return weaponScore(worn, strength) >= SALE_ADVANTAGE * weaponScore(spare, strength)
                     || (worn.getClass() == spare.getClass() && spare.enchantment == null
-                        && weaponAtLeastAsGood(worn, spare));
+                        && weaponAtLeastAsGood(worn, spare, strength));
         }
         if (candidate instanceof Armor && equipped instanceof Armor) {
             return armorRating((Armor) equipped) >= armorRating((Armor) candidate);
@@ -379,7 +388,7 @@ final class BlastAutoEquipment {
 
     private static boolean canSellSpare(Hero hero, Item spare, Item upgrade) {
         return isEquipment(spare) && !spare.isEquipped(hero)
-                && (isSaleCandidate(hero, spare) || isRedundant(spare, upgrade))
+                && (isSaleCandidate(hero, spare) || isRedundant(spare, upgrade, hero.STR()))
                 && Shopkeeper.canSell(spare);
     }
 
@@ -452,9 +461,8 @@ final class BlastAutoEquipment {
         if (current == null) return true;
         if (!(current instanceof MeleeWeapon) || isCursed(current)) return false;
         MeleeWeapon worn = (MeleeWeapon) current;
-        int rating = weaponRating(candidate);
-        int currentRating = weaponRating(worn);
-        return rating > currentRating || (rating == currentRating && weaponDominates(candidate, worn));
+        int strength = hero.STR();
+        return weaponScore(candidate, strength) > weaponScore(worn, strength);
     }
 
     private static boolean equipBetterWeapon(Hero hero) {
