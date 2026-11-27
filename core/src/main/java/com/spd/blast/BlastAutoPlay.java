@@ -19,6 +19,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Thief;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Wraith;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.NPC;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.Sheep;
+import com.shatteredpixel.shatteredpixeldungeon.effects.TargetedCell;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.Trap;
@@ -668,6 +669,22 @@ public final class BlastAutoPlay {
         progress.refreshHazards(Dungeon.level.length(),
                 cell -> BlastAutoEnvironment.hazardousAt(cell, hazards)
                         || specialBarriers[cell]);
+
+        // Telegraphs take priority over combat, loot, and other ordinary actions.
+        // Preserve the dedicated timing planner for vault machinery.
+        if (!hero.rooted && attackWarningAt(hero.pos)
+                && !BlastAutoVault.imminentAttackAt(hero, Dungeon.level)) {
+            for (int offset : PathFinder.NEIGHBOURS8) {
+                int cell = hero.pos + offset;
+                if (Dungeon.level.insideMap(cell) && safe[cell]) {
+                    debugDecision = "attack-warning-dodge";
+                    progress.intent(BlastAutoProgressGuard.Intent.RETREAT);
+                    hero.curAction = new HeroAction.Move(cell);
+                    BlastLog.debug("auto-dodge warning from=" + hero.pos + " to=" + cell);
+                    return false;
+                }
+            }
+        }
 
         // Finish toxic-room loot even without protection; generic gas retreat
         // must not interrupt a deliberate crossing.
@@ -1473,6 +1490,25 @@ public final class BlastAutoPlay {
         return trap == null || !trap.active;
     }
 
+    /** Use native actor-time expiry, not the render-thread fade of a warning icon. */
+    private static boolean attackWarningAt(int cell) {
+        synchronized (TargetedCell.cells) {
+            TargetedCell warning = TargetedCell.cells.get(cell);
+            return warning != null && warning.time >= Actor.now();
+        }
+    }
+
+    private static void excludeAttackWarnings(boolean[] safe) {
+        synchronized (TargetedCell.cells) {
+            float now = Actor.now();
+            for (TargetedCell warning : TargetedCell.cells.valueList()) {
+                if (warning.time >= now) {
+                    safe[warning.pos] = false;
+                }
+            }
+        }
+    }
+
     private static boolean[] safeCells(Hero hero, Blob[] hazards, boolean[] specialBarriers) {
         return safeCells(hero, hazards, specialBarriers, false);
     }
@@ -1536,6 +1572,9 @@ public final class BlastAutoPlay {
                 safe[cell] = false;
             }
         }
+        // Timed vault routes already forecast machinery on each future turn.
+        // Do not turn their transient warning icons into permanent route barriers.
+        if (!planTimedHazards) excludeAttackWarnings(safe);
         safe[hero.pos] = true;
         return safe;
     }
