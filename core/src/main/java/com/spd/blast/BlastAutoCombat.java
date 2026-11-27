@@ -28,6 +28,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.CrystalMimic;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mimic;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.KindOfWeapon;
+import com.shatteredpixel.shatteredpixeldungeon.items.rings.Ring;
 import com.shatteredpixel.shatteredpixeldungeon.items.rings.RingOfAccuracy;
 import com.shatteredpixel.shatteredpixeldungeon.items.rings.RingOfForce;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.Weapon;
@@ -36,6 +37,7 @@ import com.shatteredpixel.shatteredpixeldungeon.items.weapon.enchantments.Shocki
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.enchantments.Unstable;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.SpiritBow;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.MagesStaff;
+import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.MeleeWeapon;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.missiles.MissileWeapon;
 import com.shatteredpixel.shatteredpixeldungeon.items.wands.DamageWand;
 import com.shatteredpixel.shatteredpixeldungeon.items.wands.Wand;
@@ -550,15 +552,16 @@ final class BlastAutoCombat {
         if (RingOfForce.fightingUnarmed(hero)) {
             // Ordinary unarmed damage is 1..STR-8; the force ring improves both
             // bounds through the same strength-tier approximation as SPD.
-            int force = RingOfForce.armedDamageBonus(hero);
+            int force = Ring.getBuffedBonus(hero, RingOfForce.Force.class);
             if (hero.buff(RingOfForce.Force.class) == null) {
                 damage = (1f + Math.max(1, hero.STR() - 8)) / 2f;
             } else {
                 float tier = Math.max(1f, (hero.STR() - 8) / 2f);
-                if (tier > 5f) tier = 5f + (tier - 5f) / 2f;
-                if (force <= 0) tier = 1f;
-                damage = (Math.round(tier + force)
-                        + Math.round(5f * (tier + 1f) + force * (tier + 1f))) / 2f;
+                if (tier > 6f) tier = 6f + (tier - 6f) / 2f;
+                float damageTier = force <= 0 ? 1f : tier;
+                damage = (Math.max(0, Math.round(damageTier + force))
+                        + Math.max(0, Math.round(5f * (damageTier + 1f)
+                                + force * (damageTier + 1f)))) / 2f;
                 RingOfForce.BrawlersStance stance = hero.buff(RingOfForce.BrawlersStance.class);
                 if (stance != null && stance.active) {
                     damage += Math.round(3f + tier + force * (4f + 2f * tier) / 8f);
@@ -566,7 +569,7 @@ final class BlastAutoCombat {
             }
         } else if (weapon != null) {
             damage = weaponDamage(hero, weapon);
-            damage += RingOfForce.armedDamageBonus(hero);
+            damage += armedForceDamage(hero, weapon);
         } else {
             damage = 1f;
         }
@@ -578,11 +581,30 @@ final class BlastAutoCombat {
 
     private static float physicalDamage(Hero hero, Mob target, MissileWeapon weapon,
                                         KindOfWeapon damageSource) {
-        float damage = weaponDamage(hero, damageSource);
+        float damage = weaponDamage(hero, damageSource) + armedForceDamage(hero, weapon);
         PhysicalEmpower empower = hero.buff(PhysicalEmpower.class);
         if (empower != null) damage += empower.dmgBoost;
         return Math.max(0f, boostedDamage(hero, damage)
                 * hitChance(hero, target, weapon, true));
+    }
+
+    /** Midpoint of SPD's weapon-tier Force damage range, without consuming RNG. */
+    static float forceAverageDamage(int bonus, int tier) {
+        int max = (int)(bonus * (tier + 1) / 2f);
+        return (bonus + max) / 2f;
+    }
+
+    private static float armedForceDamage(Hero hero, KindOfWeapon weapon) {
+        int bonus = Ring.getBuffedBonus(hero, RingOfForce.Force.class);
+        if (weapon instanceof MeleeWeapon) {
+            MeleeWeapon melee = (MeleeWeapon) weapon;
+            float damage = forceAverageDamage(bonus, melee.tier);
+            return melee.augment == null ? damage : melee.augment.damageFactor(damage);
+        }
+        if (weapon instanceof MissileWeapon) {
+            return forceAverageDamage(bonus, ((MissileWeapon) weapon).tier);
+        }
+        return bonus;
     }
 
     private static float boostedDamage(Hero hero, float damage) {
