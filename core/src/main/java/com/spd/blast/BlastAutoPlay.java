@@ -676,7 +676,8 @@ public final class BlastAutoPlay {
                 && !BlastAutoVault.imminentAttackAt(hero, Dungeon.level)) {
             for (int offset : PathFinder.NEIGHBOURS8) {
                 int cell = hero.pos + offset;
-                if (Dungeon.level.insideMap(cell) && safe[cell]) {
+                if (Dungeon.level.insideMap(cell) && safe[cell]
+                        && !BlastMovement.shouldUnlock(cell)) {
                     debugDecision = "attack-warning-dodge";
                     progress.intent(BlastAutoProgressGuard.Intent.RETREAT);
                     hero.curAction = new HeroAction.Move(cell);
