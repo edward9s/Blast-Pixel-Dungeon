@@ -1,12 +1,14 @@
 package com.spd.blast;
 
 import com.shatteredpixel.shatteredpixeldungeon.Assets;
+import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.MagicImmune;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Talent;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.Shopkeeper;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.BrokenSeal;
+import com.shatteredpixel.shatteredpixeldungeon.items.Gold;
 import com.shatteredpixel.shatteredpixeldungeon.items.KindOfWeapon;
 import com.shatteredpixel.shatteredpixeldungeon.items.armor.Armor;
 import com.shatteredpixel.shatteredpixeldungeon.items.armor.ClassArmor;
@@ -30,26 +32,21 @@ import com.shatteredpixel.shatteredpixeldungeon.items.armor.glyphs.Obfuscation;
 import com.shatteredpixel.shatteredpixeldungeon.items.armor.glyphs.Swiftness;
 import com.shatteredpixel.shatteredpixeldungeon.items.armor.glyphs.Thorns;
 import com.shatteredpixel.shatteredpixeldungeon.journal.Catalog;
-import com.shatteredpixel.shatteredpixeldungeon.windows.WndTradeItem;
 import com.watabou.noosa.audio.Sample;
 import com.watabou.utils.Random;
 
-import java.util.ArrayDeque;
+import java.util.ArrayList;
 
 /** Idle equipment maintenance, restricted to melee weapons and armor. */
 final class BlastAutoEquipment {
 
     private static final ThreadLocal<Boolean> automaticItemUse = new ThreadLocal<>();
-    private static final ArrayDeque<Item> replacedEquipment = new ArrayDeque<>();
-    private static Item pendingSale;
     private static boolean pendingStrengthCleanup;
 
     private BlastAutoEquipment() {}
 
     static void reset() {
-        pendingSale = null;
         pendingStrengthCleanup = false;
-        replacedEquipment.clear();
     }
 
     static boolean isUsingAutomatically() {
@@ -90,28 +87,61 @@ final class BlastAutoEquipment {
         return item instanceof Armor && betterArmor(hero, (Armor) item, hero.belongings.armor());
     }
 
-    /** Only sell a spare if removing it will make enough room for a wearable upgrade. */
-    static Item spareForUpgrade(Hero hero, Item upgrade) {
+    static boolean canMakeRoom(Hero hero, Item item) {
+        if (!isEquipment(item) || hero.belongings.lostInventory()
+                || availableAlchemize(hero) == null) return false;
+        return spareForPickup(hero, item, pickup(hero, item)) != null;
+    }
+
+    private static boolean isEquipment(Item item) {
+        return item instanceof MeleeWeapon || item instanceof Armor;
+    }
+
+    /** Find a spare to remove from the main backpack before pickup. */
+    private static Item spareForPickup(Hero hero, Item item, Pickup decision) {
         Bag backpack = hero.belongings.backpack;
-        if (!(upgrade instanceof MeleeWeapon || upgrade instanceof Armor)
-                || backpack.items.size() != backpack.capacity()
-                || hero.belongings.lostInventory()
-                || !isUpgrade(hero, upgrade)
-                || availableAlchemize(hero) == null) return null;
+        if (backpack.items.size() != backpack.capacity()) return null;
+        Item upgrade = decision == Pickup.KEEP && isUpgrade(hero, item) ? item : null;
+        if (upgrade == null && decision != Pickup.SELL) return null;
 
         for (Item spare : backpack.items) {
-            if (!spare.isEquipped(hero)
-                    && (isSaleCandidate(hero, spare) || isRedundant(spare, upgrade))
-                    && Shopkeeper.canSell(spare)) return spare;
+            if (canSellSpare(hero, spare, upgrade)) return spare;
         }
         return null;
     }
 
-    static void makeRoomForUpgrade(Hero hero, Item upgrade) {
-        Item spare = spareForUpgrade(hero, upgrade);
-        if (spare != null && !sellWithAlchemize(hero, spare)) {
-            throw new IllegalStateException("Could not sell spare equipment for a floor upgrade");
+    /** Reserve space only during native pickup, so failed pickups leave the inventory intact. */
+    static boolean pickUp(Hero hero, Item item) {
+        if (!isEquipment(item) || hero.belongings.lostInventory()) return item.doPickUp(hero);
+        Alchemize spell = availableAlchemize(hero);
+        if (spell == null) return item.doPickUp(hero);
+
+        Pickup decision = pickup(hero, item);
+        Bag backpack = hero.belongings.backpack;
+        Item spare = spareForPickup(hero, item, decision);
+        int slot = -1;
+        if (spare != null) {
+            slot = Dungeon.quickslot.getSlot(spare);
+            spare.detachAll(backpack);
         }
+        if (!item.doPickUp(hero)) {
+            if (spare != null) {
+                if (!spare.collect(backpack)) {
+                    throw new IllegalStateException("Could not restore spare after failed pickup");
+                }
+                if (slot >= 0) Dungeon.quickslot.setSlot(slot, spare);
+            }
+            return false;
+        }
+
+        // Accumulate ordinary resale loot while there is room. Cursed gear is sold immediately.
+        if (spare != null || (decision == Pickup.SELL && isCursed(item))) {
+            Item upgrade = decision == Pickup.KEEP ? item : null;
+            ArrayList<Item> batch = saleBatch(hero, upgrade);
+            if (decision == Pickup.SELL && !batch.contains(item)) batch.add(item);
+            sellBatch(hero, spell, batch, spare);
+        }
+        return true;
     }
 
     private static Pickup pickup(Hero hero, Item item) {
@@ -202,24 +232,6 @@ final class BlastAutoEquipment {
         return reason;
     }
 
-    /** Mark the exact auto-selected item before native pickup begins. */
-    static void onPickupScheduled(Hero hero, Item item) {
-        pendingSale = pickup(hero, item) == Pickup.SELL ? item : null;
-    }
-
-    static void onPickupFailed(Item item) {
-        if (pendingSale == item) pendingSale = null;
-    }
-
-    /** Sell in Hero.actPickUp's success branch, without waiting for another AI turn. */
-    static void onPickupCompleted(Hero hero, Item item) {
-        if (pendingSale != item) return;
-        pendingSale = null;
-        if (!sellWithAlchemize(hero, item)) {
-            throw new IllegalStateException("Equipment collected for sale could not be sold");
-        }
-    }
-
     /** Use persistent true upgrades, never unknown UI values or temporary buffs. */
     static int weaponRating(MeleeWeapon weapon) {
         int level = weapon.trueLevel();
@@ -307,7 +319,9 @@ final class BlastAutoEquipment {
         if (candidate instanceof MeleeWeapon && equipped instanceof MeleeWeapon) {
             MeleeWeapon worn = (MeleeWeapon) equipped;
             MeleeWeapon spare = (MeleeWeapon) candidate;
-            return weaponDominates(worn, spare) || weaponOverwhelms(worn, spare);
+            return weaponDominates(worn, spare) || weaponOverwhelms(worn, spare)
+                    || (worn.getClass() == spare.getClass() && spare.enchantment == null
+                        && weaponAtLeastAsGood(worn, spare));
         }
         if (candidate instanceof Armor && equipped instanceof Armor) {
             return armorRating((Armor) equipped) >= armorRating((Armor) candidate);
@@ -351,22 +365,39 @@ final class BlastAutoEquipment {
         return false;
     }
 
-    private static boolean sellWithAlchemize(Hero hero, Item item) {
-        Alchemize spell = availableAlchemize(hero);
-        if (spell == null || item.isEquipped(hero)
-                || !hero.belongings.contains(item) || !Shopkeeper.canSell(item)) return false;
+    private static boolean canSellSpare(Hero hero, Item spare, Item upgrade) {
+        return isEquipment(spare) && !spare.isEquipped(hero)
+                && (isSaleCandidate(hero, spare) || isRedundant(spare, upgrade))
+                && Shopkeeper.canSell(spare);
+    }
 
-        // Native trade grants gold and removes the item from the backpack.
-        WndTradeItem.sell(item);
+    private static ArrayList<Item> saleBatch(Hero hero, Item upgrade) {
+        ArrayList<Item> batch = new ArrayList<>();
+        for (Item spare : hero.belongings.backpack.items) {
+            if (spare == upgrade) continue;
+            if (canSellSpare(hero, spare, upgrade)) batch.add(spare);
+        }
+        return batch;
+    }
+
+    private static void sellBatch(Hero hero, Alchemize spell, ArrayList<Item> batch, Item detached) {
+        int gold = detached == null ? 0 : detached.value();
+        for (Item item : batch) {
+            gold += item.value();
+            item.detachAll(hero.belongings.backpack);
+        }
+        // Match native trade timing and pay out the batch as a single gold pickup.
+        hero.spend(-hero.cooldown());
+        new Gold(gold).doPickUp(hero);
         spell.detach(hero.belongings.backpack);
         Sample.INSTANCE.play(Assets.Sounds.TELEPORT);
         Catalog.countUse(Alchemize.class);
-        BlastLog.debug("auto-gear action=sell item=" + item.getClass().getSimpleName());
+        int count = batch.size() + (detached == null ? 0 : 1);
+        BlastLog.debug("auto-gear action=sell count=" + count + " gold=" + gold);
         // Match Alchemize's native one-in-eight scroll talent chance.
         if (Random.Float() < 1f / 8f) {
             Talent.onScrollUsed(hero, hero.pos, 1f, Alchemize.class);
         }
-        return true;
     }
 
     private static boolean drinkStrength(Hero hero) {
@@ -386,60 +417,22 @@ final class BlastAutoEquipment {
         return true;
     }
 
-    private static boolean sellReplaced(Hero hero) {
-        while (!replacedEquipment.isEmpty()) {
-            Item item = replacedEquipment.peekFirst();
-            if (!hero.belongings.contains(item) || item.isEquipped(hero)
-                    || isProtectedEquipment(item)
-                    || !Shopkeeper.canSell(item)) {
-                replacedEquipment.removeFirst();
-                continue;
+    static boolean sellSpares(Hero hero) {
+        if (hero.belongings.lostInventory()) return false;
+        Alchemize spell = availableAlchemize(hero);
+        if (spell == null) return false;
+        ArrayList<Item> batch = saleBatch(hero, null);
+        if (pendingStrengthCleanup) {
+            int strength = hero.STR();
+            for (Item item : hero.belongings.backpack.items) {
+                if (!item.isEquipped(hero) && isUnwearableForSale(item, strength)
+                        && Shopkeeper.canSell(item) && !batch.contains(item)) batch.add(item);
             }
-            if (availableAlchemize(hero) == null) {
-                replacedEquipment.removeFirst();
-                continue;
-            }
-            if (!sellWithAlchemize(hero, item)) {
-                throw new IllegalStateException("Replaced equipment could not be sold");
-            }
-            replacedEquipment.removeFirst();
-            return true;
-        }
-        return false;
-    }
-
-    /** Sell still-unwearable backpack gear only after automatic strength drinking. */
-    private static boolean sellUnwearableAfterStrength(Hero hero) {
-        if (!pendingStrengthCleanup) return false;
-        if (availableAlchemize(hero) == null) {
             pendingStrengthCleanup = false;
-            return false;
         }
-        for (Item item : hero.belongings.getAllItems(Item.class)) {
-            if (!isUnwearableForSale(item, hero.STR())
-                    || item.isEquipped(hero) || !Shopkeeper.canSell(item)) continue;
-            if (!sellWithAlchemize(hero, item)) {
-                throw new IllegalStateException("Unwearable equipment could not be sold");
-            }
-            return true;
-        }
-        pendingStrengthCleanup = false;
-        return false;
-    }
-
-    private static boolean sellRedundant(Hero hero) {
-        if (availableAlchemize(hero) == null) return false;
-        for (Item item : hero.belongings.getAllItems(Item.class)) {
-            if (item.isEquipped(hero)) continue;
-            Item equipped = item instanceof MeleeWeapon ? hero.belongings.weapon()
-                    : item instanceof Armor ? hero.belongings.armor() : null;
-            if (!isRedundant(item, equipped) || !Shopkeeper.canSell(item)) continue;
-            if (!sellWithAlchemize(hero, item)) {
-                throw new IllegalStateException("Redundant equipment could not be sold");
-            }
-            return true;
-        }
-        return false;
+        if (batch.isEmpty()) return false;
+        sellBatch(hero, spell, batch, null);
+        return true;
     }
 
     private static boolean betterWeapon(Hero hero, MeleeWeapon candidate, KindOfWeapon current) {
@@ -465,10 +458,6 @@ final class BlastAutoEquipment {
             throw new IllegalStateException("Eligible weapon upgrade failed to equip");
         }
         BlastLog.debug("auto-gear action=equip item=" + best.getClass().getSimpleName());
-        if (current instanceof MeleeWeapon && availableAlchemize(hero) != null
-                && isRedundant(current, best) && Shopkeeper.canSell(current)) {
-            replacedEquipment.addLast(current);
-        }
         return true;
     }
 
@@ -576,21 +565,14 @@ final class BlastAutoEquipment {
         if (seal != null && best.checkSeal() != seal) {
             throw new IllegalStateException("Warrior seal was not attached to replacement armor");
         }
-        if (current != null && availableAlchemize(hero) != null
-                && !isProtectedEquipment(current) && Shopkeeper.canSell(current)) {
-            replacedEquipment.addLast(current);
-        }
         return true;
     }
 
     /** One native item action at a time. */
     static boolean manage(Hero hero) {
         if (hero.belongings.lostInventory()) return false;
-        if (sellReplaced(hero)) return true;
         // Finish all strength potions before making irreversible sale decisions.
         if (drinkStrength(hero)) return true;
-        if (sellUnwearableAfterStrength(hero)) return true;
-        if (equipBetterWeapon(hero) || equipBetterArmor(hero)) return true;
-        return sellRedundant(hero);
+        return equipBetterWeapon(hero) || equipBetterArmor(hero);
     }
 }

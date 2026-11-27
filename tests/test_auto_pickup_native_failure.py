@@ -47,9 +47,11 @@ class NativeAutoPickupTests(unittest.TestCase):
         callback = PATCH.index("BlastAutoPickup.onPickupFailure(this, item, pos);")
         self.assertLess(callback, PATCH.index("if (waitOrPickup)", callback))
 
-    def test_native_hero_checks_for_room_before_collecting(self):
-        hook = PATCH.index("BlastAutoPickup.onPickupAttempt(this, item, pos);")
-        self.assertLess(hook, PATCH.index("if (item.doPickUp( this ))", hook))
+    def test_native_hero_routes_pickup_through_automatic_gear_handling(self):
+        hook = PATCH.index("if (com.spd.blast.BlastAutoPickup.pickUp(this, item, pos))")
+        self.assertLess(hook, PATCH.index("heap.pickUp();", hook))
+        self.assertIn("isAttempt(hero, item, cell) ? BlastAutoEquipment.pickUp(hero, item)"
+                      " : item.doPickUp(hero)", PICKUP)
 
 
 if __name__ == "__main__":

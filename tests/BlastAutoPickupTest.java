@@ -55,10 +55,9 @@ public final class BlastAutoPickupTest {
 
         if (BlastAutoPickup.canCollect(hero, upgrade, BLAST_INSTANT)
                 || !BlastAutoPickup.canCollectFromHeap(hero, upgrade, BLAST_INSTANT)
-                || BlastAutoEquipment.spareForUpgrade(hero, upgrade) != spare
-                || BlastAutoPickup.canCollectFromHeap(hero, weaker, BLAST_INSTANT)
+                || !BlastAutoPickup.canCollectFromHeap(hero, weaker, BLAST_INSTANT)
                 || BlastAutoPickup.canCollectFromHeap(hero, new Greatsword(), BLAST_INSTANT)) {
-            throw new AssertionError("A full backpack should make room only for a wearable upgrade");
+            throw new AssertionError("A full backpack should make room for upgrades and gear for sale");
         }
         if (!hero.belongings.backpack.items.contains(spare) || spell.quantity() != 1) {
             throw new AssertionError("Checking loot eligibility must not perform the sale");
@@ -66,12 +65,14 @@ public final class BlastAutoPickupTest {
 
         hero.belongings.backpack.items.remove(spell);
         hero.belongings.backpack.items.add(new Item());
-        if (BlastAutoPickup.canCollectFromHeap(hero, upgrade, BLAST_INSTANT)) {
+        if (BlastAutoPickup.canCollectFromHeap(hero, upgrade, BLAST_INSTANT)
+                || BlastAutoPickup.canCollectFromHeap(hero, weaker, BLAST_INSTANT)) {
             throw new AssertionError("A full backpack cannot make room without Alchemize");
         }
         hero.belongings.backpack.items.remove(spare);
         hero.belongings.backpack.items.add(spell);
-        if (BlastAutoPickup.canCollectFromHeap(hero, upgrade, BLAST_INSTANT)) {
+        if (BlastAutoPickup.canCollectFromHeap(hero, upgrade, BLAST_INSTANT)
+                || BlastAutoPickup.canCollectFromHeap(hero, weaker, BLAST_INSTANT)) {
             throw new AssertionError("Only gear eligible for sale can make room for an upgrade");
         }
     }

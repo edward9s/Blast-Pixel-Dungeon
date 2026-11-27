@@ -1029,8 +1029,7 @@ public final class BlastAutoPlay {
         debugDecision = "manual-route";
         if (resumeInterruptedTravel(hero, idleSafe, idleDistances)) return hero.curAction == null;
 
-        // Strength potions, equipment upgrades, and ordinary gear cleanup run only while idle.
-        // Equipment picked up for sale is handled by the native pickup-success callback.
+        // Use strength potions and equip upgrades before selling spare gear.
         debugDecision = "equipment";
         if (BlastAutoEquipment.manage(hero)) return true;
 
@@ -1071,6 +1070,10 @@ public final class BlastAutoPlay {
             progress.intent(BlastAutoProgressGuard.Intent.PICKUP);
             return false;
         }
+
+        // Give reachable resale loot a chance to join the backpack's sale.
+        debugDecision = "sell-gear";
+        if (BlastAutoEquipment.sellSpares(hero)) return true;
 
         // Mine known dark-gold veins after ordinary pickups, before roaming.
         idleSafe = progress.safeFor(safe, hero.pos, BlastAutoProgressGuard.Intent.INTERACT);
