@@ -50,31 +50,14 @@ final class BlastAutoChasmRoom {
         if (!(level instanceof RegularLevel)) return null;
         SecretChestChasmRoom room = (SecretChestChasmRoom)
                 ((RegularLevel) level).room(SecretChestChasmRoom.class);
-        if (room == null || room.entrance() == null) return null;
-        int door = level.pointToCell(room.entrance());
-        return level.insideMap(door)
-                && (level.visited[door] || level.mapped[door] || hero.fieldOfView[door])
-                ? room : null;
+        return BlastAutoSpecialRooms.knownEntrance(level, hero, room) ? room : null;
     }
 
-    /** The puzzle has no internal traps; only known chasm cells gain flight access. */
     private static boolean[] flightMap(Hero hero, SecretChestChasmRoom room,
                                        boolean[] safe, Blob[] hazards,
                                        boolean[] specialBarriers) {
-        Level level = Dungeon.level;
-        boolean[] flight = safe.clone();
-        for (int y = room.top + 1; y < room.bottom; y++) {
-            for (int x = room.left + 1; x < room.right; x++) {
-                int cell = x + y * level.width();
-                if (!flightTile(level, room, cell)
-                        || specialBarriers[cell]
-                        || BlastAutoEnvironment.hazardousAt(cell, hazards)
-                        || AutoPlayPlantSafety.isHarmful(level.plants.get(cell))
-                        || Actor.findChar(cell) != null) continue;
-                flight[cell] = true;
-            }
-        }
-        return flight;
+        return BlastAutoSpecialRooms.roomPath(hero, room, safe, hazards, specialBarriers,
+                cell -> flightTile(Dungeon.level, room, cell));
     }
 
     static boolean enoughFlight(float remaining, int toGoal, int actionTurns,

@@ -17,11 +17,14 @@ import com.shatteredpixel.shatteredpixeldungeon.items.potions.brews.AquaBrew;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
 import com.shatteredpixel.shatteredpixeldungeon.levels.RegularLevel;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
+import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.Room;
 import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.special.MagicalFireRoom;
+import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.special.SpecialRoom;
 import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.special.TrapsRoom;
-import com.shatteredpixel.shatteredpixeldungeon.levels.traps.Trap;
 import com.shatteredpixel.shatteredpixeldungeon.mechanics.Ballistica;
 import com.watabou.utils.PathFinder;
+
+import java.util.function.IntPredicate;
 
 /** Clears the magical-fire barrier and opens trapped treasure rooms with native items. */
 final class BlastAutoSpecialRooms {
@@ -65,6 +68,39 @@ final class BlastAutoSpecialRooms {
         return Action.MOVE;
     }
 
+    static boolean knownCell(Level level, Hero hero, int cell) {
+        return level.visited[cell] || level.mapped[cell] || hero.fieldOfView[cell];
+    }
+
+    static boolean knownEntrance(Level level, Hero hero, SpecialRoom room) {
+        if (room == null || room.entrance() == null) return false;
+        int door = level.pointToCell(room.entrance());
+        return level.insideMap(door) && level.map[door] != Terrain.SECRET_DOOR
+                && (door == hero.pos || knownCell(level, hero, door));
+    }
+
+    /** Plan only within a discovered puzzle, using its explicit crossing rules. */
+    static boolean[] roomPath(Hero hero, Room room, boolean[] safe, Blob[] hazards,
+                              boolean[] barriers, IntPredicate crossing) {
+        Level level = Dungeon.level;
+        boolean[] path = safe.clone();
+        for (int y = room.top + 1; y < room.bottom; y++) {
+            for (int x = room.left + 1; x < room.right; x++) {
+                int cell = x + y * level.width();
+                if (path[cell] || level.solid[cell] || barriers[cell]) continue;
+                if (!crossing.test(cell)
+                        && (knownCell(level, hero, cell) || !level.passable[cell] || level.pit[cell]
+                        || !BlastAutoPlay.isTrapSafe(level.traps.get(cell)))) continue;
+                if (BlastAutoEnvironment.hazardousAt(cell, hazards)
+                        || BlastAutoPlay.attackWarningAt(cell)
+                        || AutoPlayPlantSafety.isHarmful(level.plants.get(cell))) continue;
+                Char occupant = Actor.findChar(cell);
+                if (occupant == null || occupant == hero) path[cell] = true;
+            }
+        }
+        return path;
+    }
+
     static boolean flightTerrain(int terrain) {
         return terrain == Terrain.TRAP || terrain == Terrain.SECRET_TRAP
                 || terrain == Terrain.CHASM;
@@ -86,28 +122,14 @@ final class BlastAutoSpecialRooms {
 
     private static boolean[] flightMap(Hero hero, TrapsRoom room, boolean[] safe,
                                        Blob[] hazards, boolean[] specialBarriers) {
-        Level level = Dungeon.level;
-        boolean[] crossing = safe.clone();
-        for (int y = room.top + 1; y < room.bottom; y++) {
-            for (int x = room.left + 1; x < room.right; x++) {
-                int cell = x + y * level.width();
-                if (!flightTerrain(level.map[cell])
-                        || !(level.visited[cell] || level.mapped[cell] || hero.fieldOfView[cell])
-                        || level.solid[cell] || specialBarriers[cell]
-                        || BlastAutoEnvironment.hazardousAt(cell, hazards)
-                        || AutoPlayPlantSafety.isHarmful(level.plants.get(cell))
-                        || Actor.findChar(cell) != null) continue;
-                crossing[cell] = true;
-            }
-        }
-        return crossing;
+        return roomPath(hero, room, safe, hazards, specialBarriers,
+                cell -> flightTerrain(Dungeon.level.map[cell]));
     }
 
-    private static Heap knownChest(Level level, TrapsRoom room, Hero hero) {
+    private static Heap unopenedChest(Level level, TrapsRoom room) {
         for (Heap heap : level.heaps.valueList()) {
-            if (heap.type == Heap.Type.CHEST
-                    && (heap.seen || hero.fieldOfView[heap.pos])
-                    && room.inside(level.cellToPoint(heap.pos))) return heap;
+            if (heap.type == Heap.Type.CHEST && room.inside(level.cellToPoint(heap.pos)))
+                return heap;
         }
         return null;
     }
@@ -130,13 +152,17 @@ final class BlastAutoSpecialRooms {
             flightTreasure = -1;
             return Action.NONE;
         }
+        if (room.entrance() == null) return Action.NONE;
         int exit = level.pointToCell(room.entrance());
-        if (!level.insideMap(exit) || !safe[exit]
-                || distances[exit] == Integer.MAX_VALUE) return Action.NONE;
+        if (!level.insideMap(exit)) return Action.NONE;
+        safe = flightMap(hero, room, safe, hazards, specialBarriers);
+        PathFinder.buildDistanceMap(hero.pos, safe);
+        distances = PathFinder.distance.clone();
+        if (!safe[exit] || distances[exit] == Integer.MAX_VALUE) return Action.NONE;
         if (activeFlightRoom == null) {
             // Recover the route after loading a save inside a trap room.
             activeFlightRoom = room;
-            Heap chest = knownChest(level, room, hero);
+            Heap chest = unopenedChest(level, room);
             flightTreasure = chest == null ? -1 : chest.pos;
         }
         float timePerStep = Math.max(1f, 1f / hero.speed());
@@ -205,7 +231,7 @@ final class BlastAutoSpecialRooms {
         }
         if (hero.belongings.lostInventory()) return Action.NONE;
 
-        Action fire = clearEternalFire(hero, safe, distances);
+        Action fire = clearEternalFire(hero, safe, hazards, specialBarriers);
         if (fire != Action.NONE) return fire;
 
         Action sentry = BlastAutoSentryRoom.chooseAction(
@@ -225,17 +251,26 @@ final class BlastAutoSpecialRooms {
         if (summoning != Action.NONE) return summoning;
 
         TrapsRoom room = (TrapsRoom) ((RegularLevel) level).room(TrapsRoom.class);
-        if (room == null || room.entrance() == null) return Action.NONE;
-        Heap chest = knownChest(level, room, hero);
+        if (!knownEntrance(level, hero, room)) return Action.NONE;
+        Heap chest = unopenedChest(level, room);
         if (chest == null) return Action.NONE;
         int exit = level.pointToCell(room.entrance());
-        if (!level.insideMap(exit) || !safe[exit]
-                || distances[exit] == Integer.MAX_VALUE) return Action.NONE;
+        if (!safe[exit] || distances[exit] == Integer.MAX_VALUE) return Action.NONE;
         if (safe[chest.pos] && distances[chest.pos] != Integer.MAX_VALUE) return Action.NONE;
+
+        boolean[] walk = roomPath(hero, room, safe, hazards, specialBarriers, cell -> false);
+        PathFinder.buildDistanceMap(hero.pos, walk);
+        int[] walkingDistances = PathFinder.distance.clone();
+        if (walkingDistances[chest.pos] != Integer.MAX_VALUE) {
+            if (hero.rooted) return Action.NONE;
+            hero.curAction = new HeroAction.Move(
+                    BlastAutoPlay.firstStep(chest.pos, walk, walkingDistances));
+            return Action.MOVE;
+        }
 
         PotionOfLevitation potion = hero.belongings.getItem(PotionOfLevitation.class);
         if (potion != null && potion.quantity() > 0) {
-            boolean[] crossing = flightMap(hero, room, safe, hazards, specialBarriers);
+            boolean[] crossing = flightMap(hero, room, walk, hazards, specialBarriers);
             PathFinder.buildDistanceMap(exit, crossing);
             int toChest = PathFinder.distance[chest.pos];
             PathFinder.buildDistanceMap(chest.pos, crossing);
@@ -252,7 +287,7 @@ final class BlastAutoSpecialRooms {
                 return Action.USE;
             }
         }
-        return floodTraps(hero, room, chest.pos, safe, distances, hazards, specialBarriers);
+        return floodTraps(hero, room, chest.pos, walk, walkingDistances, hazards, specialBarriers);
     }
 
     /** Route the trapped treasure-room puzzle through the shared Aqua planner. */
@@ -277,7 +312,8 @@ final class BlastAutoSpecialRooms {
     }
 
     /** Use a nearby landable tile; a projectile stops short of impassable flame. */
-    private static Action clearEternalFire(Hero hero, boolean[] safe, int[] distances) {
+    private static Action clearEternalFire(Hero hero, boolean[] safe,
+                                           Blob[] hazards, boolean[] specialBarriers) {
         Level level = Dungeon.level;
         Blob fire = level.blobs.get(MagicalFireRoom.EternalFire.class);
         if (fire == null || fire.volume == 0) {
@@ -285,17 +321,22 @@ final class BlastAutoSpecialRooms {
             return Action.NONE;
         }
         if (attemptedFire && fire.volume >= lastFireVolume) return Action.NONE;
+        MagicalFireRoom room = (MagicalFireRoom) ((RegularLevel) level).room(MagicalFireRoom.class);
+        if (!knownEntrance(level, hero, room)) return Action.NONE;
         PotionOfFrost frost = hero.belongings.getItem(PotionOfFrost.class);
         Item item = frost != null && frost.quantity() > 0
                 ? frost : hero.belongings.getItem(AquaBrew.class);
         if (item == null || item.quantity() == 0) return Action.NONE;
+        safe = roomPath(hero, room, safe, hazards, specialBarriers, cell -> false);
+        PathFinder.buildDistanceMap(hero.pos, safe);
+        int[] distances = PathFinder.distance.clone();
         boolean aqua = item instanceof AquaBrew;
         int minimumDistance = aqua ? 3 : 2;
         int bestFlame = -1, bestTarget = -1, bestStand = -1;
         int bestSteps = Integer.MAX_VALUE;
 
         for (int flame = 0; flame < fire.cur.length; flame++) {
-            if (fire.cur[flame] <= 0 || !hero.fieldOfView[flame]) continue;
+            if (fire.cur[flame] <= 0 || !room.inside(level.cellToPoint(flame))) continue;
             // The water geyser floods at least one tile in all four directions;
             // frost shatters into the same cardinal-neighbor footprint.
             for (int offset : PathFinder.NEIGHBOURS4) {

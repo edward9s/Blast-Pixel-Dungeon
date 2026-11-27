@@ -153,14 +153,31 @@ final class BlastAutoVault {
         return false;
     }
 
-    private static VaultTreasureRoom timedTreasureRoom(Hero hero, Level level) {
+    static VaultTreasureRoom timedTreasureRoom(Hero hero, Level level) {
         if (!(level instanceof VaultLevel)) return null;
-        Room room = ((RegularLevel) level).room(hero.pos);
-        if (room instanceof VaultLaserTreasureRoom || room instanceof VaultHardLaserTreasureRoom
-                || room instanceof VaultCircleScanTreasureRoom || room instanceof VaultManyScansRoom) {
-            return (VaultTreasureRoom) room;
+        RegularLevel regular = (RegularLevel) level;
+        Room inside = regular.room(hero.pos);
+        if (inside != null) return isTimedTreasureRoom(inside) ? (VaultTreasureRoom) inside : null;
+        for (Room room : regular.rooms()) {
+            if (!isTimedTreasureRoom(room)) continue;
+            VaultTreasureRoom treasure = (VaultTreasureRoom) room;
+            if (treasure.entrance() != null && hero.pos == level.pointToCell(treasure.entrance()))
+                return treasure;
         }
         return null;
+    }
+
+    private static boolean isTimedTreasureRoom(Room room) {
+        return room instanceof VaultLaserTreasureRoom || room instanceof VaultHardLaserTreasureRoom
+                || room instanceof VaultCircleScanTreasureRoom || room instanceof VaultManyScansRoom;
+    }
+
+    static boolean hasTimedTreasure(Hero hero, Level level, Room room) {
+        for (Heap heap : level.heaps.valueList()) {
+            if (room.inside(level.cellToPoint(heap.pos)) && hasTreasureAction(hero, heap))
+                return true;
+        }
+        return false;
     }
 
     static int timedTreasureGoal(Hero hero, Level level, boolean[] passable) {
@@ -168,16 +185,18 @@ final class BlastAutoVault {
         if (room == null || room.entrance() == null) return -1;
         int target = -1;
         int nearest = Integer.MAX_VALUE;
+        boolean pending = false;
         for (Heap heap : level.heaps.valueList()) {
-            if (!passable[heap.pos] || !(heap.seen || hero.fieldOfView[heap.pos])
-                    || !room.inside(level.cellToPoint(heap.pos))) continue;
+            if (!room.inside(level.cellToPoint(heap.pos)) || !hasTreasureAction(hero, heap)) continue;
+            pending = true;
+            if (!passable[heap.pos]) continue;
             int distance = level.distance(hero.pos, heap.pos);
-            if (distance < nearest && hasTreasureAction(hero, heap)) {
+            if (distance < nearest) {
                 target = heap.pos;
                 nearest = distance;
             }
         }
-        return target >= 0 ? target : level.pointToCell(room.entrance());
+        return pending ? target : level.pointToCell(room.entrance());
     }
 
     private static boolean hasTreasureAction(Hero hero, Heap heap) {
