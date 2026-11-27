@@ -107,6 +107,18 @@ def patch(path: Path) -> None:
         "Hero.handle tap on sheep"
     )
 
+    # A previously safe cached path may become electrified between hero turns.
+    # Clear it before native replanning so the usual long-detour cutoff cannot
+    # reject a safe route solely because the old route was shorter.
+    s = replace_once(
+        s,
+        "\t\t\tboolean newPath = false;",
+        "\t\t\tif (path != null && !path.isEmpty()"
+        " && com.spd.blast.BlastMovement.pylonDanger(path.getFirst())) path = null;\n"
+        "\t\t\tboolean newPath = false;",
+        "Hero.getCloser replan electrified route"
+    )
+
     # For doors with a matching key, delegate to SPD's normal Unlock action.
     # Preserve the movement destination until the unlock animation completes.
     s = replace_once(
@@ -120,6 +132,10 @@ def patch(path: Path) -> None:
         s,
         "\t\tif (step != -1) {\n\n\t\t\tfloat delay = 1;",
         "\t\tif (step != -1) {\n"
+        "\t\t\tif (com.spd.blast.BlastMovement.pylonDanger(step)) {\n"
+        "\t\t\t\tpath = null;\n"
+        "\t\t\t\treturn false;\n"
+        "\t\t\t}\n"
         "\t\t\tif (com.spd.blast.BlastMovement.shouldUnlock(step)) {\n"
         "\t\t\t\tblastActionAfterUnlock = curAction;\n"
         "\t\t\t\tcurAction = new HeroAction.Unlock(step);\n"
