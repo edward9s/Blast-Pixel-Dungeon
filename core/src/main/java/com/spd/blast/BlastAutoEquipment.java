@@ -32,6 +32,7 @@ import com.shatteredpixel.shatteredpixeldungeon.items.armor.glyphs.Obfuscation;
 import com.shatteredpixel.shatteredpixeldungeon.items.armor.glyphs.Swiftness;
 import com.shatteredpixel.shatteredpixeldungeon.items.armor.glyphs.Thorns;
 import com.shatteredpixel.shatteredpixeldungeon.journal.Catalog;
+import com.shatteredpixel.shatteredpixeldungeon.windows.WndTradeItem;
 import com.watabou.noosa.audio.Sample;
 import com.watabou.utils.Random;
 
@@ -438,10 +439,10 @@ final class BlastAutoEquipment {
         return true;
     }
 
-    static boolean sellSpares(Hero hero) {
+    static boolean sellSpares(Hero hero, Shopkeeper shop) {
         if (hero.belongings.lostInventory()) return false;
-        Alchemize spell = availableAlchemize(hero);
-        if (spell == null) return false;
+        Alchemize spell = shop == null ? availableAlchemize(hero) : null;
+        if (shop == null && spell == null) return false;
         ArrayList<Item> batch = saleBatch(hero, null);
         if (pendingStrengthCleanup) {
             int strength = hero.STR();
@@ -452,7 +453,14 @@ final class BlastAutoEquipment {
             pendingStrengthCleanup = false;
         }
         if (batch.isEmpty()) return false;
-        sellBatch(hero, spell, batch, null);
+        if (shop != null) {
+            int gold = Dungeon.gold;
+            for (Item item : batch) WndTradeItem.sell(item, shop);
+            BlastLog.debug("auto-shop action=sell count=" + batch.size()
+                    + " gold=" + (Dungeon.gold - gold));
+        } else {
+            sellBatch(hero, spell, batch, null);
+        }
         return true;
     }
 
