@@ -259,6 +259,8 @@ jobs:
 
       - name: Generate Blast changelog with Copilot
         if: needs.prepare.outputs.mode == 'formal' || needs.prepare.outputs.mode == 'manual'
+        id: changelog
+        continue-on-error: true
         working-directory: blast
         shell: bash
         env:
@@ -294,7 +296,7 @@ jobs:
             { invalid = 1 }
             END { exit (invalid || bullets < 1 || bullets > 8) }
           ' <<< "$notes"; then
-            echo "::error::Copilot must return 1 to 8 Markdown bullets or NO_USER_FACING_CHANGES."
+            echo "::warning::Copilot must return 1 to 8 Markdown bullets or NO_USER_FACING_CHANGES."
             exit 1
           fi
           printf '%s\n' "$notes" > release-notes-ai.md
@@ -307,6 +309,7 @@ jobs:
           PREV_TAG: ${{ steps.previous.outputs.tag }}
           SPD_TAG: ${{ needs.prepare.outputs.spd_tag }}
           SMM_VER: ${{ steps.smm_version.outputs.value }}
+          CHANGELOG_OUTCOME: ${{ steps.changelog.outcome }}
         run: |
           set -euo pipefail
           changes="../release-notes-changes.md"
@@ -320,10 +323,17 @@ jobs:
               echo "- Updated base game from Shattered Pixel Dungeon $previous_spd to $SPD_TAG." >> "$changes"
             fi
           fi
-          ai_notes=$(cat release-notes-ai.md)
-          if [[ "$ai_notes" != "NO_USER_FACING_CHANGES" ]]; then
-            cat release-notes-ai.md >> "$changes"
-            echo >> "$changes"
+          if [[ "$CHANGELOG_OUTCOME" == "success" ]]; then
+            if [[ "$(cat release-notes-ai.md)" != "NO_USER_FACING_CHANGES" ]]; then
+              cat release-notes-ai.md >> "$changes"
+              echo >> "$changes"
+            fi
+          elif [[ -n "$PREV_TAG" ]] && previous_commit=$(git rev-parse --verify --quiet "$PREV_TAG^{commit}"); then
+            printf -- '- [Compare changes with the previous Blast release](%s/%s/compare/%s...%s)\n' \
+              "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$previous_commit" "$GITHUB_SHA" >> "$changes"
+          else
+            printf -- '- [View the source for this Blast release](%s/%s/tree/%s)\n' \
+              "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_SHA" >> "$changes"
           fi
           if [[ ! -s "$changes" ]]; then
             echo "- Maintenance release with no player-visible gameplay changes." >> "$changes"
