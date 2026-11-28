@@ -1277,11 +1277,6 @@ public final class BlastAutoPlay {
                 hero.curAction = new HeroAction.Move(firstStep(staging, safe, distances));
                 return false;
             }
-            if (pitfall != null && !collapsing) {
-                debugDecision = "pitfall-wait";
-                hero.spendAndNext(Actor.TICK);
-                return true;
-            }
             debugDecision = "idle";
         }
         return false;

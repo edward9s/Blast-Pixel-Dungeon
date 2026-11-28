@@ -12,17 +12,26 @@ class AttackWarningTests(unittest.TestCase):
     def test_dodge_precedes_combat_and_special_room_loot(self):
         action = PLAY.split("private static boolean chooseActionOnce(Hero hero) {", 1)[1]
         dodge = action.split("// Finish toxic-room loot", 1)[0]
-        self.assertIn("!hero.rooted && attackWarningAt(hero.pos)", dodge)
+        self.assertIn("!hero.rooted && (collapsing || (attackWarningAt(hero.pos)", dodge)
         self.assertIn("PathFinder.NEIGHBOURS8", dodge)
         self.assertIn("Dungeon.level.insideMap(cell) && safe[cell]", dodge)
         self.assertIn("!BlastMovement.shouldUnlock(cell)", dodge)
         self.assertIn("hero.curAction = new HeroAction.Move(cell);", dodge)
         self.assertIn("return false;", dodge)
         self.assertNotIn("Indestructible", dodge)
-        self.assertLess(action.index('debugDecision = "attack-warning-dodge"'),
-                        action.index('debugDecision = "gas-ranged-bomb"'))
-        self.assertLess(action.index('debugDecision = "attack-warning-dodge"'),
-                        action.index('debugDecision = "combat"'))
+        dodge_decision = action.index(
+            'debugDecision = collapsing ? "pitfall-dodge" : "attack-warning-dodge"')
+        self.assertLess(dodge_decision, action.index('debugDecision = "gas-ranged-bomb"'))
+        self.assertLess(dodge_decision, action.index('debugDecision = "combat"'))
+
+    def test_delayed_pitfall_uses_the_native_footprint(self):
+        pending = PLAY.split("private static boolean[] pendingPitfallCells(Hero hero) {", 1)[1].split(
+            "private static boolean[] safeCells", 1)[0]
+        self.assertIn("hero.buffs(PitfallTrap.DelayedPit.class)", pending)
+        self.assertIn("pit.depth != Dungeon.depth || pit.branch != Dungeon.branch", pending)
+        self.assertIn("for (int cell : pit.positions)", pending)
+        self.assertIn("danger[cell] = true;", pending)
+        self.assertIn("if (pitfall[cell]) safe[cell] = false;", PLAY)
 
     def test_native_warning_expiry_and_synchronization(self):
         check = PLAY.split("static boolean attackWarningAt(int cell) {", 1)[1].split(

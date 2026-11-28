@@ -114,7 +114,7 @@ class AutoTrapClearanceTest(unittest.TestCase):
         self.assertIn("level.blobs.get(gasType)", CLEAR)
         self.assertIn("spreadingGas(trap)", CLEAR)
         self.assertIn("standSafeForEffect(level, trap, stand)", CLEAR)
-        self.assertIn("safeToActivate(level, trap)", CLEAR)
+        self.assertIn("safeToActivate(hero, level, trap)", CLEAR)
         self.assertIn("side == 0", CLEAR)
         self.assertNotIn('reason = "not-chokepoint"', CLEAR)
         self.assertIn("BlastAutoTrapClearer.gasRetreatStep(hero, safe)", PLAY)
