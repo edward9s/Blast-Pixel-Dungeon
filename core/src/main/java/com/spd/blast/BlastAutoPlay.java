@@ -1063,6 +1063,13 @@ public final class BlastAutoPlay {
             return hero.curAction == null;
         }
 
+        // Finish local shop transactions before pickups can lead away from the shop.
+        debugDecision = "shop";
+        if (BlastAutoShop.chooseAction(hero, idleSafe, idleDistances)) {
+            progress.intent(BlastAutoProgressGuard.Intent.INTERACT);
+            return hero.curAction == null;
+        }
+
         // Collect reachable floor loot after visible enemies have been handled.
         idleSafe = progress.safeFor(safe, hero.pos, BlastAutoProgressGuard.Intent.PICKUP);
         idleDistances = navigationDistances(hero.pos, safe, distances, idleSafe);
@@ -1075,7 +1082,7 @@ public final class BlastAutoPlay {
 
         // Give reachable resale loot a chance to join the backpack's sale.
         debugDecision = "sell-gear";
-        if (BlastAutoEquipment.sellSpares(hero)) return true;
+        if (BlastAutoEquipment.sellSpares(hero, null)) return true;
 
         // Mine known dark-gold veins after ordinary pickups, before roaming.
         idleSafe = progress.safeFor(safe, hero.pos, BlastAutoProgressGuard.Intent.INTERACT);
