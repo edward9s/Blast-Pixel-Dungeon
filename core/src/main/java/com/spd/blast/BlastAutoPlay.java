@@ -21,6 +21,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.NPC;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.Sheep;
 import com.shatteredpixel.shatteredpixeldungeon.effects.TargetedCell;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
+import com.shatteredpixel.shatteredpixeldungeon.levels.MiningLevel;
 import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.Room;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.Trap;
@@ -1734,6 +1735,10 @@ public final class BlastAutoPlay {
 
     private static int roamStep(Hero hero, boolean[] safe, int[] distances) {
         Level level = Dungeon.level;
+        if (level instanceof MiningLevel && BlastMovement.enabled()) {
+            return roaming.miningStep(hero.pos, level.width(), safe, distances,
+                    level.visited, level.mapped, hero.fieldOfView, level.passable, level.solid);
+        }
         int goal = roaming.chooseDestination(hero.pos, level.width(), safe, distances,
                 level.visited, level.mapped, hero.fieldOfView, level.solid);
         return goal < 0 ? -1 : firstStep(goal, safe, distances);

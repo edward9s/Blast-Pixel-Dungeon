@@ -1,5 +1,6 @@
 package com.spd.blast;
 
+import com.watabou.utils.PathFinder;
 import java.util.Arrays;
 
 /** Regression checks for frontier selection, failure memory, and idle roaming. */
@@ -36,6 +37,74 @@ public final class BlastAutoRoamingTest {
             return roaming.chooseDestination(position, width, safe, distances,
                     visited, mapped, visible, solid);
         }
+    }
+
+    private static final class Mine {
+        static final int WIDTH = 11;
+        static final int START = 3 * WIDTH + 2;
+
+        final boolean[] safe = new boolean[WIDTH * 7];
+        final boolean[] passable = new boolean[safe.length];
+        final boolean[] solid = new boolean[safe.length];
+        final boolean[] visited = new boolean[safe.length];
+        final boolean[] mapped = new boolean[safe.length];
+        final boolean[] visible = new boolean[safe.length];
+        final BlastAutoRoaming roaming = new BlastAutoRoaming();
+
+        Mine(int landing) {
+            PathFinder.setMapSize(WIDTH, 7);
+            Arrays.fill(visited, true);
+            Arrays.fill(solid, true);
+            Arrays.fill(safe, START, landing + 1, true);
+            floor(START);
+            floor(landing);
+        }
+
+        void floor(int cell) {
+            solid[cell] = false;
+            safe[cell] = true;
+            passable[cell] = true;
+        }
+
+        int step(int position) {
+            PathFinder.buildDistanceMap(position, safe);
+            return roaming.miningStep(position, WIDTH, safe, PathFinder.distance.clone(),
+                    visited, mapped, visible, passable, solid);
+        }
+    }
+
+    private static void mining() {
+        int start = Mine.START;
+        Mine crossing = new Mine(start + 4);
+        crossing.visited[start + 5] = false;
+        for (int step = 0; step < 4; step++) {
+            equal(start + step + 1, crossing.step(start + step),
+                    "three rock steps followed by the committed landing");
+        }
+
+        Mine thickRock = new Mine(start + 5);
+        thickRock.visited[start + 6] = false;
+        thickRock.floor(start - Mine.WIDTH);
+        thickRock.floor(start - 2 * Mine.WIDTH);
+        equal(start - Mine.WIDTH, thickRock.step(start),
+                "a four-rock shortcut must give way to a floor route");
+
+        Mine peek = new Mine(start);
+        peek.safe[start + 1] = true;
+        peek.visited[start + 2] = false;
+        equal(start + 1, peek.step(start), "rock frontier with a safe return can be explored");
+        equal(start, peek.step(start + 1), "a rock frontier returns to floor");
+        equal(-1, peek.step(start), "an unchanged rocky frontier is exhausted");
+
+        Mine blockedLanding = new Mine(start + 4);
+        blockedLanding.visited[start + 5] = false;
+        equal(start + 1, blockedLanding.step(start), "start a bounded crossing");
+        blockedLanding.safe[start + 4] = false;
+        equal(start, blockedLanding.step(start + 1), "a blocked landing triggers a safe retreat");
+
+        Mine loadedInRock = new Mine(start + 6);
+        equal(start + 2, loadedInRock.step(start + 3),
+                "a hero loaded inside rock heads toward nearby floor");
     }
 
     public static void main(String[] args) {
@@ -127,6 +196,7 @@ public final class BlastAutoRoamingTest {
         equal(32, handoff.select(interrupted, 24),
                 "farming cancels stale roaming destination");
 
+        mining();
         System.out.println("BlastAutoRoamingTest passed");
     }
 }
