@@ -6,9 +6,11 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.CrystalSpire;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.CrystalGuardian;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.GnollGeomancer;
-import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroAction;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.Blacksmith;
+import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
+import com.shatteredpixel.shatteredpixeldungeon.items.Item;
+import com.shatteredpixel.shatteredpixeldungeon.items.quest.DarkGold;
 import com.shatteredpixel.shatteredpixeldungeon.items.quest.Pickaxe;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
 import com.shatteredpixel.shatteredpixeldungeon.levels.MiningLevel;
@@ -17,6 +19,9 @@ import com.watabou.utils.PathFinder;
 
 /** Native mining actions and scoped movement for the troll blacksmith quest. */
 final class BlastAutoBlacksmith {
+    // The blacksmith awards 50 favor per piece, capped at 2,000.
+    private static final int GOLD_FOR_FULL_REWARD = 40;
+
     private BlastAutoBlacksmith() {}
 
     static boolean active() {
@@ -103,7 +108,7 @@ final class BlastAutoBlacksmith {
     static boolean attackArmoredGeomancer(Hero hero, boolean[] safe, int[] distances) {
         if (!active() || Blacksmith.Quest.Type() != Blacksmith.Quest.GNOLL
                 || hero.belongings.getItem(Pickaxe.class) == null
-                || !goldCollected()) return false;
+                || !enoughGoldForGeomancer(hero)) return false;
         for (Mob mob : Dungeon.level.mobs) {
             if (!(mob instanceof GnollGeomancer) || !mob.isAlive()
                     || !hero.fieldOfView[mob.pos]
@@ -127,15 +132,19 @@ final class BlastAutoBlacksmith {
         return false;
     }
 
-    static boolean goldCollected() {
+    static boolean enoughGoldForGeomancer(Hero hero) {
+        DarkGold gold = hero.belongings.getItem(DarkGold.class);
+        return (gold != null && gold.quantity() >= GOLD_FOR_FULL_REWARD) || goldCollected();
+    }
+
+    private static boolean goldCollected() {
         if (!active()) return false;
         for (int cell = 0; cell < Dungeon.level.length(); cell++) {
             if (Dungeon.level.map[cell] == Terrain.WALL_DECO) return false;
         }
         for (Heap heap : Dungeon.level.heaps.valueList()) {
-            for (com.shatteredpixel.shatteredpixeldungeon.items.Item item : heap.items) {
-                if (item instanceof com.shatteredpixel.shatteredpixeldungeon.items.quest.DarkGold)
-                    return false;
+            for (Item item : heap.items) {
+                if (item instanceof DarkGold) return false;
             }
         }
         return true;

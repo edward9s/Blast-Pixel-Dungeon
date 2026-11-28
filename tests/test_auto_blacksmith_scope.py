@@ -42,6 +42,16 @@ class AutoBlacksmithScopeTest(unittest.TestCase):
         self.assertIn("if (mob instanceof CrystalGuardian && BlastAutoBlacksmith.active()) return guardians;", demolition)
         self.assertIn("return general && !(mob instanceof CrystalSpire)", demolition)
 
+    def test_geomancer_uses_the_gold_reward_cap_in_both_phases(self):
+        mining = (SRC / "BlastAutoBlacksmith.java").read_text()
+        play = (SRC / "BlastAutoPlay.java").read_text()
+        spire, geomancer = mining.split("static boolean attackArmoredGeomancer(", 1)
+        self.assertIn("!goldCollected()", spire)
+        self.assertIn("!enoughGoldForGeomancer(hero)", geomancer)
+        self.assertIn("GOLD_FOR_FULL_REWARD = 40", mining)
+        self.assertIn("gold.quantity() >= GOLD_FOR_FULL_REWARD) || goldCollected()", geomancer)
+        self.assertIn("!BlastAutoBlacksmith.enoughGoldForGeomancer(Dungeon.hero)", play)
+
 
 if __name__ == "__main__":
     unittest.main()

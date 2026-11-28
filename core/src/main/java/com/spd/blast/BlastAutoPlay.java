@@ -1398,7 +1398,8 @@ public final class BlastAutoPlay {
                     && (mob instanceof CrystalSpire
                         || (mob instanceof CrystalGuardian && ((CrystalGuardian) mob).recovering())
                         || (mob instanceof GnollGeomancer
-                            && (!BlastAutoBlacksmith.goldCollected() || mob.heroShouldInteract()))));
+                            && (!BlastAutoBlacksmith.enoughGoldForGeomancer(Dungeon.hero)
+                                || mob.heroShouldInteract()))));
     }
 
     /** Sleeping enemies are deliberately left alone by automatic combat. */
