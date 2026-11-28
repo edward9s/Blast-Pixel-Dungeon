@@ -24,6 +24,7 @@ import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
 import com.shatteredpixel.shatteredpixeldungeon.levels.MiningLevel;
 import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.Room;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.PitfallTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.Trap;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
 import com.watabou.utils.PathFinder;
@@ -672,18 +673,21 @@ public final class BlastAutoPlay {
                 cell -> BlastAutoEnvironment.hazardousAt(cell, hazards)
                         || specialBarriers[cell]);
 
+        boolean[] pitfall = pendingPitfallCells(hero);
+        boolean collapsing = pitfall != null && pitfall[hero.pos];
         // Telegraphs take priority over combat, loot, and other ordinary actions.
         // Preserve the dedicated timing planner for vault machinery.
-        if (!hero.rooted && attackWarningAt(hero.pos)
-                && !BlastAutoVault.imminentAttackAt(hero, Dungeon.level)) {
+        if (!hero.rooted && (collapsing || (attackWarningAt(hero.pos)
+                && !BlastAutoVault.imminentAttackAt(hero, Dungeon.level)))) {
             for (int offset : PathFinder.NEIGHBOURS8) {
                 int cell = hero.pos + offset;
                 if (Dungeon.level.insideMap(cell) && safe[cell]
                         && !BlastMovement.shouldUnlock(cell)) {
-                    debugDecision = "attack-warning-dodge";
+                    debugDecision = collapsing ? "pitfall-dodge" : "attack-warning-dodge";
                     progress.intent(BlastAutoProgressGuard.Intent.RETREAT);
                     hero.curAction = new HeroAction.Move(cell);
-                    BlastLog.debug("auto-dodge warning from=" + hero.pos + " to=" + cell);
+                    BlastLog.debug("auto-dodge " + (collapsing ? "pitfall" : "warning")
+                            + " from=" + hero.pos + " to=" + cell);
                     return false;
                 }
             }
@@ -1273,6 +1277,11 @@ public final class BlastAutoPlay {
                 hero.curAction = new HeroAction.Move(firstStep(staging, safe, distances));
                 return false;
             }
+            if (pitfall != null && !collapsing) {
+                debugDecision = "pitfall-wait";
+                hero.spendAndNext(Actor.TICK);
+                return true;
+            }
             debugDecision = "idle";
         }
         return false;
@@ -1522,6 +1531,23 @@ public final class BlastAutoPlay {
         }
     }
 
+    /** Native delayed pits remain dangerous after their trap tile is disarmed. */
+    private static boolean[] pendingPitfallCells(Hero hero) {
+        if (hero.flying) return null;
+        Level level = Dungeon.level;
+        boolean[] danger = null;
+        for (PitfallTrap.DelayedPit pit : hero.buffs(PitfallTrap.DelayedPit.class)) {
+            if (pit.depth != Dungeon.depth || pit.branch != Dungeon.branch || pit.positions == null)
+                continue;
+            for (int cell : pit.positions) {
+                if (!level.insideMap(cell) || (level.solid[cell] && !level.passable[cell])) continue;
+                if (danger == null) danger = new boolean[level.length()];
+                danger[cell] = true;
+            }
+        }
+        return danger;
+    }
+
     private static boolean[] safeCells(Hero hero, Blob[] hazards, boolean[] specialBarriers) {
         return safeCells(hero, hazards, specialBarriers, false);
     }
@@ -1595,6 +1621,12 @@ public final class BlastAutoPlay {
         // Timed vault routes already forecast machinery on each future turn.
         // Do not turn their transient warning icons into permanent route barriers.
         if (!planTimedHazards) excludeAttackWarnings(safe);
+        boolean[] pitfall = pendingPitfallCells(hero);
+        if (pitfall != null) {
+            for (int cell = 0; cell < safe.length; cell++) {
+                if (pitfall[cell]) safe[cell] = false;
+            }
+        }
         safe[hero.pos] = true;
         return safe;
     }

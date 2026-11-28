@@ -10,6 +10,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.ToxicGas;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroAction;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
+import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.armor.Armor;
 import com.shatteredpixel.shatteredpixeldungeon.items.food.Food;
@@ -41,6 +42,7 @@ import com.shatteredpixel.shatteredpixeldungeon.levels.traps.GeyserTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.GrimTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.GuardianTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.OozeTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.PitfallTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.PoisonDartTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.ShockingTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.TeleportationTrap;
@@ -128,6 +130,8 @@ final class BlastAutoTrapClearer {
         if (type == GuardianTrap.class) return 1;
         // Ooze is applied to the trap and eight adjoining cells, without a lingering blob.
         if (type == OozeTrap.class || type == ChillingTrap.class) return 2;
+        // A pitfall drops characters on the trap and its eight neighbors.
+        if (type == PitfallTrap.class) return 2;
         // Frost seeds freezing blobs as far as two connected floor cells from the trap.
         // A three-cell stand-off keeps the hero outside the initial frost area.
         if (type == FrostTrap.class) return 3;
@@ -223,13 +227,31 @@ final class BlastAutoTrapClearer {
         return null;
     }
 
-    /** Sheep may press other traps within their two-tile spawning radius. */
-    private static boolean safeToActivate(Level level, Trap trap) {
+    private static boolean safeToActivate(Hero hero, Level level, Trap trap) {
+        if (trap.getClass() == PitfallTrap.class) return safePitfall(hero, level, trap.pos);
         if (trap.getClass() != FlockTrap.class) return true;
+        // Sheep may press other traps within their two-tile spawning radius.
         for (Trap nearby : level.traps.valueList()) {
             if (nearby != trap && nearby.active && level.distance(nearby.pos, trap.pos) <= 2) {
                 return false;
             }
+        }
+        return true;
+    }
+
+    private static boolean safePitfall(Hero hero, Level level, int trapCell) {
+        for (int offset : PathFinder.NEIGHBOURS9) {
+            int cell = trapCell + offset;
+            if (!level.insideMap(cell) || (level.solid[cell] && !level.passable[cell])) continue;
+            Char character = Actor.findChar(cell);
+            if (character != null && character != hero && !character.flying
+                    && character.alignment != Char.Alignment.ENEMY
+                    && !(character.alignment == Char.Alignment.NEUTRAL
+                            && Char.hasProp(character, Char.Property.IMMOVABLE))) return false;
+            Heap heap = level.heaps.get(cell);
+            if (heap != null && heap.type != Heap.Type.FOR_SALE
+                    && heap.type != Heap.Type.LOCKED_CHEST && heap.type != Heap.Type.CRYSTAL_CHEST
+                    && !(cell == heldDoor && trapCell == heldDoorTrap)) return false;
         }
         return true;
     }
@@ -660,7 +682,8 @@ final class BlastAutoTrapClearer {
             }
             String reason = null;
             if (!canTrigger(trap, level.map[cell])) reason = "unsupported";
-            else if (!safeToActivate(level, trap)) reason = "chain-reaction";
+            else if (!safeToActivate(hero, level, trap))
+                reason = trap.getClass() == PitfallTrap.class ? "unsafe-collapse" : "chain-reaction";
             else if (safe[cell]) reason = "traversable";
             else if (Actor.findChar(cell) != null) reason = "occupied";
             else if (level.plants.get(cell) != null) reason = "plant";
@@ -773,11 +796,13 @@ final class BlastAutoTrapClearer {
         if (!bestCorrosion && item == null && bestTarget == chosen.pos && fireTrap(chosen)) {
             item = hero.belongings.getItem(PotionOfFrost.class);
         }
-        if (!bestCorrosion && (item == null || item.quantity() <= 0)) {
-            if (!aimedOnly) {
-                Action aqua = douseWithAqua(hero, safe, distances);
-                if (aqua != Action.NONE) return aqua;
-            }
+        boolean noThrowable = !bestCorrosion && (item == null || item.quantity() <= 0);
+        if (!aimedOnly && (noThrowable || chosen.getClass() == PitfallTrap.class)) {
+            // Dousing avoids the collapse and preserves the item that would trigger it.
+            Action aqua = douseWithAqua(hero, safe, distances);
+            if (aqua != Action.NONE) return aqua;
+        }
+        if (noThrowable) {
             logRejection(hero, chosen, "no-throwable-item");
             return Action.NONE;
         }

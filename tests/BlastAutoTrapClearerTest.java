@@ -19,6 +19,7 @@ import com.shatteredpixel.shatteredpixeldungeon.levels.traps.ExplosiveTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.FlashingTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.FrostTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.OozeTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.PitfallTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.PoisonDartTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.ToxicTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.ConfusionTrap;
@@ -70,6 +71,15 @@ public final class BlastAutoTrapClearerTest {
         equal(2, BlastAutoTrapClearer.minimumThrowDistance(new BurningTrap()), "adjacent fire");
         equal(3, BlastAutoTrapClearer.minimumThrowDistance(new BlazingTrap()), "two-step fire");
         equal(-1, BlastAutoTrapClearer.minimumThrowDistance(new ExplosiveTrap()), "blast");
+        PitfallTrap pitfall = new PitfallTrap();
+        equal(2, BlastAutoTrapClearer.minimumThrowDistance(pitfall),
+                "pitfall throws start outside the entire collapse area");
+        equal(1, BlastAutoTrapClearer.canTrigger(pitfall, Terrain.TRAP) ? 1 : 0,
+                "revealed pitfall can be triggered from a safe stand");
+        equal(1, BlastAutoTrapClearer.canTrigger(pitfall, Terrain.SECRET_TRAP) ? 1 : 0,
+                "hidden pitfall uses the same safety radius");
+        equal(1, BlastAutoTrapClearer.canDouse(pitfall, Terrain.TRAP) ? 1 : 0,
+                "aqua can disarm pitfall without dropping nearby objects");
         equal(2, BlastAutoTrapClearer.minimumThrowDistance(new WornDartTrap()),
                 "aimed dart permits predicted hostile");
         equal(2, BlastAutoTrapClearer.minimumThrowDistance(new PoisonDartTrap()),
