@@ -1,21 +1,27 @@
 package com.spd.blast;
 
+import com.watabou.utils.PathFinder;
 import com.watabou.utils.Random;
 import java.util.Arrays;
 
 /** Explore unknown boundaries first, then roam across known reachable terrain. */
 final class BlastAutoRoaming {
     private static final int MIN_DISTANT_STEPS = 3;
+    private static final int MAX_ROCK_STEPS = 3;
 
     private int destination = -1;
     private boolean frontierDestination;
     private boolean[] exhaustedFrontiers;
     private boolean[] solidSnapshot;
+    private final PathFinder.Path crossing = new PathFinder.Path();
+    private int crossingPosition = -1;
 
     void reset() {
         clearDestination();
         exhaustedFrontiers = null;
         solidSnapshot = null;
+        crossing.clear();
+        crossingPosition = -1;
     }
 
     void clearDestination() {
@@ -44,13 +50,7 @@ final class BlastAutoRoaming {
             System.arraycopy(solid, 0, solidSnapshot, 0, length);
         }
 
-        if (destination == position) {
-            if (frontierDestination
-                    && hasUnknownNeighbor(destination, width, visited, mapped, visible)) {
-                exhaustedFrontiers[destination] = true;
-            }
-            clearDestination();
-        }
+        arrive(position, width, visited, mapped, visible);
 
         // Keep a reachable goal. The common navigation guard handles stalled moves.
         if (destination >= 0 && safe[destination]
@@ -97,6 +97,92 @@ final class BlastAutoRoaming {
         }
         destination = distant >= 0 ? distant : other;
         return destination;
+    }
+
+    int miningStep(int position, int width, boolean[] safe, int[] distances,
+                   boolean[] visited, boolean[] mapped, boolean[] visible,
+                   boolean[] passable, boolean[] solid) {
+        boolean[] floor = new boolean[safe.length];
+        for (int cell = 0; cell < safe.length; cell++) {
+            floor[cell] = safe[cell] && passable[cell];
+        }
+        if (!passable[position]) {
+            arrive(position, width, visited, mapped, visible);
+            if (!crossing.isEmpty() && crossing.getFirst() == position) {
+                crossing.removeFirst();
+                crossingPosition = position;
+            }
+            if (crossingPosition == position && !crossing.isEmpty()
+                    && floor[crossing.getLast()] && crossing.stream().allMatch(cell -> safe[cell])) {
+                return crossing.getFirst();
+            }
+            // Recover after loading in rock or after the planned landing becomes unsafe.
+            crossing.clear();
+            clearDestination();
+            int landing = -1;
+            int shortest = Integer.MAX_VALUE;
+            for (int cell = 0; cell < floor.length; cell++) {
+                if (floor[cell] && distances[cell] < shortest) {
+                    shortest = distances[cell];
+                    landing = cell;
+                }
+            }
+            return landing < 0 ? -1 : PathFinder.getStep(position, landing, safe);
+        }
+
+        crossing.clear();
+        boolean[] goals = floor.clone();
+        for (int cell = 0; cell < safe.length; cell++) {
+            if (safe[cell] && !goals[cell]) goals[cell] = adjacentFloor(cell, floor) >= 0;
+        }
+        int goal = chooseDestination(position, width, goals, distances, visited, mapped, visible, solid);
+        if (goal < 0) return -1;
+        PathFinder.Path route = PathFinder.find(position, goal, safe);
+        if (route != null && boundedCrossing(route, floor)) {
+            for (int cell : route) {
+                crossing.add(cell);
+                if (floor[cell]) break;
+            }
+            crossingPosition = position;
+            return crossing.getFirst();
+        }
+
+        // A shortest route through thick rock cannot claim the roaming turn.
+        clearDestination();
+        PathFinder.buildDistanceMap(position, floor);
+        goal = chooseDestination(position, width, floor, PathFinder.distance,
+                visited, mapped, visible, solid);
+        return goal < 0 ? -1 : PathFinder.getStep(position, goal, floor);
+    }
+
+    private static int adjacentFloor(int cell, boolean[] floor) {
+        // Roaming only admits interior cells, so the neighbors are inside the array.
+        for (int offset : PathFinder.NEIGHBOURS8) {
+            if (floor[cell + offset]) return cell + offset;
+        }
+        return -1;
+    }
+
+    private static boolean boundedCrossing(PathFinder.Path route, boolean[] floor) {
+        int steps = 0;
+        for (int cell : route) {
+            if (floor[cell]) steps = 0;
+            else if (++steps > MAX_ROCK_STEPS) return false;
+        }
+        if (steps > 0) {
+            int landing = adjacentFloor(route.getLast(), floor);
+            if (landing < 0) return false;
+            route.add(landing);
+        }
+        return true;
+    }
+
+    private void arrive(int position, int width, boolean[] visited, boolean[] mapped, boolean[] visible) {
+        if (destination != position) return;
+        if (frontierDestination && hasUnknownNeighbor(position, width, visited, mapped, visible)) {
+            exhaustedFrontiers[position] = true;
+        }
+        clearDestination();
     }
 
     private static boolean hasUnknownNeighbor(int cell, int width, boolean[] visited,
