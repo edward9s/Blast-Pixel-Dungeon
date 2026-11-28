@@ -32,6 +32,13 @@ final class BlastAutoRoaming {
     int chooseDestination(int position, int width, boolean[] safe, int[] distances,
                           boolean[] visited, boolean[] mapped, boolean[] visible,
                           boolean[] solid) {
+        return chooseDestination(position, width, safe, distances, visited, mapped, visible,
+                solid, safe);
+    }
+
+    private int chooseDestination(int position, int width, boolean[] safe, int[] distances,
+                                  boolean[] visited, boolean[] mapped, boolean[] visible,
+                                  boolean[] solid, boolean[] fallback) {
         int length = safe.length;
         if (width < 3 || length % width != 0 || distances.length != length
                 || visited.length != length || mapped.length != length
@@ -87,7 +94,7 @@ final class BlastAutoRoaming {
         int otherCount = 0;
         for (int cell = 0; cell < length; cell++) {
             int steps = distances[cell];
-            if (cell == position || !safe[cell] || exhaustedFrontiers[cell]
+            if (cell == position || !fallback[cell] || exhaustedFrontiers[cell]
                     || steps <= 1 || steps == Integer.MAX_VALUE) continue;
             if (steps >= MIN_DISTANT_STEPS) {
                 if (Random.Int(++distantCount) == 0) distant = cell;
@@ -135,24 +142,18 @@ final class BlastAutoRoaming {
         for (int cell = 0; cell < safe.length; cell++) {
             if (safe[cell] && !goals[cell]) goals[cell] = adjacentFloor(cell, floor) >= 0;
         }
-        int goal = chooseDestination(position, width, goals, distances, visited, mapped, visible, solid);
+        MiningRoutes routes = new MiningRoutes(position, width, safe, floor);
+        int goal = chooseDestination(position, width, goals, routes.distances, visited, mapped,
+                visible, solid, floor);
         if (goal < 0) return -1;
-        PathFinder.Path route = PathFinder.find(position, goal, safe);
-        if (route != null && boundedCrossing(route, floor)) {
-            for (int cell : route) {
-                crossing.add(cell);
-                if (floor[cell]) break;
-            }
-            crossingPosition = position;
-            return crossing.getFirst();
+        PathFinder.Path route = routes.routeTo(goal);
+        if (!floor[goal]) route.add(adjacentFloor(goal, floor));
+        for (int cell : route) {
+            crossing.add(cell);
+            if (floor[cell]) break;
         }
-
-        // A shortest route through thick rock cannot claim the roaming turn.
-        clearDestination();
-        PathFinder.buildDistanceMap(position, floor);
-        goal = chooseDestination(position, width, floor, PathFinder.distance,
-                visited, mapped, visible, solid);
-        return goal < 0 ? -1 : PathFinder.getStep(position, goal, floor);
+        crossingPosition = position;
+        return crossing.getFirst();
     }
 
     private static int adjacentFloor(int cell, boolean[] floor) {
@@ -163,18 +164,67 @@ final class BlastAutoRoaming {
         return -1;
     }
 
-    private static boolean boundedCrossing(PathFinder.Path route, boolean[] floor) {
-        int steps = 0;
-        for (int cell : route) {
-            if (floor[cell]) steps = 0;
-            else if (++steps > MAX_ROCK_STEPS) return false;
+    /** A cell reached through rock and the same cell reached from floor can have different exits. */
+    private static final class MiningRoutes {
+        private static final int STATES_PER_CELL = MAX_ROCK_STEPS + 1;
+
+        private final int start;
+        private final int[] previous;
+        private final int[] reached;
+        private final int[] distances;
+
+        MiningRoutes(int position, int width, boolean[] safe, boolean[] floor) {
+            int length = safe.length;
+            int height = length / width;
+            start = position * STATES_PER_CELL;
+            previous = new int[length * STATES_PER_CELL];
+            reached = new int[length];
+            distances = new int[length];
+            Arrays.fill(previous, -1);
+            Arrays.fill(distances, Integer.MAX_VALUE);
+
+            int[] queue = new int[previous.length];
+            int head = 0;
+            int tail = 0;
+            queue[tail++] = start;
+            previous[start] = start;
+            reached[position] = start;
+            distances[position] = 0;
+            for (int steps = 1; head < tail; steps++) {
+                int layerEnd = tail;
+                while (head < layerEnd) {
+                    int state = queue[head++];
+                    int cell = state / STATES_PER_CELL;
+                    int rock = state % STATES_PER_CELL;
+                    int x = cell % width;
+                    int y = cell / width;
+                    for (int ny = Math.max(0, y - 1); ny <= Math.min(height - 1, y + 1); ny++) {
+                        for (int nx = Math.max(0, x - 1); nx <= Math.min(width - 1, x + 1); nx++) {
+                            int next = nx + ny * width;
+                            if (next == cell || !safe[next]) continue;
+                            int nextRock = floor[next] ? 0 : rock + 1;
+                            if (nextRock > MAX_ROCK_STEPS) continue;
+                            int nextState = next * STATES_PER_CELL + nextRock;
+                            if (previous[nextState] >= 0) continue;
+                            previous[nextState] = state;
+                            queue[tail++] = nextState;
+                            if (distances[next] == Integer.MAX_VALUE) {
+                                distances[next] = steps;
+                                reached[next] = nextState;
+                            }
+                        }
+                    }
+                }
+            }
         }
-        if (steps > 0) {
-            int landing = adjacentFloor(route.getLast(), floor);
-            if (landing < 0) return false;
-            route.add(landing);
+
+        PathFinder.Path routeTo(int goal) {
+            PathFinder.Path route = new PathFinder.Path();
+            for (int state = reached[goal]; state != start; state = previous[state]) {
+                route.addFirst(state / STATES_PER_CELL);
+            }
+            return route;
         }
-        return true;
     }
 
     private void arrive(int position, int width, boolean[] visited, boolean[] mapped, boolean[] visible) {

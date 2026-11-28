@@ -107,6 +107,40 @@ public final class BlastAutoRoamingTest {
                 "a hero loaded inside rock heads toward nearby floor");
     }
 
+    private static void legalMiningDetour() {
+        int start = Mine.START;
+        int landing = start + 5;
+        Mine detour = new Mine(landing);
+        detour.visited[landing + 1] = false;
+        // The direct line is faster but crosses four rocks. The upper route
+        // also needs to cross rock, so a floor-only search cannot leave start.
+        detour.safe[start - Mine.WIDTH] = true;
+        for (int cell = start - 2 * Mine.WIDTH; cell < landing - 2 * Mine.WIDTH; cell++) {
+            detour.floor(cell);
+        }
+        detour.floor(landing - Mine.WIDTH);
+        int position = start;
+        int rock = 0;
+        for (int steps = 0; steps < 12; steps++) {
+            int next = detour.step(position);
+            if (next < 0) throw new AssertionError("a legal route out of the pocket exists");
+            if (steps == 0) equal(start - Mine.WIDTH, next, "take the bounded detour");
+            rock = detour.passable[next] ? 0 : rock + 1;
+            if (rock > 3) throw new AssertionError("the detour crossed too much rock");
+            if (next == landing || next == landing - Mine.WIDTH) return;
+            position = next;
+        }
+        throw new AssertionError("the hero did not reach the far frontier");
+    }
+
+    private static void knownRockIsNotAnIdleDestination() {
+        int start = Mine.START;
+        Mine pocket = new Mine(start);
+        pocket.floor(start + 1);
+        pocket.safe[start + 2] = true;
+        equal(-1, pocket.step(start), "fully explored rock has no value as a roaming goal");
+    }
+
     public static void main(String[] args) {
         Map stableMap = new Map();
         BlastAutoRoaming stable = new BlastAutoRoaming();
@@ -197,6 +231,8 @@ public final class BlastAutoRoamingTest {
                 "farming cancels stale roaming destination");
 
         mining();
+        legalMiningDetour();
+        knownRockIsNotAnIdleDestination();
         System.out.println("BlastAutoRoamingTest passed");
     }
 }
